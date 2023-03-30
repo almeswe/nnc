@@ -8,7 +8,7 @@
 #define NNC_ARENA_ZIP_RATE  ((nnc_f64)0.15)
 
 typedef struct _nnc_arena_entry {
-    nnc_u32 bytes;
+    nnc_u64 bytes;
     nnc_heap_ptr hptr;
 } nnc_arena_entry;
 
