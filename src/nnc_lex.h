@@ -10,6 +10,7 @@
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND, TOK_ASTERISK,
     TOK_ATPERSAND, TOK_CBRACE,
+    TOK_CHR,       TOK_STR,-
     TOK_CBRACKET,  TOK_CIRCUMFLEX,
     TOK_COLON,     TOK_COMMA,
     TOK_CPAREN,    TOK_DOLLAR, 

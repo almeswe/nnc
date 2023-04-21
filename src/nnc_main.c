@@ -36,6 +36,8 @@ void nnc_lex_test(char** argv) {
     while (nnc_lex_next(&lex) != TOK_EOF) {
         printf("%s", nnc_tok_str(lex.ctok.kind));
         if (lex.ctok.kind == TOK_IDENT ||
+            lex.ctok.kind == TOK_STR   ||
+            lex.ctok.kind == TOK_CHR   ||
             lex.ctok.kind == TOK_NUMBER) {
             printf(" %s", lex.ctok.lexeme);
         }
