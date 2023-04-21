@@ -5,6 +5,8 @@ static const char* nnc_tok_strs[] = {
     [TOK_ASTERISK]      = "TOK_ASTERISK",
     [TOK_ATPERSAND]     = "TOK_ATPERSAND",
     [TOK_CBRACE]        = "TOK_CBRACE",
+    [TOK_CHR]           = "TOK_CHR",
+    [TOK_STR]           = "TOK_STR",
     [TOK_CBRACKET]      = "TOK_CBRACKET",
     [TOK_CIRCUMFLEX]    = "TOK_CIRCUMFLEX",
     [TOK_COLON]         = "TOK_COLON",
@@ -72,7 +74,11 @@ static void nnc_lex_skip(nnc_lex* lex) {
     }
 }
 
-static void nnc_lex_clean(nnc_lex* lex) {
+static bool nnc_lex_match(nnc_lex* lex, char c) {
+    return lex->cc == c;
+}
+
+static void nnc_lex_tok_clean(nnc_lex* lex) {
     lex->ctok.size = 0;
     memset(lex->ctok.lexeme, 0, NNC_TOK_BUF_MAX);
 }
@@ -82,8 +88,41 @@ static void nnc_lex_tok_put_cc(nnc_lex* lex) {
     lex->ctok.lexeme[(*size)++] = lex->cc;
 }
 
+static nnc_tok_kind nnc_lex_grab_esc(nnc_lex* lex) {
+
+}
+
+static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
+    nnc_lex_tok_clean(lex);
+    if (nnc_lex_grab(lex) != EOF) {
+        nnc_lex_tok_put_cc(lex);
+    }
+    if (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc != '\'') {
+            printf("single quote expected\n"), exit(1);            
+        }
+    }
+    return TOK_CHR;
+}
+
+static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
+    nnc_lex_tok_clean(lex);
+    while (nnc_lex_grab(lex) != EOF) {
+        if (nnc_lex_match(lex, '\n') || 
+            nnc_lex_match(lex, '\"')) {
+            break;
+        }
+        lex->cctx.hint_char++;
+        nnc_lex_tok_put_cc(lex);
+    }
+    if (!nnc_lex_match(lex, '\"')) {
+        printf("double quote expected\n"), exit(1);            
+    }
+    return TOK_STR;
+}
+
 static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
-    nnc_lex_clean(lex);
+    nnc_lex_tok_clean(lex);
     nnc_lex_tok_put_cc(lex);
     nnc_bool dot_met = false;
     while (nnc_lex_grab(lex) != EOF) {
@@ -101,7 +140,7 @@ static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
 }
 
 static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
-    nnc_lex_clean(lex);
+    nnc_lex_tok_clean(lex);
     nnc_lex_tok_put_cc(lex);
     while (nnc_lex_grab(lex) != EOF) {
         if ((lex->cc < '0' || lex->cc > '9') &&
@@ -143,15 +182,15 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         case '%':   NNC_LEX_COMMIT(TOK_PERCENT);
         case '+':   NNC_LEX_COMMIT(TOK_PLUS);
         case '?':   NNC_LEX_COMMIT(TOK_QUESTION);
-        case '\'':  NNC_LEX_COMMIT(TOK_QUOTE);
-        case '\"':  NNC_LEX_COMMIT(TOK_QUOTES);
         case ';':   NNC_LEX_COMMIT(TOK_SEMICOLON);
         case '#':   NNC_LEX_COMMIT(TOK_SIGN);
         case '/':   NNC_LEX_COMMIT(TOK_SLASH);
         case '~':   NNC_LEX_COMMIT(TOK_TILDE);
-        case '_':   NNC_LEX_COMMIT(TOK_UNDERSCORE);
+        //case '_':   NNC_LEX_COMMIT(TOK_UNDERSCORE);
         case '|':   NNC_LEX_COMMIT(TOK_VLINE);
             break;
+        case '\'':  NNC_LEX_COMMIT(nnc_lex_grab_chr(lex));
+        case '\"':  NNC_LEX_COMMIT(nnc_lex_grab_str(lex));
         case '1': case '2':
         case '3': case '4':
         case '5': case '6':
@@ -159,6 +198,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         case '9': case '0': 
             NNC_LEX_COMMIT(nnc_lex_grab_number(lex));
             break;
+        case '_':
         case 'a': case 'A': case 'b': case 'B': 
         case 'c': case 'C': case 'd': case 'D':
         case 'e': case 'E': case 'f': case 'F':
