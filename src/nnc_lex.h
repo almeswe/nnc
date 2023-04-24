@@ -10,7 +10,7 @@
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND, TOK_ASTERISK,
     TOK_ATPERSAND, TOK_CBRACE,
-    TOK_CHR,       TOK_STR,-
+    TOK_CHR,       TOK_STR,
     TOK_CBRACKET,  TOK_CIRCUMFLEX,
     TOK_COLON,     TOK_COMMA,
     TOK_CPAREN,    TOK_DOLLAR, 
@@ -46,7 +46,7 @@ typedef struct _nnc_lex {
 
 nnc_tok_kind nnc_lex_next(nnc_lex* lex);
 const char* nnc_tok_str(nnc_tok_kind kind);
-void nnc_lex_init(nnc_lex* out_lex);
+void nnc_lex_init(nnc_lex* out_lex, const char* fpath);
 void nnc_lex_fini(nnc_lex* lex);
 
 #endif
