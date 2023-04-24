@@ -1,5 +1,7 @@
 #include "nnc_lex.h"
 
+// todo: add support for keywords and compound chars
+
 static const char* nnc_tok_strs[] = {
     [TOK_AMPERSAND]     = "TOK_AMPERSAND",
     [TOK_ASTERISK]      = "TOK_ASTERISK",
@@ -78,44 +80,80 @@ static bool nnc_lex_match(nnc_lex* lex, char c) {
     return lex->cc == c;
 }
 
+static bool nnc_lex_not_match(nnc_lex* lex, char c) {
+    return lex->cc != c;
+}
+
 static void nnc_lex_tok_clean(nnc_lex* lex) {
     lex->ctok.size = 0;
     memset(lex->ctok.lexeme, 0, NNC_TOK_BUF_MAX);
 }
 
-static void nnc_lex_tok_put_cc(nnc_lex* lex) {
+static void nnc_lex_tok_put_c(nnc_lex* lex, char c) {
     nnc_u64* size = &lex->ctok.size;
-    lex->ctok.lexeme[(*size)++] = lex->cc;
+    lex->ctok.lexeme[(*size)++] = c;
+} 
+
+static void nnc_lex_tok_put_cc(nnc_lex* lex) {
+    nnc_lex_tok_put_c(lex, lex->cc);
 }
 
-static nnc_tok_kind nnc_lex_grab_esc(nnc_lex* lex) {
-
+static char nnc_lex_make_esc(nnc_lex* lex) {
+    switch (lex->cc) {
+        case 'a':   return '\a';
+        case 'b':   return '\b';
+        case 'f':   return '\f';
+        case 't':   return '\t';
+        case 'v':   return '\v';
+        case 'r':   return '\r';
+        case 'n':   return '\n';
+        case '\\':  return '\\';
+        case '\'':  return '\'';
+        case '\"':  return '\"';
+    }
+    // todo: error here
 }
 
 static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
     nnc_lex_tok_clean(lex);
-    if (nnc_lex_grab(lex) != EOF) {
-        nnc_lex_tok_put_cc(lex);
-    }
-    if (nnc_lex_grab(lex) != EOF) {
-        if (lex->cc != '\'') {
-            printf("single quote expected\n"), exit(1);            
+    char initial = nnc_lex_grab(lex); 
+    if (initial != EOF) {
+        if (nnc_lex_not_match(lex, '\\')) {
+            nnc_lex_tok_put_c(lex, initial);
         }
+        else {
+            nnc_lex_grab(lex);
+            char esc = nnc_lex_make_esc(lex);
+            nnc_lex_tok_put_c(lex, esc);
+        }
+        nnc_lex_grab(lex);
+    }
+    if (nnc_lex_not_match(lex, '\'')) {
+        printf("single quote expected, %d %d\n", 
+            lex->cctx.hint_line, lex->cctx.hint_char), exit(1);            
     }
     return TOK_CHR;
 }
 
 static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
     nnc_lex_tok_clean(lex);
+    // todo: move lex->cctx.hint_char++ to nnc_lex_grab 
     while (nnc_lex_grab(lex) != EOF) {
         if (nnc_lex_match(lex, '\n') || 
             nnc_lex_match(lex, '\"')) {
             break;
         }
         lex->cctx.hint_char++;
-        nnc_lex_tok_put_cc(lex);
+        if (nnc_lex_not_match(lex, '\\')) {
+            nnc_lex_tok_put_cc(lex);
+        }
+        else {
+            nnc_lex_grab(lex);
+            char esc = nnc_lex_make_esc(lex);
+            nnc_lex_tok_put_c(lex, esc);
+        }
     }
-    if (!nnc_lex_match(lex, '\"')) {
+    if (nnc_lex_not_match(lex, '\"')) {
         printf("double quote expected\n"), exit(1);            
     }
     return TOK_STR;
@@ -186,7 +224,6 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         case '#':   NNC_LEX_COMMIT(TOK_SIGN);
         case '/':   NNC_LEX_COMMIT(TOK_SLASH);
         case '~':   NNC_LEX_COMMIT(TOK_TILDE);
-        //case '_':   NNC_LEX_COMMIT(TOK_UNDERSCORE);
         case '|':   NNC_LEX_COMMIT(TOK_VLINE);
             break;
         case '\'':  NNC_LEX_COMMIT(nnc_lex_grab_chr(lex));
@@ -222,8 +259,9 @@ const char* nnc_tok_str(nnc_tok_kind kind) {
     return nnc_tok_strs[kind];
 }
 
-void nnc_lex_init(nnc_lex* out_lex) {
+void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     out_lex->cc = '\0';
+    out_lex->fpath = fpath;
     out_lex->fp = fopen(out_lex->fpath, "r");
     if (out_lex->fp == NULL) {
         //todo: remove this code

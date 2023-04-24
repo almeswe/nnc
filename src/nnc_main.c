@@ -29,23 +29,6 @@ void nnc_buf_test() {
     printf("bytes: %ld\n", glob_arena.alloc_bytes);
 }
 
-void nnc_lex_test(char** argv) {
-    nnc_lex lex = { 0 };
-    lex.fpath = argv[1];
-    nnc_lex_init(&lex);
-    while (nnc_lex_next(&lex) != TOK_EOF) {
-        printf("%s", nnc_tok_str(lex.ctok.kind));
-        if (lex.ctok.kind == TOK_IDENT ||
-            lex.ctok.kind == TOK_STR   ||
-            lex.ctok.kind == TOK_CHR   ||
-            lex.ctok.kind == TOK_NUMBER) {
-            printf(" %s", lex.ctok.lexeme);
-        }
-        printf("\n");
-    }
-    nnc_lex_fini(&lex);
-}
-
 int main(int argc, char** argv) {
     INSIDE_ARENA(nnc_lex_test(argv));
     return EXIT_SUCCESS;
