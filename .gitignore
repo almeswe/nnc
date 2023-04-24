@@ -41,3 +41,5 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+.vscode
+tests/googletest
