@@ -45,152 +45,65 @@ TEST(nnc_lex_test, nnc_lex_next_1) {
 
 TEST(nnc_lex_test, nnc_lex_next_2) {
     nnc_lex_init(&lex, NNC_LEX_ALL_SPC_TOKS_FILE);
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1ull);
-    EXPECT_EQ(lex.ctok.lexeme[0], 'a');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1ull);
-    EXPECT_EQ(lex.ctok.lexeme[0], 'b');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1ull);
-    EXPECT_EQ(lex.ctok.lexeme[0], 'c');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 0);
-    EXPECT_STREQ(lex.ctok.lexeme, "");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_STREQ(lex.ctok.lexeme, "1");
-    
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 3);
-    EXPECT_STREQ(lex.ctok.lexeme, "123");
-    
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 15);
-    EXPECT_STREQ(lex.ctok.lexeme, "test string abc");
-    
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_STREQ(lex.ctok.lexeme, "_");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 3);
-    EXPECT_STREQ(lex.ctok.lexeme, "___");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 17);
-    EXPECT_STREQ(lex.ctok.lexeme, "_______identifier");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 6);
-    EXPECT_STREQ(lex.ctok.lexeme, "__id__");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 4);
-    EXPECT_STREQ(lex.ctok.lexeme, "test");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 4);
-    EXPECT_STREQ(lex.ctok.lexeme, "t123");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
-    EXPECT_EQ(lex.ctok.size, 8);
-    EXPECT_STREQ(lex.ctok.lexeme, "_909test");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_STREQ(lex.ctok.lexeme, "1");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 2);
-    EXPECT_STREQ(lex.ctok.lexeme, "23");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 3);
-    EXPECT_STREQ(lex.ctok.lexeme, "456");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 4);
-    EXPECT_STREQ(lex.ctok.lexeme, "7890");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 3);
-    EXPECT_STREQ(lex.ctok.lexeme, "1.0");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 5);
-    EXPECT_STREQ(lex.ctok.lexeme, "23.23");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 7);
-    EXPECT_STREQ(lex.ctok.lexeme, "456.456");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
-    EXPECT_EQ(lex.ctok.size, 9);
-    EXPECT_STREQ(lex.ctok.lexeme, "7890.7890");
-
+    auto chr_toks = std::vector<char> {
+        'a', 'b', 'c'
+    };
+    auto str_toks = std::vector<const char*> {
+        "", "1", "123", "test string abc"
+    };
+    auto num_toks = std::vector<const char*> {
+        "1", "23", "456", "7890", "1.0",
+        "23.23", "456.456", "7890.7890"
+    };
+    auto ident_toks = std::vector<const char*> {
+        "_", "___", "_______identifier", "__id__",
+        "test", "t123", "_909test"
+    };
+    for (size_t i = 0; i < chr_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
+        EXPECT_EQ(lex.ctok.size, 1);
+        EXPECT_EQ(lex.ctok.lexeme[0], chr_toks[i]);
+    }
+    for (size_t i = 0; i < str_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
+        EXPECT_EQ(lex.ctok.size, strlen(str_toks[i]));
+        EXPECT_STREQ(lex.ctok.lexeme, str_toks[i]);
+    }
+    for (size_t i = 0; i < ident_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_IDENT);
+        EXPECT_EQ(lex.ctok.size, strlen(ident_toks[i]));
+        EXPECT_STREQ(lex.ctok.lexeme, ident_toks[i]);
+    }
+    for (size_t i = 0; i < num_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_NUMBER);
+        EXPECT_EQ(lex.ctok.size, strlen(num_toks[i]));
+        EXPECT_STREQ(lex.ctok.lexeme, num_toks[i]);
+    }
     EXPECT_EQ(nnc_lex_next(&lex), TOK_EOF);
     nnc_lex_fini(&lex);
 }
 
 TEST(nnc_lex_test, nnc_lex_next_3) {
     nnc_lex_init(&lex, NNC_LEX_ALL_ESC_TOKS_FILE);
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\a');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\b');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\f');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\t');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\v');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\r');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\n');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\\');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\'');
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
-    EXPECT_EQ(lex.ctok.size, 1);
-    EXPECT_EQ(lex.ctok.lexeme[0], '\"');
-    
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 10);
-    EXPECT_STREQ(lex.ctok.lexeme, "\a\b\f\t\v\r\n\\\'\"");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 22);
-    EXPECT_STREQ(lex.ctok.lexeme, "\'s\'\n\rtext continuation");
-
-    EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
-    EXPECT_EQ(lex.ctok.size, 16);
-    EXPECT_STREQ(lex.ctok.lexeme, "GET / HTTP/1.1\r\n");
-
+    auto chr_toks = std::vector<char> {
+        '\a', '\b', '\f', '\t', '\v',
+        '\r', '\n', '\\', '\'', '\"'
+    };
+    auto str_toks = std::vector<const char*> {
+        "\a\b\f\t\v\r\n\\\'\"",
+        "\'s\'\n\rtext continuation",
+        "GET / HTTP/1.1\r\n"
+    };
+    for (size_t i = 0; i < chr_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_CHR);
+        EXPECT_EQ(lex.ctok.size, 1);
+        EXPECT_EQ(lex.ctok.lexeme[0], chr_toks[i]);
+    }
+    for (size_t i = 0; i < str_toks.size(); i++) {
+        EXPECT_EQ(nnc_lex_next(&lex), TOK_STR);
+        EXPECT_EQ(lex.ctok.size, strlen(lex.ctok.lexeme));
+        EXPECT_STREQ(lex.ctok.lexeme, str_toks[i]);
+    }
     EXPECT_EQ(nnc_lex_next(&lex), TOK_EOF);
     nnc_lex_fini(&lex);
 }
