@@ -20,6 +20,12 @@ typedef struct _nnc_buf {
 #define nncbuf__need(buf) ((buf) ? (nncbuf__cap(buf) <= nncbuf__len(buf)) : 1)
 #define nncbuf__fits(buf) ((nncbuf__need(buf)) ? ((buf) = nncbuf__grow(buf)) : 0)
 
+
+/*
+    Macro just to make buf type definition more readable
+*/
+#define _vec_(valtype)   valtype*
+
 #define buf_len(buf) 		((buf) ? nncbuf__len(buf) : 0)
 #define buf_cap(buf) 		((buf) ? nncbuf__cap(buf) : 0)
 #define buf_add(buf, item) 	(nncbuf__fits(buf), (buf)[nncbuf__len(buf)++] = (item))
