@@ -1,18 +1,22 @@
-#ifndef _NNC_MAP3_H
-#define _NNC_MAP3_H
+#ifndef _NNC_MAP_H
+#define _NNC_MAP_H
 
 #include "nnc_arena.h"
-#include <stdio.h>
 
 #define NNC_MAP_INICAP          128
 #define NNC_MAP_MAX_LOAD        0.7
-#define NNC_MAP_REHASH_SCALAR   2
+#define NNC_MAP_REHASH_SCALAR   1.5
 
-#define map_def(keytype, valtype)   nnc_map*
+/*
+    Macro just to make map type definition more readable
+*/
+#define _map_(keytype, valtype)   nnc_map*
+
 #define map_init()              nncmap_init()
 #define map_fini(map)           nncmap_fini(map)
 #define map_has(map, key)       nncmap_has(map, (nnc_map_key)(key))
 #define map_get(map, key)       nncmap_get(map, (nnc_map_key)(key))
+#define map_pop(map, key)       nncmap_pop(map, (nnc_map_key)(key))
 #define map_put(map, key, val)  nncmap_put(map, (nnc_map_key)(key), (nnc_map_val)(val))
 
 typedef void* nnc_map_val;
@@ -34,7 +38,8 @@ typedef struct _nnc_map {
 } nnc_map;
 
 nnc_map* nncmap_init();
-void* nncmap_get(nnc_map* map, nnc_map_key key);
+nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key);
+void nncmap_pop(nnc_map* map, nnc_map_key key);
 void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val);
 nnc_bool nncmap_has(nnc_map* map, nnc_map_key key);
 void nncmap_fini(nnc_map* map);
