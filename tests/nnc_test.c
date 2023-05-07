@@ -6,23 +6,31 @@ void nnc_test_stats() {
         tests, tests_passed, tests - tests_passed, (int)(tests_passed / (double)tests * 100));
 }
 
-void nnc_run_test(nnc_test_fn* fn) {
+void nnc_run_tests(const nnc_test* first, const nnc_test* last) {
+    for (const nnc_test* test = first; test < last; test++) {
+        printf(BOLDMAGENTA "(%3d) %s:%s\n" RED, ++tests, 
+            test->test_suit_name, test->test_case_name);
+        nnc_run_test(test);
+    }
+    nnc_test_stats();
+}
+
+void nnc_run_test(const nnc_test* test) {
     pid_t pid = fork();
     if (pid == 0) {
-        exit(fn());    
+        test->test(), exit(EXIT_SUCCESS);
     }
-    tests++;
     int status = 0;
     waitpid(pid, &status, 0);
     if (WEXITSTATUS(status) == EXIT_FAILURE || WIFSIGNALED(status)) {
         if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
-            NNC_TEST_PRINTF(BOLDRED "RECEIVED SIGNAL: [%d]\n", sig);
+            printf(BOLDRED "RECEIVED SIGNAL: [%d]\n" RED, sig);
         }
-        NNC_TEST_PRINTF(BOLDRED "%s\n", "FAILED");
+        printf(BOLDRED "%s\n" RED, "FAILED");
     }
     else {
         tests_passed++;
-        NNC_TEST_PRINTF(BOLDGREEN "%s\n", "PASSED");
+        printf(BOLDGREEN "%s\n" RED, "PASSED");
     }
 }
