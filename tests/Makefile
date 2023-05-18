@@ -17,21 +17,23 @@ LIBS		= -lpthread -lgtest_main -lgtest
 
 GTESTS_EXECUTABLE 	= run_gtests
 
-MAP_TESTS_SRC = nnc_map_tests.c 	\
+MAP_TESTS_SRC = nnc_tests_main.c 	\
 				nnc_test.c 			\
-				../src/nnc_map.c 	\
 				../src/nnc_buf.c 	\
+				../src/nnc_map.c 	\
+				../src/nnc_lex.c	\
 				../src/nnc_arena.c
 
-MAP_TESTS_OBJ = nnc_map_tests.o 	\
+MAP_TESTS_OBJ = nnc_tests_main.o 	\
 				nnc_test.o 			\
+				nnc_buf.o 	        \
 				nnc_map.o 			\
-				nnc_buf.o 			\
+				nnc_lex.o			\
 				nnc_arena.o
 
-MAP_TESTS_EXECUTABLE = run_map_tests
+MAP_TESTS_EXECUTABLE = run_tests
 
-all: gtests map_tests
+all: map_tests
 	@echo "All tests compiled."
 
 .PHONY: gtests
@@ -49,6 +51,9 @@ map_tests: map_tests_o
 .PHONY: map_tests_o
 map_tests_o: $(MAP_TESTS_SRC)
 	$(CC) $(CXXFLAGS) -c $(MAP_TESTS_SRC)
+
+buf_tests: buf_tests_o
+	$(CC) $(CXXFLAGS) -c $(BUF_TESTS_SRC)
 
 .PHONY: clean
 clean:

@@ -3,7 +3,10 @@
 
 #include "nnc_buf.h"
 #include "nnc_map.h"
+
 #include "nnc_lex.h"
+
 #include "nnc_arena.h"
+#include "nnc_format.h"
 
 #endif

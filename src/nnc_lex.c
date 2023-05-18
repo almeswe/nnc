@@ -1,9 +1,12 @@
 #include "nnc_lex.h"
 
-// todo: add support for keywords and compound chars
+// todo: add support for keywords
+// todo: add support for error-recovery
 
 static const char* nnc_tok_strs[] = {
     [TOK_AMPERSAND]     = "TOK_AMPERSAND",
+    [TOK_AND]           = "TOK_AND",
+    [TOK_ASSIGN]        = "TOK_ASSIGN",
     [TOK_ASTERISK]      = "TOK_ASTERISK",
     [TOK_ATPERSAND]     = "TOK_ATPERSAND",
     [TOK_CBRACE]        = "TOK_CBRACE",
@@ -17,22 +20,28 @@ static const char* nnc_tok_strs[] = {
     [TOK_DOLLAR]        = "TOK_DOLLAR",
     [TOK_DOT]           = "TOK_DOT",
     [TOK_EOF]           = "TOK_EOF",
-    [TOK_EQUALS]        = "TOK_EQUALS",
+    [TOK_EQ]            = "TOK_EQ",
     [TOK_EXCMARK]       = "TOK_EXCMARK",
     [TOK_GRAVE]         = "TOK_GRAVE",
     [TOK_GT]            = "TOK_GT",
+    [TOK_GTE]           = "TOK_GTE",
     [TOK_IDENT]         = "TOK_IDENT",
     [TOK_LT]            = "TOK_LT",
+    [TOK_LTE]           = "TOK_LTE",
+    [TOK_LSHIFT]        = "TOK_LSHIFT",
     [TOK_MINUS]         = "TOK_MINUS",
+    [TOK_NEQ]           = "TOK_NEQ",
     [TOK_NUMBER]        = "TOK_NUMBER",
     [TOK_OBRACE]        = "TOK_OBRACE",
     [TOK_OBRACKET]      = "TOK_OBRACKET",
     [TOK_OPAREN]        = "TOK_OPAREN",
+    [TOK_OR]            = "TOK_OR",
     [TOK_PERCENT]       = "TOK_PERCENT",
     [TOK_PLUS]          = "TOK_PLUS",
     [TOK_QUESTION]      = "TOK_QUESTION",
     [TOK_QUOTE]         = "TOK_QUOTE",
     [TOK_QUOTES]        = "TOK_QUOTES",
+    [TOK_RSHIFT]        = "TOK_RSHIFT",
     [TOK_SEMICOLON]     = "TOK_SEMICOLON",
     [TOK_SIGN]          = "TOK_SIGN",
     [TOK_SLASH]         = "TOK_SLASH",
@@ -67,8 +76,8 @@ static void nnc_lex_skip(nnc_lex* lex) {
             case '\r':
                 break;
             case '\n':
-                lex->cctx.hint_line++;
-                lex->cctx.hint_char = 0;
+                lex->cctx.hint_ln++;
+                lex->cctx.hint_ch = 0;
                 break;
             default:
                 return;
@@ -130,7 +139,7 @@ static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
     }
     if (nnc_lex_not_match(lex, '\'')) {
         printf("single quote expected, %d %d\n", 
-            lex->cctx.hint_line, lex->cctx.hint_char), exit(1);            
+            lex->cctx.hint_ln, lex->cctx.hint_ch), exit(1);            
     }
     return TOK_CHR;
 }
@@ -143,7 +152,7 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
             nnc_lex_match(lex, '\"')) {
             break;
         }
-        lex->cctx.hint_char++;
+        lex->cctx.hint_ch++;
         if (nnc_lex_not_match(lex, '\\')) {
             nnc_lex_tok_put_cc(lex);
         }
@@ -170,7 +179,7 @@ static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
             }
             dot_met = true;
         }
-        lex->cctx.hint_char++;
+        lex->cctx.hint_ch++;
         nnc_lex_tok_put_cc(lex);
     }
     nnc_lex_undo(lex);
@@ -186,18 +195,28 @@ static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
             (lex->cc < 'A' || lex->cc > 'Z') && lex->cc != '_') {
             break;
         }
-        lex->cctx.hint_char++;
+        lex->cctx.hint_ch++;
         nnc_lex_tok_put_cc(lex);
     }
     nnc_lex_undo(lex);
     return TOK_IDENT;
 }
 
+static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
+    if (lex->cc == EOF) {
+        return false;
+    }
+    char adjusted = nnc_lex_grab(lex);
+    if (adjusted != c) {
+        nnc_lex_undo(lex);
+    } 
+    return adjusted == c;
+}
+
 nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
     nnc_lex_skip(lex);
     switch (lex->cc) {
         case EOF:   NNC_LEX_COMMIT(TOK_EOF);
-        case '&':   NNC_LEX_COMMIT(TOK_AMPERSAND);
         case '*':   NNC_LEX_COMMIT(TOK_ASTERISK);
         case '@':   NNC_LEX_COMMIT(TOK_ATPERSAND);
         case '}':   NNC_LEX_COMMIT(TOK_CBRACE);
@@ -208,11 +227,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         case ')':   NNC_LEX_COMMIT(TOK_CPAREN);
         case '$':   NNC_LEX_COMMIT(TOK_DOLLAR);
         case '.':   NNC_LEX_COMMIT(TOK_DOT);
-        case '=':   NNC_LEX_COMMIT(TOK_EQUALS);
-        case '!':   NNC_LEX_COMMIT(TOK_EXCMARK);
         case '`':   NNC_LEX_COMMIT(TOK_GRAVE);
-        case '>':   NNC_LEX_COMMIT(TOK_GT);
-        case '<':   NNC_LEX_COMMIT(TOK_LT);
         case '-':   NNC_LEX_COMMIT(TOK_MINUS);
         case '{':   NNC_LEX_COMMIT(TOK_OBRACE);
         case '[':   NNC_LEX_COMMIT(TOK_OBRACKET);
@@ -224,7 +239,17 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         case '#':   NNC_LEX_COMMIT(TOK_SIGN);
         case '/':   NNC_LEX_COMMIT(TOK_SLASH);
         case '~':   NNC_LEX_COMMIT(TOK_TILDE);
-        case '|':   NNC_LEX_COMMIT(TOK_VLINE);
+        
+        case '<':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_LTE)     : 
+                    NNC_LEX_ADJUST('<') ? NNC_LEX_SET_TERN(TOK_LSHIFT)  : NNC_LEX_SET_TERNB(TOK_LT);
+
+        case '>':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_GTE)     :
+                    NNC_LEX_ADJUST('>') ? NNC_LEX_SET_TERN(TOK_RSHIFT)  : NNC_LEX_SET_TERNB(TOK_GT);
+
+        case '=':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_EQ)  : NNC_LEX_SET_TERNB(TOK_ASSIGN);
+        case '!':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_NEQ) : NNC_LEX_SET_TERNB(TOK_EXCMARK);
+        case '&':   NNC_LEX_ADJUST('&') ? NNC_LEX_SET_TERN(TOK_AND) : NNC_LEX_SET_TERNB(TOK_AMPERSAND);
+        case '|':   NNC_LEX_ADJUST('|') ? NNC_LEX_SET_TERN(TOK_OR)  : NNC_LEX_SET_TERNB(TOK_VLINE);
             break;
         case '\'':  NNC_LEX_COMMIT(nnc_lex_grab_chr(lex));
         case '\"':  NNC_LEX_COMMIT(nnc_lex_grab_str(lex));

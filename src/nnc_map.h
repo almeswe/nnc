@@ -19,6 +19,11 @@
 #define map_pop(map, key)       nncmap_pop(map, (nnc_map_key)(key))
 #define map_put(map, key, val)  nncmap_put(map, (nnc_map_key)(key), (nnc_map_val)(val))
 
+#define map_has_s(map, key)       map_has(map, nncmap_hash_str(key))
+#define map_get_s(map, key)       map_get(map, nncmap_hash_str(key))
+#define map_pop_s(map, key)       map_pop(map, nncmap_hash_str(key))
+#define map_put_s(map, key, val)  map_put(map, nncmap_hash_str(key), (nnc_map_val)(val))
+
 typedef void* nnc_map_val;
 typedef nnc_u64 nnc_map_idx;
 typedef nnc_u64 nnc_map_key;
@@ -36,6 +41,9 @@ typedef struct _nnc_map {
     nnc_u64 len;
     nnc_map_bucket* buckets;
 } nnc_map;
+
+nnc_map_hash nncmap_hash(nnc_map_key key);
+nnc_map_hash nncmap_hash_str(const char* key);
 
 nnc_map* nncmap_init();
 nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key);
