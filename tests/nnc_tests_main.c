@@ -4,6 +4,7 @@ TEST_SECTION_BEGIN;
 
 nnc_arena glob_arena;
 
+#include "nnc_lex_tests.c"
 #include "nnc_map_tests.c"
 #include "nnc_buf_tests.c"
 

@@ -5,7 +5,7 @@
  * @param key 64bit number key to be hashed.
  * @return Hash of the key.
  */
-static nnc_map_hash nncmap_hash(nnc_map_key key) {
+nnc_map_hash nncmap_hash(nnc_map_key key) {
     key = (key ^ (key >> 31) ^ (key >> 62)) * 0x319642b2d24d8ec3UL;
     key = (key ^ (key >> 27) ^ (key >> 54)) * 0x96de1b173f119089UL;
     key = (key ^ (key >> 30) ^ (key >> 60));
@@ -18,10 +18,10 @@ static nnc_map_hash nncmap_hash(nnc_map_key key) {
  * @param key String key to be hashed.
  * @return Hash of the key.
  */
-static nnc_map_hash nncmap_hash_str(const char* key) {
+nnc_map_hash nncmap_hash_str(const char* key) {
     nnc_i32 c = 0;
     nnc_u64 hash = 5481;
-    while ((c = *key++)) {
+    while ((c = *(key++))) {
         hash = ((hash << 5) + hash) + c;
     }
     return (nnc_map_hash)hash;
@@ -127,18 +127,13 @@ nnc_map* nncmap_init() {
  */
 nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key) {
     nnc_map_idx idx = nncmap_hash(key) % map->cap;
-    // it ensures that nncmap_has is already called from outside
-    // before nncmap_get call performed
-    // this is needed to avoid returning any value from this function
-    // in case when key is not listed, due to fact that we don't know
-    // what default value is. (may be NULL is valid return value too?)
-    assert(nncmap_has(map, key));
     nnc_map_bucket* bucket = &map->buckets[idx];
     for (; bucket != NULL; bucket = bucket->next) {
         if (bucket->key == key) {
             break;
         }
     }
+    assert(bucket->has_key);
     return bucket->val;
 }
 
