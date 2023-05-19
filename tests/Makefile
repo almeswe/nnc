@@ -17,18 +17,25 @@ LIBS		= -lpthread -lgtest_main -lgtest
 
 GTESTS_EXECUTABLE 	= run_gtests
 
-MAP_TESTS_SRC = nnc_tests_main.c 	\
-				nnc_test.c 			\
-				../src/nnc_buf.c 	\
-				../src/nnc_map.c 	\
-				../src/nnc_lex.c	\
+MAP_TESTS_SRC = nnc_tests_main.c 		\
+				nnc_test.c 				\
+				../src/nnc_buf.c 		\
+				../src/nnc_map.c 		\
+				../src/nnc_ctx.c		\
+				../src/nnc_format.c  	\
+				../src/nnc_error.c		\
+				../src/nnc_try_catch.c	\
 				../src/nnc_arena.c
 
 MAP_TESTS_OBJ = nnc_tests_main.o 	\
 				nnc_test.o 			\
 				nnc_buf.o 	        \
 				nnc_map.o 			\
-				nnc_lex.o			\
+				nnc_lex.o 			\
+				nnc_ctx.o			\
+				nnc_format.o 		\
+				nnc_error.o			\
+				nnc_try_catch.o		\
 				nnc_arena.o
 
 MAP_TESTS_EXECUTABLE = run_tests
