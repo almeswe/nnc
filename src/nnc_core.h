@@ -9,4 +9,6 @@
 #include "nnc_arena.h"
 #include "nnc_format.h"
 
+#include "nnc_try_catch.h"
+
 #endif
