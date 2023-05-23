@@ -19,8 +19,10 @@ void nnc_ctx_fini(nnc_ctx* ctx) {
 }
 
 char* nnc_ctx_tostr(const nnc_ctx* ctx) {
-    if (ctx->fabs) {
-        const char* fname = basename(ctx->fabs);
+    if (ctx->fabs && strlen(ctx->fabs) < MAX_PATH) {
+        char path[MAX_PATH] = { 0 };
+        strcpy(path, ctx->fabs);
+        const char* fname = basename(path);
         return sformat("%s:%lu:%lu", fname, 
             ctx->hint_ln, ctx->hint_ch); 
     }
