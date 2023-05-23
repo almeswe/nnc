@@ -34,3 +34,7 @@ void nnc_abort(const char* what, const nnc_ctx* ctx) {
     fprintf(stderr, "%s", what);
     exit(EXIT_FAILURE);
 }
+
+void nnc_abort_no_ctx(const char* what) {
+    nnc_abort(what, NULL);
+}

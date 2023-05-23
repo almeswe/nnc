@@ -7,11 +7,6 @@
 #define NNC_ARENA_CAP       4
 #define NNC_ARENA_ZIP_RATE  ((nnc_f64)0.15)
 
-#define INSIDE_ARENA(expr)          \
-    nnc_arena_init(&glob_arena);    \
-    expr;                           \
-    nnc_arena_fini(&glob_arena)
-
 typedef struct _nnc_arena_entry {
     nnc_u64 bytes;
     nnc_heap_ptr hptr;
@@ -28,6 +23,7 @@ typedef struct _nnc_arena {
 } nnc_arena;
 
 extern nnc_arena glob_arena;
+extern void nnc_abort_no_ctx(const char* what);
 
 void nnc_arena_init(nnc_arena* out_arena);
 void nnc_arena_fini(nnc_arena* arena);

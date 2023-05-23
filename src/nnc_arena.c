@@ -9,7 +9,9 @@
 static nnc_arena_entry* nnc_arena_entry_init(nnc_u64 size, nnc_heap_ptr ptr) {
     nnc_arena_entry* entry = (nnc_arena_entry*)
         calloc(1, sizeof(nnc_arena_entry));
-    // todo: add memory allocation error check.
+    if (entry == NULL) {
+        nnc_abort_no_ctx("nnc_arena_entry_init: calloc failed.\n");
+    }
     entry->hptr = ptr;
     entry->bytes = size;
     return entry;
@@ -74,8 +76,10 @@ static void nnc_arena_grow(nnc_arena* arena) {
     nnc_u64 size = arena->metrics.cap 
         * sizeof(nnc_arena_entry*);
     arena->entries = (nnc_arena_entry**)
-        realloc(arena->entries, size); 
-    // todo: add memory allocation error check.
+        realloc(arena->entries, size);
+    if (arena->entries == NULL) {
+        nnc_abort_no_ctx("nnc_arena_grow: realloc failed.\n");
+    }
 }
 
 /**
@@ -118,7 +122,9 @@ static void nnc_arena_flush(nnc_arena* arena, nnc_u64 index) {
  */
 nnc_heap_ptr nnc_alloc(nnc_u64 size) {
     nnc_heap_ptr mem = malloc(size);
-    // todo: add memory allocation error check.
+    if (mem == NULL) {
+        nnc_abort_no_ctx("nnc_alloc: malloc failed.\n");
+    }
     // flush allocated memory.
     memset(mem, 0, size);
     // create new nnc_arena_entry, and push it the the arena.
@@ -169,9 +175,11 @@ void nnc_arena_init(nnc_arena* out_arena) {
             .disposed = 0
         }
     };
-    // todo: add memory allocation error check.
     out_arena->entries = (nnc_arena_entry**)
         calloc(out_arena->metrics.cap, sizeof(nnc_arena_entry));
+    if (out_arena->entries == NULL) {
+        nnc_abort_no_ctx("nnc_arena_init: calloc failed.\n");
+    }
 }
 
 /**

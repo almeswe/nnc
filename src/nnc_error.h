@@ -27,7 +27,6 @@ typedef struct _nnc_error {
 void nnc_report_warning(const char* what, const nnc_ctx* ctx);
 void nnc_report_error(const char* what, const nnc_ctx* ctx);
 void nnc_abort(const char* what, const nnc_ctx* ctx);
-
-//void nnc_show_ctx(const nnc_ctx* ctx);
+void nnc_abort_no_ctx(const char* what);
 
 #endif
