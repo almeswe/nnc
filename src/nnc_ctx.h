@@ -4,6 +4,10 @@
 #include <libgen.h>
 #include "nnc_format.h"
 
+#ifndef MAX_PATH
+    #define MAX_PATH 260
+#endif
+
 typedef struct _nnc_ctx {
     nnc_u32 hint_ln;
     nnc_u32 hint_ch;
