@@ -25,6 +25,7 @@ typedef enum _nnc_exception_kind {
 
     NNC_LEX_BAD_FILE,
     NNC_LEX_BAD_ESC,
+    NNC_LEX_BAD_CHR,
     NNC_LEX_BAD_STR
 } nnc_exception_kind;
 

@@ -3,6 +3,7 @@
 
 #include "nnc_ctx.h"
 #include "nnc_arena.h"
+#include "nnc_try_catch.h"
 
 #define NNC_TOK_BUF_MAX 512
 #define NNC_LEX_ADJUST(c)       nnc_lex_adjust(lex, c)
@@ -26,7 +27,22 @@ typedef enum _nnc_tok_kind {
     TOK_QUOTE,      TOK_QUOTES,     TOK_RSHIFT,
     TOK_SEMICOLON,  TOK_SIGN,       TOK_SLASH,
     TOK_STR,        TOK_STRING,     TOK_TILDE,
-    TOK_UNDERSCORE, TOK_VLINE
+    TOK_UNDERSCORE, TOK_VLINE,
+    // keywords
+    TOK_BREAK,      TOK_CASE,       TOK_CAST, 
+    TOK_CONTINUE,   TOK_DEFAULT,    TOK_ENUM,
+    TOK_ELIF,       TOK_ENT,        TOK_EXT,
+    TOK_FOR,        TOK_FN,         TOK_FROM, 
+    TOK_F32,        TOK_F64,        TOK_GOTO,
+    TOK_IF,         TOK_I8,         TOK_I16,
+    TOK_I32,        TOK_I64,        TOK_IMPORT, 
+    TOK_NAMEPSPACE, TOK_PUB,        TOK_RETURN,
+    TOK_STRUCT,     TOK_SWITCH,     TOK_SIZEOF,
+    TOK_TYPEDEF,    TOK_UNION,      TOK_U8, 
+    TOK_U16,        TOK_U32,        TOK_U64,
+    TOK_LET,        TOK_LABEL,      TOK_LENGTHOF, 
+    TOK_VAR,        TOK_VOID,       TOK_WHILE, 
+    TOK_DO,         TOK_ELSE
 } nnc_tok_kind;
 
 typedef struct _nnc_tok {
