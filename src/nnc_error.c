@@ -19,20 +19,30 @@ static void nnc_show_ctx(const nnc_ctx* ctx) {
     nnc_show_ctx_fp(ctx, fp);
 }
 
-void nnc_report_warning(const char* what, const nnc_ctx* ctx) {
-
+void nnc_warning(const char* what, const nnc_ctx* ctx) {
+    fprintf(stderr, "%s", "\033[1m\033[33m" "[warning] " "\033[0m");
+    if (ctx != NULL) {
+        fprintf(stderr, "\033[1m\033[36m" "%s " "\033[0m", nnc_ctx_tostr(ctx));
+    }
+    fprintf(stderr, "%s", what);
 }
 
-void nnc_report_error(const char* what, const nnc_ctx* ctx) {
-
+void nnc_error(const char* what, const nnc_ctx* ctx) {
+    fprintf(stderr, "%s", "\033[1m\033[31m" "[error] " "\033[0m");
+    if (ctx != NULL) {
+        fprintf(stderr, "\033[1m\033[36m" "%s " "\033[0m", nnc_ctx_tostr(ctx));
+    }
+    fprintf(stderr, "%s", what);
 }
 
 void nnc_abort(const char* what, const nnc_ctx* ctx) {
-    if (ctx != NULL) {
-        fprintf(stderr, "%s ", nnc_ctx_tostr(ctx));
-    }
-    fprintf(stderr, "%s", what);
+    fprintf(stderr, "%s", "\033[1m\033[31m" "[abort requested] " "\033[0m");
+    nnc_error(what, ctx);
     exit(EXIT_FAILURE);
+}
+
+void nnc_error_no_ctx(const char* what) {
+    nnc_error(what, NULL);
 }
 
 void nnc_abort_no_ctx(const char* what) {
