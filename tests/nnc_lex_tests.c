@@ -2,9 +2,10 @@
 
 static nnc_lex lex;
 
-#define NNC_LEX_ALL_DEF_TOKS_FILE "nnc_lex_test_1"
-#define NNC_LEX_ALL_SPC_TOKS_FILE "nnc_lex_test_2"
-#define NNC_LEX_ALL_ESC_TOKS_FILE "nnc_lex_test_3"
+#define NNC_LEX_ALL_DEF_TOKS_FILE   "nnc_lex_test_1"
+#define NNC_LEX_ALL_SPC_TOKS_FILE   "nnc_lex_test_2"
+#define NNC_LEX_ALL_ESC_TOKS_FILE   "nnc_lex_test_3"
+#define NNC_LEX_KEYWORDS_TEST_FILE  "nnc_lex_keywords_test"
 
 TEST(test_1, nnclex) {
     nnc_arena_init(&glob_arena);
@@ -47,8 +48,9 @@ TEST(test_1, nnclex) {
     assert(nnc_lex_next(&lex) == TOK_RSHIFT);
     assert(nnc_lex_next(&lex) == TOK_EOF);
     nnc_lex_fini(&lex);
-    assert(glob_arena.alloc_bytes == 0);
+    nnc_lex_keywords_map_fini();
     nnc_arena_fini(&glob_arena);
+    assert(glob_arena.alloc_bytes == 0);
 }
 
 TEST(test_2, nnclex) {
@@ -115,4 +117,61 @@ TEST(test_3, nnclex) {
     }
     assert(nnc_lex_next(&lex) == TOK_EOF);
     nnc_lex_fini(&lex);
+}
+
+TEST(test_4, nnclex) {
+    TRY {
+        nnc_lex_init(&lex, "asldasjkdjasdkasjd");
+        assert(false);
+    }
+    CATCH (NNC_LEX_BAD_FILE) {
+        assert(true);
+    }
+}
+
+TEST(keywords_test, nnclex) {
+    nnc_arena_init(&glob_arena);
+    nnc_lex_init(&lex, NNC_LEX_KEYWORDS_TEST_FILE);
+    assert(nnc_lex_next(&lex) == TOK_BREAK);
+    assert(nnc_lex_next(&lex) == TOK_CASE);
+    assert(nnc_lex_next(&lex) == TOK_CAST);
+    assert(nnc_lex_next(&lex) == TOK_CONTINUE);
+    assert(nnc_lex_next(&lex) == TOK_DEFAULT);
+    assert(nnc_lex_next(&lex) == TOK_ENUM);
+    assert(nnc_lex_next(&lex) == TOK_ELIF);
+    assert(nnc_lex_next(&lex) == TOK_ENT);
+    assert(nnc_lex_next(&lex) == TOK_EXT);
+    assert(nnc_lex_next(&lex) == TOK_FOR);
+    assert(nnc_lex_next(&lex) == TOK_FN);
+    assert(nnc_lex_next(&lex) == TOK_FROM);
+    assert(nnc_lex_next(&lex) == TOK_F32);
+    assert(nnc_lex_next(&lex) == TOK_F64);
+    assert(nnc_lex_next(&lex) == TOK_GOTO);
+    assert(nnc_lex_next(&lex) == TOK_IF);
+    assert(nnc_lex_next(&lex) == TOK_I8);
+    assert(nnc_lex_next(&lex) == TOK_I16);
+    assert(nnc_lex_next(&lex) == TOK_I32);
+    assert(nnc_lex_next(&lex) == TOK_I64);
+    assert(nnc_lex_next(&lex) == TOK_IMPORT);
+    assert(nnc_lex_next(&lex) == TOK_NAMESPACE);
+    assert(nnc_lex_next(&lex) == TOK_PUB);
+    assert(nnc_lex_next(&lex) == TOK_RETURN);
+    assert(nnc_lex_next(&lex) == TOK_STRUCT);
+    assert(nnc_lex_next(&lex) == TOK_SWITCH);
+    assert(nnc_lex_next(&lex) == TOK_SIZEOF);
+    assert(nnc_lex_next(&lex) == TOK_TYPEDEF);
+    assert(nnc_lex_next(&lex) == TOK_UNION);
+    assert(nnc_lex_next(&lex) == TOK_U8);
+    assert(nnc_lex_next(&lex) == TOK_U16);
+    assert(nnc_lex_next(&lex) == TOK_U32);
+    assert(nnc_lex_next(&lex) == TOK_U64);
+    assert(nnc_lex_next(&lex) == TOK_LET);
+    assert(nnc_lex_next(&lex) == TOK_LABEL);
+    assert(nnc_lex_next(&lex) == TOK_LENGTHOF);
+    assert(nnc_lex_next(&lex) == TOK_VAR);
+    assert(nnc_lex_next(&lex) == TOK_VOID);
+    assert(nnc_lex_next(&lex) == TOK_WHILE);
+    assert(nnc_lex_next(&lex) == TOK_DO);
+    assert(nnc_lex_next(&lex) == TOK_ELSE);
+    nnc_arena_fini(&glob_arena);
 }
