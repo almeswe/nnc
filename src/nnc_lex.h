@@ -2,7 +2,8 @@
 #define _NNC_LEX_H
 
 #include "nnc_ctx.h"
-#include "nnc_arena.h"
+
+#include "nnc_map.h"
 #include "nnc_try_catch.h"
 
 #define NNC_TOK_BUF_MAX 512
@@ -36,7 +37,7 @@ typedef enum _nnc_tok_kind {
     TOK_F32,        TOK_F64,        TOK_GOTO,
     TOK_IF,         TOK_I8,         TOK_I16,
     TOK_I32,        TOK_I64,        TOK_IMPORT, 
-    TOK_NAMEPSPACE, TOK_PUB,        TOK_RETURN,
+    TOK_NAMESPACE, TOK_PUB,        TOK_RETURN,
     TOK_STRUCT,     TOK_SWITCH,     TOK_SIZEOF,
     TOK_TYPEDEF,    TOK_UNION,      TOK_U8, 
     TOK_U16,        TOK_U32,        TOK_U64,
@@ -52,9 +53,8 @@ typedef struct _nnc_tok {
 } nnc_tok;
 
 typedef struct _nnc_lex {
-    char cc;
-    char pc;
     FILE* fp;
+    char cc, pc;
     nnc_ctx cctx;
     nnc_tok ctok;
     const char* fpath;
@@ -64,5 +64,6 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex);
 const char* nnc_tok_str(nnc_tok_kind kind);
 void nnc_lex_init(nnc_lex* out_lex, const char* fpath);
 void nnc_lex_fini(nnc_lex* lex);
+void nnc_lex_keywords_map_fini();
 
 #endif

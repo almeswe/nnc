@@ -1,8 +1,8 @@
 #include "nnc_lex.h"
 
-// todo: add support for keywords
-// todo: add support for error-recovery
-
+/**
+ * @brief Stores string representation of each nnc_tok_kind.
+ */
 static const char* nnc_tok_strs[] = {
     [TOK_AMPERSAND]     = "TOK_AMPERSAND",
     [TOK_AND]           = "TOK_AND",
@@ -49,7 +49,7 @@ static const char* nnc_tok_strs[] = {
     [TOK_TILDE]         = "TOK_TILDE",
     [TOK_UNDERSCORE]    = "TOK_UNDERSCORE",
     [TOK_VLINE]         = "TOK_VLINE",
-
+    // keywords
     [TOK_BREAK]         = "TOK_BREAK",
     [TOK_CASE]          = "TOK_CASE",
     [TOK_CAST]          = "TOK_CAST",
@@ -71,7 +71,7 @@ static const char* nnc_tok_strs[] = {
     [TOK_I32]           = "TOK_I32",
     [TOK_I64]           = "TOK_I64",
     [TOK_IMPORT]        = "TOK_IMPORT",
-    [TOK_NAMEPSPACE]    = "TOK_NAMEPSPACE",
+    [TOK_NAMESPACE]    = "TOK_NAMESPACE",
     [TOK_PUB]           = "TOK_PUB",
     [TOK_RETURN]        = "TOK_RETURN",
     [TOK_STRUCT]        = "TOK_STRUCT",
@@ -93,6 +93,9 @@ static const char* nnc_tok_strs[] = {
     [TOK_ELSE]          = "TOK_ELSE"
 };
 
+/**
+ * @brief Stores keywords supported by nnc.
+ */
 static const char* nnc_keywords[] = {
     "break", "case", "cast", "continue",
     "default", "enum", "elif", "ent", "ext",
@@ -103,6 +106,12 @@ static const char* nnc_keywords[] = {
     "u8", "u16", "u32", "u64", "let", "label",
     "lengthof", "var", "void", "while", "do", "else"
 };
+
+/**
+ * @brief Map containing string representation of each keyword
+ *  with corresponding nnc_tok_kind. This is needed for fast identifier check.  
+*/
+static _map_(char*, nnc_tok_kind) nnc_keywods_map = NULL;
 
 static void nnc_lex_undo(nnc_lex* lex) {
     ungetc(lex->cc, lex->fp);
@@ -120,12 +129,9 @@ static char nnc_lex_grab(nnc_lex* lex) {
 static void nnc_lex_skip(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         switch (lex->cc) {
-            case ' ':
-            case '\a':
-            case '\b':
-            case '\f':
-            case '\t':
-            case '\v':
+            case ' ':  case '\a':
+            case '\b': case '\f':
+            case '\t': case '\v':
             case '\r':
                 break;
             case '\n':
@@ -182,6 +188,8 @@ static char nnc_lex_make_esc(nnc_lex* lex) {
         case '\"':  return '\"';
     }
     THROW(NNC_LEX_BAD_ESC, "expected valid escape sequence character.\n");
+    // unreachable code part, just to avoid compiler warning
+    return '\0';
 }
 
 static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
@@ -245,6 +253,14 @@ static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
     return TOK_NUMBER;
 }
 
+static nnc_bool nnc_lex_is_keyword(nnc_lex* lex) {
+    return map_has_s(nnc_keywods_map, lex->ctok.lexeme);
+}
+
+static nnc_tok_kind nnc_lex_get_keyword_kind(nnc_lex* lex) {
+    return (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme); 
+} 
+
 static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
     nnc_lex_tok_clean(lex);
     nnc_lex_tok_put_cc(lex);
@@ -258,6 +274,9 @@ static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
         nnc_lex_tok_put_cc(lex);
     }
     nnc_lex_undo(lex);
+    if (nnc_lex_is_keyword(lex)) {
+        return nnc_lex_get_keyword_kind(lex);
+    }
     return TOK_IDENT;
 }
 
@@ -359,11 +378,28 @@ void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     }
     out_lex->fpath = fpath;
     out_lex->cctx.fabs = fpath;
+    if (nnc_keywods_map == NULL) {
+        // initialize map of keywords, for fast identifier check
+        nnc_keywods_map = map_init();
+        const nnc_u64 nnc_keywords_size = sizeof(nnc_keywords)/sizeof(*nnc_keywords);
+        for (nnc_u64 i = 0ull; i < nnc_keywords_size; i++) {
+            nnc_tok_kind kind = (nnc_tok_kind)(TOK_BREAK + i);
+            map_put_s(nnc_keywods_map, nnc_keywords[i], kind);
+        }
+        assert(nnc_keywods_map->len == nnc_keywords_size);
+    }
 }   
 
 void nnc_lex_fini(nnc_lex* lex) {
     if (lex != NULL) {
         fclose(lex->fp);
         memset(lex, 0, sizeof(nnc_lex));
+    }
+}
+
+void nnc_lex_keywords_map_fini() {
+    if (nnc_keywods_map != NULL) {
+        map_fini(nnc_keywods_map);
+        nnc_keywods_map = NULL;
     }
 }
