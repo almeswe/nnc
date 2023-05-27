@@ -3,6 +3,8 @@
 
 #include "nnc_ctx.h"
 
+#define nnc_show_catched(ctx) nnc_error(sformat("%s: %s", CATCHED.repr, CATCHED.what), ctx);
+
 typedef struct _nnc_file_cache {
     const char* path;
 } nnc_file_cache;

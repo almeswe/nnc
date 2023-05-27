@@ -1,5 +1,8 @@
 #include "nnc_lex.h"
 
+//todo: fix context issues.
+//todo: use cmake
+
 /**
  * @brief Stores string representation of each nnc_tok_kind.
  */
@@ -113,11 +116,20 @@ static const char* nnc_keywords[] = {
 */
 static _map_(char*, nnc_tok_kind) nnc_keywods_map = NULL;
 
+/**
+ * @brief Ungets last character from file, anc sets current char as previous char.
+ * @param lex Pointer to `nnc_lex` instance.
+ */
 static void nnc_lex_undo(nnc_lex* lex) {
     ungetc(lex->cc, lex->fp);
     lex->cc = lex->pc;
 }
 
+/**
+ * @brief Grabs next character from file and sets it as current character.
+ *  If EOF character met, does nothing. (returns current character)
+ * @param lex Pointer to `nnc_lex` instance.
+ */
 static char nnc_lex_grab(nnc_lex* lex) {
     if (lex->cc != EOF) {
         lex->pc = lex->cc;
@@ -126,6 +138,11 @@ static char nnc_lex_grab(nnc_lex* lex) {
     return lex->cc;
 }
 
+/**
+ * @brief Skips sequence of unused escape characters (including space), until it mets
+ *  valuable character. Simply, skips all \r,\n, ' ' until it met something that can be put in to lexeme. 
+ * @param lex Pointer to `nnc_lex` instance.
+ */
 static void nnc_lex_skip(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         switch (lex->cc) {
@@ -144,28 +161,19 @@ static void nnc_lex_skip(nnc_lex* lex) {
     }
 }
 
-static bool nnc_lex_match(nnc_lex* lex, char c) {
-    return lex->cc == c;
-}
-
-static bool nnc_lex_not_match(nnc_lex* lex, char c) {
-    return lex->cc != c;
-}
-
-static void nnc_lex_tok_clean(nnc_lex* lex) {
+/**
+ * @brief Clears `lex->tok` field.
+ * @param lex Pointer to `nnc_lex` instance.
+ */
+static void nnc_lex_tok_clear(nnc_lex* lex) {
     lex->ctok.size = 0;
     memset(lex->ctok.lexeme, 0, NNC_TOK_BUF_MAX);
 }
 
-static void nnc_lex_tok_put_c(nnc_lex* lex, char c) {
-    nnc_u64* size = &lex->ctok.size;
-    lex->ctok.lexeme[(*size)++] = c;
-} 
-
-static void nnc_lex_tok_put_cc(nnc_lex* lex) {
-    nnc_lex_tok_put_c(lex, lex->cc);
-}
-
+/**
+ * @brief Performs error-recovery, by skipping whole line of characters.
+ * @param lex Pointer to `nnc_lex` instance.
+ */
 static void nnc_lex_make_recovery(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         if (lex->cc == '\n') {
@@ -174,6 +182,13 @@ static void nnc_lex_make_recovery(nnc_lex* lex) {
     }
 }
 
+/**
+ * @brief Makes escape character from combination of backslash '\' and one more character.
+ *  So, '\' + 'n', -> '\n'
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return Escape character represented by two separate characters.
+ *  May throw NNC_LEX_BAD_ESC.
+ */
 static char nnc_lex_make_esc(nnc_lex* lex) {
     switch (lex->cc) {
         case 'a':   return '\a';
@@ -192,52 +207,67 @@ static char nnc_lex_make_esc(nnc_lex* lex) {
     return '\0';
 }
 
+/**
+ * @brief Grabs character literal. Supports escape sequence characters.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return TOK_CHR value, or throws NNC_LEX_BAD_CHR.
+ */
 static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
-    nnc_lex_tok_clean(lex);
+    nnc_lex_tok_clear(lex);
     char initial = nnc_lex_grab(lex); 
     if (initial != EOF) {
-        if (nnc_lex_not_match(lex, '\\')) {
-            nnc_lex_tok_put_c(lex, initial);
+        if (NNC_LEX_NOT_MATCH('\\')) {
+            NNC_TOK_PUT_C(initial);
         }
         else {
             nnc_lex_grab(lex);
             char esc = nnc_lex_make_esc(lex);
-            nnc_lex_tok_put_c(lex, esc);
+            NNC_TOK_PUT_C(esc);
         }
         nnc_lex_grab(lex);
     }
-    if (nnc_lex_not_match(lex, '\'')) {
+    if (NNC_LEX_NOT_MATCH('\'')) {
         THROW(NNC_LEX_BAD_CHR, "expected single quote [\'].\n");
     }
     return TOK_CHR;
 }
 
+/**
+ * @brief Grabs string literal. Supports escape sequence characters.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return TOK_STR value, or throws NNC_LEX_BAD_STR.
+ */
 static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
-    nnc_lex_tok_clean(lex);
+    nnc_lex_tok_clear(lex);
     while (nnc_lex_grab(lex) != EOF) {
-        if (nnc_lex_match(lex, '\n') || 
-            nnc_lex_match(lex, '\"')) {
+        if (NNC_LEX_MATCH('\n') || 
+            NNC_LEX_MATCH('\"')) {
             break;
         }
         lex->cctx.hint_ch++;
-        if (nnc_lex_not_match(lex, '\\')) {
-            nnc_lex_tok_put_cc(lex);
+        if (NNC_LEX_NOT_MATCH('\\')) {
+            NNC_TOK_PUT_CC();
         }
         else {
             nnc_lex_grab(lex);
             char esc = nnc_lex_make_esc(lex);
-            nnc_lex_tok_put_c(lex, esc);
+            NNC_TOK_PUT_C(esc);
         }
     }
-    if (nnc_lex_not_match(lex, '\"')) {
+    if (NNC_LEX_NOT_MATCH('\"')) {
         THROW(NNC_LEX_BAD_STR, "expected double quote [\"].\n");
     }
     return TOK_STR;
 }
 
+/**
+ * @brief Grabs number token.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return TOK_NUMBER value.
+ */
 static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
-    nnc_lex_tok_clean(lex);
-    nnc_lex_tok_put_cc(lex);
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
     nnc_bool dot_met = false;
     while (nnc_lex_grab(lex) != EOF) {
         if (lex->cc < '0' || lex->cc > '9') {
@@ -247,23 +277,20 @@ static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
             dot_met = true;
         }
         lex->cctx.hint_ch++;
-        nnc_lex_tok_put_cc(lex);
+        NNC_TOK_PUT_CC();
     }
     nnc_lex_undo(lex);
     return TOK_NUMBER;
 }
 
-static nnc_bool nnc_lex_is_keyword(nnc_lex* lex) {
-    return map_has_s(nnc_keywods_map, lex->ctok.lexeme);
-}
-
-static nnc_tok_kind nnc_lex_get_keyword_kind(nnc_lex* lex) {
-    return (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme); 
-} 
-
+/**
+ * @brief Grabs identifier token.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return TOK_IDENT value.
+ */
 static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
-    nnc_lex_tok_clean(lex);
-    nnc_lex_tok_put_cc(lex);
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
         if ((lex->cc < '0' || lex->cc > '9') &&
             (lex->cc < 'a' || lex->cc > 'z') &&
@@ -271,15 +298,22 @@ static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
             break;
         }
         lex->cctx.hint_ch++;
-        nnc_lex_tok_put_cc(lex);
+        NNC_TOK_PUT_CC();
     }
     nnc_lex_undo(lex);
-    if (nnc_lex_is_keyword(lex)) {
-        return nnc_lex_get_keyword_kind(lex);
+    if (NNC_IS_KEYWORD()) {
+        return NNC_GET_KEYWORD_KIND();
     }
     return TOK_IDENT;
 }
 
+/**
+ * @brief Performs forward adjusting with check for specified character.
+ *  Used for cases when compound character met (>>, <= etc.)
+ * @param lex Pointer to `nnc_lex` instance.
+ * @param c Next character in sequence to be checked.
+ * @return `true` if adjusted character is the same as specfied, `false` otherwise. 
+ */
 static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
     if (lex->cc == EOF) {
         return false;
@@ -291,6 +325,12 @@ static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
     return adjusted == c;
 }
 
+/**
+ * @brief Grabs next token from sequence of characters.
+ *  This function is recovers from error automatically.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return Kind of token grabbed. 
+ */
 nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
     TRY {
         nnc_lex_skip(lex);
@@ -360,16 +400,28 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         return lex->ctok.kind;
     }
     CATCHALL {
-        nnc_error(sformat("%s: %s", CATCHED.repr, CATCHED.what), &lex->cctx);
+        nnc_show_catched(&lex->cctx);
         nnc_lex_make_recovery(lex);
         return nnc_lex_next(lex);
     }
 }
 
+/**
+ * @brief Gets string representation of specified token kind.
+ * @param kind Token kind for which string representation will be retrieved.
+ * @return String representation of a token kind.
+ */
 const char* nnc_tok_str(nnc_tok_kind kind) {
     return nnc_tok_strs[kind];
 }
 
+/**
+ * @brief Initializes preallocated instance of `nnc_lex`.
+ *  Also initializes hash map of keywords, if it is not already initialized.
+ * @param out_lex Pointer to preallocated instance of `nnc_lex`.
+ * @param fpath Path to target file for lexical analysis.
+ *  Throws NNC_LEX_BAD_FILE if file cannot be opened for reading.
+ */
 void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     out_lex->cc = '\0';
     out_lex->fp = fopen(fpath, "r");
@@ -390,6 +442,10 @@ void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     }
 }   
 
+/**
+ * @brief Finalizes instance of `nnc_lex`.
+ * @param lex Pointer to instance of `nnc_lex` to be finalized.
+ */
 void nnc_lex_fini(nnc_lex* lex) {
     if (lex != NULL) {
         fclose(lex->fp);
@@ -397,6 +453,9 @@ void nnc_lex_fini(nnc_lex* lex) {
     }
 }
 
+/**
+ * @brief Finalizes hash map of keywords. 
+ */
 void nnc_lex_keywords_map_fini() {
     if (nnc_keywods_map != NULL) {
         map_fini(nnc_keywods_map);

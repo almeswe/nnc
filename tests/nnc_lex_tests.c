@@ -5,6 +5,7 @@ static nnc_lex lex;
 #define NNC_LEX_ALL_DEF_TOKS_FILE   "nnc_lex_test_1"
 #define NNC_LEX_ALL_SPC_TOKS_FILE   "nnc_lex_test_2"
 #define NNC_LEX_ALL_ESC_TOKS_FILE   "nnc_lex_test_3"
+#define NNC_LEX_TOKS_FILE           "nnc_lex_test_4"
 #define NNC_LEX_KEYWORDS_TEST_FILE  "nnc_lex_keywords_test"
 
 TEST(test_1, nnclex) {
@@ -127,6 +128,193 @@ TEST(test_4, nnclex) {
     CATCH (NNC_LEX_BAD_FILE) {
         assert(true);
     }
+}
+
+TEST(test_5, nnclex) {
+    nnc_arena_init(&glob_arena);
+    nnc_lex_init(&lex, NNC_LEX_TOKS_FILE);
+    assert(nnc_lex_next(&lex) == TOK_SIGN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_STR);
+    
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+    
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_ASTERISK);
+    assert(nnc_lex_next(&lex) == TOK_ASTERISK);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_ASSIGN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+    assert(nnc_lex_next(&lex) == TOK_NUMBER);
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_AMPERSAND);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OBRACKET);
+    assert(nnc_lex_next(&lex) == TOK_NUMBER);
+    assert(nnc_lex_next(&lex) == TOK_CBRACKET);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_FOR);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_ASSIGN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_AMPERSAND);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_STR);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_AMPERSAND);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_DOT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IF);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_EQ);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+    assert(nnc_lex_next(&lex) == TOK_BREAK);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_STR);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_DOT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_DOT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_RETURN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_ASTERISK);
+    assert(nnc_lex_next(&lex) == TOK_ASTERISK);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_OBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_AMPERSAND);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_ASSIGN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_COMMA);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_OPAREN);
+    assert(nnc_lex_next(&lex) == TOK_AMPERSAND);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_CPAREN);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_RETURN);
+    assert(nnc_lex_next(&lex) == TOK_IDENT);
+    assert(nnc_lex_next(&lex) == TOK_SEMICOLON);
+
+    assert(nnc_lex_next(&lex) == TOK_CBRACE);
+
+    assert(nnc_lex_next(&lex) == TOK_EOF);
+    nnc_arena_fini(&glob_arena);
 }
 
 TEST(keywords_test, nnclex) {

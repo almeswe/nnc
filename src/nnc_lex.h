@@ -7,11 +7,22 @@
 #include "nnc_try_catch.h"
 
 #define NNC_TOK_BUF_MAX 512
+
+#define NNC_LEX_MATCH(c)     (lex->cc == c)
+#define NNC_LEX_NOT_MATCH(c) (lex->cc != c)
+
+#define NNC_TOK_PUT_C(c) (lex->ctok.lexeme[lex->ctok.size] = c, lex->ctok.size++)
+#define NNC_TOK_PUT_CC() (NNC_TOK_PUT_C(lex->cc))
+
+#define NNC_IS_KEYWORD()            map_has_s(nnc_keywods_map, lex->ctok.lexeme)
+#define NNC_GET_KEYWORD_KIND()      (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme);
+
 #define NNC_LEX_ADJUST(c)       nnc_lex_adjust(lex, c)
 #define NNC_LEX_SET(k)          lex->ctok.kind = k
 #define NNC_LEX_SET_TERN(k)     (NNC_LEX_SET(k), 0)
 #define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
 #define NNC_LEX_COMMIT(k)       NNC_LEX_SET(k); break
+
 
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND,  TOK_AND,        TOK_ASSIGN,
@@ -47,17 +58,17 @@ typedef enum _nnc_tok_kind {
 } nnc_tok_kind;
 
 typedef struct _nnc_tok {
-    nnc_u64 size;
-    nnc_tok_kind kind;
-    char lexeme[NNC_TOK_BUF_MAX];
+    nnc_u64 size;                   // size of lexeme
+    nnc_tok_kind kind;              // token's kind
+    char lexeme[NNC_TOK_BUF_MAX];   // lexeme buffer
 } nnc_tok;
 
 typedef struct _nnc_lex {
-    FILE* fp;
-    char cc, pc;
-    nnc_ctx cctx;
-    nnc_tok ctok;
-    const char* fpath;
+    FILE* fp;               // pointer to FILE retrieved from `fpath`
+    char cc, pc;            // current & previous characters
+    nnc_ctx cctx;           // current context
+    nnc_tok ctok;           // current token
+    const char* fpath;      // path to file
 } nnc_lex;
 
 nnc_tok_kind nnc_lex_next(nnc_lex* lex);
