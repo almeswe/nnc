@@ -5,6 +5,8 @@
 #include <string.h>
 #include "nnc_types.h"
 
+#define new(type) (type*)nnc_alloc(sizeof(type))
+
 typedef void* nnc_heap_ptr;
 
 nnc_heap_ptr nnc_alloc(nnc_u64 size);

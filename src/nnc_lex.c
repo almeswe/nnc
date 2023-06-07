@@ -166,8 +166,10 @@ static void nnc_lex_skip(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  */
 static void nnc_lex_tok_clear(nnc_lex* lex) {
+    if (lex->ctok.size > 0) {
+        memset(lex->ctok.lexeme, 0, lex->ctok.size);
+    }
     lex->ctok.size = 0;
-    memset(lex->ctok.lexeme, 0, NNC_TOK_BUF_MAX);
 }
 
 /**
@@ -189,7 +191,7 @@ static void nnc_lex_make_recovery(nnc_lex* lex) {
  * @return Escape character represented by two separate characters.
  *  May throw NNC_LEX_BAD_ESC.
  */
-static char nnc_lex_make_esc(nnc_lex* lex) {
+static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
     switch (lex->cc) {
         case 'a':   return '\a';
         case 'b':   return '\b';
@@ -221,7 +223,7 @@ static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
         }
         else {
             nnc_lex_grab(lex);
-            char esc = nnc_lex_make_esc(lex);
+            char esc = nnc_lex_grab_esc_seq(lex);
             NNC_TOK_PUT_C(esc);
         }
         nnc_lex_grab(lex);
@@ -250,7 +252,7 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
         }
         else {
             nnc_lex_grab(lex);
-            char esc = nnc_lex_make_esc(lex);
+            char esc = nnc_lex_grab_esc_seq(lex);
             NNC_TOK_PUT_C(esc);
         }
     }
@@ -261,26 +263,146 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
 }
 
 /**
- * @brief Grabs number token.
- * @param lex Pointer to `nnc_lex` instance.
+ * @brief Grabs exponent part of decimal or floating point number.
+ * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value.
  */
-static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
-    nnc_lex_tok_clear(lex);
+static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
+    //todo: finish exponent parsing
+    THROW(NNC_UNINPLEMENTED, "nnc_lex_grab_exponent\n");
+    return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number in floating point view.
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @return TOK_NUMBER value. 
+ */
+static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
-    nnc_bool dot_met = false;
     while (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc == 'e' || lex->cc == 'E') {
+            return nnc_lex_grab_exponent(lex);
+        }
         if (lex->cc < '0' || lex->cc > '9') {
-            if (lex->cc != '.' || dot_met) {
-                break;
-            }
-            dot_met = true;
+            nnc_lex_undo(lex);
+            break;
         }
         lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
-    nnc_lex_undo(lex);
     return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number in hex view (base 16).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @return TOK_NUMBER value. 
+ */
+static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
+    while (nnc_lex_grab(lex) != EOF) {
+        if ((lex->cc < '0' || lex->cc > '9') &&
+            (lex->cc < 'a' || lex->cc > 'f') &&
+            (lex->cc < 'A' || lex->cc > 'F')) {
+            nnc_lex_undo(lex);
+            break;
+        }
+        lex->cctx.hint_ch++;
+        NNC_TOK_PUT_CC();
+    }
+    return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number in decimal view (base 10).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @return TOK_NUMBER value. 
+ */
+static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
+    while (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc == '.') {
+            return nnc_lex_grab_float(lex);
+        }
+        if (lex->cc == 'e' || lex->cc == 'E') {
+            return nnc_lex_grab_exponent(lex);
+        }
+        if (lex->cc < '0' || lex->cc > '9') {
+            nnc_lex_undo(lex);
+            break;
+        }
+        lex->cctx.hint_ch++;
+        NNC_TOK_PUT_CC();
+    }
+    return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number in octal view (base 8).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @return TOK_NUMBER value. 
+ */
+static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
+    while (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc < '0' || lex->cc > '7') {
+            nnc_lex_undo(lex);
+            break;
+        }
+        lex->cctx.hint_ch++;
+        NNC_TOK_PUT_CC();
+    }
+    return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number in binary view (base 2).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @return TOK_NUMBER value. 
+ */
+static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
+    nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
+    while (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc < '0' || lex->cc > '1') {
+            nnc_lex_undo(lex);
+            break;
+        }
+        lex->cctx.hint_ch++;
+        NNC_TOK_PUT_CC();
+    }
+    return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs number token (this may be hex, dec, oct, bin and float literal).
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return TOK_NUMBER value.
+ */
+static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
+    if (lex->cc != '0') {
+        return nnc_lex_grab_dec(lex);
+    }
+    if (nnc_lex_grab(lex) == EOF) {
+        nnc_lex_undo(lex);
+        return nnc_lex_grab_dec(lex);
+    }
+    switch (lex->cc) {
+        case 'x': return nnc_lex_grab_hex(lex);
+        case 'o': return nnc_lex_grab_oct(lex);
+        case 'b': return nnc_lex_grab_bin(lex);
+        default:
+            if (lex->cc >= '0' || lex->cc <= '9') {
+                nnc_lex_undo(lex);
+                return nnc_lex_grab_dec(lex);
+            }
+            nnc_lex_undo(lex);
+    }
+    return TOK_NUMBER;    
 }
 
 /**

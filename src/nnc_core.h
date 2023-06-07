@@ -5,6 +5,8 @@
 #include "nnc_map.h"
 
 #include "nnc_lex.h"
+#include "nnc_ast.h"
+#include "nnc_parse.h"
 
 #include "nnc_arena.h"
 #include "nnc_format.h"
