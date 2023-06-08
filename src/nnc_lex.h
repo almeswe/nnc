@@ -48,7 +48,7 @@ typedef enum _nnc_tok_kind {
     TOK_F32,        TOK_F64,        TOK_GOTO,
     TOK_IF,         TOK_I8,         TOK_I16,
     TOK_I32,        TOK_I64,        TOK_IMPORT, 
-    TOK_NAMESPACE, TOK_PUB,        TOK_RETURN,
+    TOK_NAMESPACE,  TOK_PUB,        TOK_RETURN,
     TOK_STRUCT,     TOK_SWITCH,     TOK_SIZEOF,
     TOK_TYPEDEF,    TOK_UNION,      TOK_U8, 
     TOK_U16,        TOK_U32,        TOK_U64,

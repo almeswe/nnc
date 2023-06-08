@@ -1,7 +1,6 @@
 #include "nnc_lex.h"
 
 //todo: fix context issues.
-//todo: use cmake
 
 /**
  * @brief Stores string representation of each nnc_tok_kind.
@@ -263,14 +262,118 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
 }
 
 /**
- * @brief Grabs exponent part of decimal or floating point number.
+ * @brief Grabs exponent part of floating point number.
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value.
  */
 static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
-    //todo: finish exponent parsing
-    THROW(NNC_UNINPLEMENTED, "nnc_lex_grab_exponent\n");
+    NNC_TOK_PUT_CC();
+    // skip 'e' or 'E' character 
+    nnc_lex_grab(lex);
+    nnc_byte sign = lex->cc;
+    if (sign != '+' && sign != '-') {
+        THROW(NNC_LEX_BAD_EXP, "expected exponent sign (+ or -).\n");
+    }
+    NNC_TOK_PUT_C(sign);
+    while (nnc_lex_grab(lex) != EOF) {
+        if (lex->cc < '0' || lex->cc > '9') {
+            break;
+        }
+        //todo: add this line before or after each addition
+        //lex->cctx.hint_ch++;
+        NNC_TOK_PUT_CC();
+    }
     return TOK_NUMBER;
+}
+
+/**
+ * @brief Grabs suffix for integer number in format (u|U|i|I)(8|16|32|64).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @throw NNC_LEX_BAD_SUFFIX.
+ */
+static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
+    switch (lex->cc) {
+        case 'u': case 'i': 
+        case 'U': case 'I':
+            NNC_TOK_PUT_CC();
+            nnc_lex_grab(lex);
+            switch (lex->cc) {
+                case '1':
+                    NNC_TOK_PUT_CC();
+                    nnc_lex_grab(lex);
+                    if (lex->cc != '6') {
+                        goto bad_suffix;
+                    }
+                    NNC_TOK_PUT_CC();
+                    break;
+                case '3':
+                    NNC_TOK_PUT_CC();
+                    nnc_lex_grab(lex);
+                    if (lex->cc != '2') {
+                        goto bad_suffix;
+                    }
+                    NNC_TOK_PUT_CC();
+                    break;
+                case '6':
+                    NNC_TOK_PUT_CC();
+                    nnc_lex_grab(lex);
+                    if (lex->cc != '4') {
+                        goto bad_suffix;
+                    }
+                    NNC_TOK_PUT_CC();
+                    break;
+                case '8':
+                    NNC_TOK_PUT_CC();
+                    break;
+                default:
+                    bad_suffix:
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (i/I/u/U)(8|16|32|64)\n");
+                    break;
+            }
+            break;
+        default:
+            nnc_lex_undo(lex);
+            break;
+    }
+}
+
+/**
+ * @brief Grabs suffix for float number in format (f|F)(32|64).
+ * @param lex Pointer to 'nnc_lex' instance.
+ * @throw NNC_LEX_BAD_SUFFIX.
+ */
+static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
+    switch (lex->cc) {
+        case 'f': case 'F':
+            NNC_TOK_PUT_CC();
+            nnc_lex_grab(lex);
+            switch (lex->cc) {
+                case '3':
+                    NNC_TOK_PUT_CC();
+                    nnc_lex_grab(lex);
+                    if (lex->cc != '2') {
+                        goto bad_suffix;
+                    }
+                    NNC_TOK_PUT_CC();
+                    break;
+                case '6':
+                    NNC_TOK_PUT_CC();
+                    nnc_lex_grab(lex);
+                    if (lex->cc != '4') {
+                        goto bad_suffix;
+                    }
+                    NNC_TOK_PUT_CC();
+                    break;
+                default:
+                    bad_suffix:
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (f/F)(32/64)\n"); 
+                    break;
+            }
+            break;
+        default:
+            nnc_lex_undo(lex);
+            break;
+    }
 }
 
 /**
@@ -280,16 +383,23 @@ static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
  */
 static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
+    nnc_u64 size_after_dot = 0;
     while (nnc_lex_grab(lex) != EOF) {
         if (lex->cc == 'e' || lex->cc == 'E') {
-            return nnc_lex_grab_exponent(lex);
+            nnc_lex_grab_exponent(lex);
+            nnc_lex_grab_float_suffix(lex);
+            break;
         }
         if (lex->cc < '0' || lex->cc > '9') {
-            nnc_lex_undo(lex);
+            nnc_lex_grab_float_suffix(lex);
             break;
         }
         lex->cctx.hint_ch++;
+        size_after_dot++;
         NNC_TOK_PUT_CC();
+    }
+    if (size_after_dot == 0) {
+        THROW(NNC_LEX_BAD_FLOAT, "empty after dot part.\n");
     }
     return TOK_NUMBER;
 }
@@ -306,7 +416,7 @@ static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
         if ((lex->cc < '0' || lex->cc > '9') &&
             (lex->cc < 'a' || lex->cc > 'f') &&
             (lex->cc < 'A' || lex->cc > 'F')) {
-            nnc_lex_undo(lex);
+            nnc_lex_grab_int_suffix(lex);
             break;
         }
         lex->cctx.hint_ch++;
@@ -327,17 +437,14 @@ static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
         if (lex->cc == '.') {
             return nnc_lex_grab_float(lex);
         }
-        if (lex->cc == 'e' || lex->cc == 'E') {
-            return nnc_lex_grab_exponent(lex);
-        }
         if (lex->cc < '0' || lex->cc > '9') {
-            nnc_lex_undo(lex);
+            nnc_lex_grab_int_suffix(lex);
             break;
         }
         lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
-    return TOK_NUMBER;
+    return TOK_NUMBER; 
 }
 
 /**
@@ -350,7 +457,7 @@ static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
         if (lex->cc < '0' || lex->cc > '7') {
-            nnc_lex_undo(lex);
+            nnc_lex_grab_int_suffix(lex);
             break;
         }
         lex->cctx.hint_ch++;
@@ -369,7 +476,7 @@ static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
         if (lex->cc < '0' || lex->cc > '1') {
-            nnc_lex_undo(lex);
+            nnc_lex_grab_int_suffix(lex);
             break;
         }
         lex->cctx.hint_ch++;
