@@ -23,10 +23,15 @@ typedef enum _nnc_exception_kind {
     NNC_UNHANDLED       = 0x01,
     NNC_UNINPLEMENTED   = 0x02,
 
+    NNC_OVERFLOW,
+
     NNC_LEX_BAD_FILE,
     NNC_LEX_BAD_ESC,
     NNC_LEX_BAD_CHR,
-    NNC_LEX_BAD_STR
+    NNC_LEX_BAD_STR,
+    NNC_LEX_BAD_EXP,
+    NNC_LEX_BAD_FLOAT,
+    NNC_LEX_BAD_SUFFIX
 } nnc_exception_kind;
 
 typedef struct _nnc_exception {

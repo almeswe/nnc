@@ -23,8 +23,9 @@ nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
 }
 
 nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
-    THROW(NNC_UNINPLEMENTED, "nnc_parse_dbl\n");
-    return NULL;
+    const nnc_tok* tok = nnc_parser_get(parser);
+    nnc_heap_ptr exact = nnc_dbl_new(tok->lexeme);
+    return nnc_expr_new(EXPR_DBL_LITERAL, exact);
 }
 
 nnc_expression* nnc_parse_int(nnc_parser* parser) {

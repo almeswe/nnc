@@ -4,8 +4,6 @@
 #include "nnc_buf.h"
 #include "nnc_literal.h"
 
-#include "nnc_try_catch.h"
-
 typedef enum _nnc_expression_kind {
     EXPR_DBL_LITERAL,
     EXPR_INT_LITERAL,
@@ -18,13 +16,13 @@ typedef struct _nnc_expression {
     nnc_heap_ptr exact;
 } nnc_expression;
 
+nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact);
+
 typedef struct _nnc_ast {
     //todo: incomplete
     nnc_expression* expr;
     const char* file;
 } nnc_ast;
-
-nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact);
 
 nnc_ast* nnc_ast_new(const char* file);
 

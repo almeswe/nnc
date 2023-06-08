@@ -1,6 +1,7 @@
 #ifndef _NNC_TYPEDEFS_H
 #define _NNC_TYPEDEFS_H
 
+#include <float.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdbool.h>
