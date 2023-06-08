@@ -43,3 +43,10 @@ Mkfile.old
 dkms.conf
 .vscode
 tests/googletest
+
+src/CMakeCache.txt
+src/cmake_install.cmake
+src/Makefile
+src/CMakeFiles
+src/nnc
+src/tests
