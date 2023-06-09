@@ -64,6 +64,7 @@ nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
         THROW(NNC_OVERFLOW, sformat("this value out of bounds "
             "of it's type \'%f\'.\n", literal->exact));
     }
+    return literal;
 }
 
 /**
@@ -125,7 +126,7 @@ nnc_int_suffix nnc_get_int_suffix(const char* repr) {
     // and suffix must be shifted by one character to
     // remove any offset.
     if (suffix[0] == '\0') {
-        suffix_ptr++; 
+        suffix_ptr++;
     }
     nnc_bool is_unsigned = (suffix_ptr[0] == 'u' || suffix_ptr[0] == 'U');
     // then determine exact suffix.
@@ -140,7 +141,7 @@ nnc_int_suffix nnc_get_int_suffix(const char* repr) {
     }
     if (suffix_ptr[1] == '3' && 
         suffix_ptr[2] == '2') {
-        return is_unsigned ? 
+        return is_unsigned ?
             SUFFIX_U32 : SUFFIX_I32;
     }
     if (suffix_ptr[1] == '6' && 
@@ -152,6 +153,7 @@ nnc_int_suffix nnc_get_int_suffix(const char* repr) {
     // accepted this, it means that bug was detected, report this.
     nnc_abort_no_ctx(sformat("nnc_get_int_suffix: "
         "bug detected. suffix: %s\n", suffix));
+    return SUFFIX_NONE;
 }
 
 /**
@@ -243,7 +245,7 @@ nnc_int_literal* nnc_int_new(const char* repr) {
     }
     if (errno == ENOENT) {
         THROW(NNC_OVERFLOW, sformat("this value out of bounds "
-            "of it's type \'%ld\'.\n", repr_buf));
+            "of it's type \'%s\'.\n", repr_buf));
     }
     if (errno != 0) {
         nnc_abort_no_ctx(sformat("nnc_int_new [errno: %d]: cannot"
