@@ -10,7 +10,7 @@ typedef uint64_t    nnc_u64;
 typedef uint32_t    nnc_u32;
 typedef uint16_t    nnc_u16;
 typedef uint8_t     nnc_u8;
-typedef uint8_t     nnc_byte;
+typedef char        nnc_byte;
 
 typedef int64_t     nnc_i64;
 typedef int32_t     nnc_i32;
