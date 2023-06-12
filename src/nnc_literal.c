@@ -53,7 +53,6 @@ nnc_dbl_suffix nnc_get_dbl_suffix(const char* repr) {
  * @throw NNC_OVERFLOW in case of overflow.
  */
 nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
-    //todo: weird thing with f32 overflow (it does not occurs)
     static const nnc_bounds bounds[] = {
         [SUFFIX_F32]  = { .min.f = FLT_MIN, .max.f = FLT_MAX  },
         [SUFFIX_F64]  = { .min.f = DBL_MIN, .max.f = DBL_MAX  },
@@ -89,7 +88,7 @@ nnc_dbl_literal* nnc_dbl_new(const char* repr) {
     // copy cropped representation to buffer.
     memcpy(repr_buf, repr, repr_size);
     ptr->exact = atof(repr_buf);
-    return ptr;
+    return nnc_dbl_check_overflow(ptr);
 }
 
 /**
@@ -212,7 +211,7 @@ nnc_int_literal* nnc_int_new(const char* repr) {
     // representation has 'b', 'x' or 'o' at the beginning
     // it must be skipped for correct parsing.
     if (ptr->base != 10) {
-        repr = repr + 1;
+        repr += 1;
     }
     nnc_u64 repr_size = strlen(repr);
     // then suffix must be removed from the end
@@ -243,7 +242,7 @@ nnc_int_literal* nnc_int_new(const char* repr) {
     else {
         ptr->exact.u = strtoull(repr_buf, NULL, ptr->base);
     }
-    if (errno == ENOENT) {
+    if (errno == ERANGE) {
         THROW(NNC_OVERFLOW, sformat("this value out of bounds "
             "of it's type \'%s\'.\n", repr_buf));
     }
@@ -254,12 +253,71 @@ nnc_int_literal* nnc_int_new(const char* repr) {
     return nnc_int_check_overflow(ptr);
 }
 
+/**
+ * @brief Allocates & initializes new instance of `nnc_chr_literal`.
+ * @param repr String representation of char literal which will be parsed.
+ * @return Allocated & initialized instance of `nnc_chr_literal`.
+ * @throw NNC_LEX_BAD_CHR in case of `strlen(repr) != 1`.
+ */
 nnc_chr_literal* nnc_chr_new(const char* repr) {
-    THROW(NNC_UNINPLEMENTED, "nnc_chr_new\n");
-    return NULL;
+    nnc_chr_literal* ptr = new(nnc_chr_literal);
+    if (strlen(repr) != 1) {
+        THROW(NNC_LEX_BAD_CHR, "nnc_chr_new: bug detected. strlen(repr) != 1\n");
+    }
+    ptr->exact = (nnc_byte)repr[0];
+    return ptr;
 }
 
+/**
+ * @brief Allocates & initializes new instance of `nnc_str_literal`.
+ * @param repr String representation of string literal which will be parsed.
+ * @return Allocated & initialized instance of `nnc_str_literal`.
+ */
 nnc_str_literal* nnc_str_new(const char* repr) {
-    THROW(NNC_UNINPLEMENTED, "nnc_str_new\n");
-    return NULL;
+    nnc_str_literal* ptr = new(nnc_str_literal);
+    ptr->length = strlen(repr);
+    ptr->exact = cnew(nnc_byte, ptr->length + 1);
+    strcpy(ptr->exact, repr);
+    return ptr;
+}
+
+/**
+ * @brief Disposes float literal instance.
+ * @param literal Float literal instance to be disposed.
+ */
+void nnc_dbl_free(nnc_dbl_literal* literal) {
+    if (literal != NULL) {
+        nnc_dispose(literal);
+    }
+}
+
+/**
+ * @brief Disposes integral literal instance.
+ * @param literal Integral literal instance to be disposed.
+ */
+void nnc_int_free(nnc_int_literal* literal) {
+    if (literal != NULL) {
+        nnc_dispose(literal);
+    }
+}
+
+/**
+ * @brief Disposes character literal instance.
+ * @param literal Character literal instance to be disposed.
+ */
+void nnc_chr_free(nnc_chr_literal* literal) {
+    if (literal != NULL) {
+        nnc_dispose(literal);
+    }
+}
+
+/**
+ * @brief Disposes string literal instance.
+ * @param literal String literal instance to be disposed.
+ */
+void nnc_str_free(nnc_str_literal* literal) {
+    if (literal != NULL) {
+        nnc_dispose(literal->exact);
+        nnc_dispose(literal);
+    }
 }

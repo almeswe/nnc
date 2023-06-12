@@ -6,8 +6,9 @@
 
 #include "nnc_types.h"
 
-#define new(type) (type*)nnc_alloc(sizeof(type))
-#define rem(ptr)  nnc_dispose(ptr)
+#define new(type)           (type*)nnc_alloc(sizeof(type))
+#define cnew(type, size)    (type*)nnc_alloc(sizeof(type) * (size))
+#define rem(ptr)            nnc_dispose(ptr)
 
 typedef void* nnc_heap_ptr;
 

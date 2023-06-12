@@ -36,13 +36,12 @@ typedef struct _nnc_int_literal {
 } nnc_int_literal;
 
 typedef struct _nnc_chr_literal {
-    nnc_byte code;
-    nnc_bool has_escape_seq;
+    nnc_byte exact;
 } nnc_chr_literal;
 
 typedef struct _nnc_str_literal {
-    char* exact;
-    nnc_u64 size;
+    nnc_u64 length;
+    nnc_byte* exact;
 } nnc_str_literal;
 
 typedef struct _nnc_bounds {
@@ -62,5 +61,10 @@ nnc_dbl_literal* nnc_dbl_new(const char* repr);
 nnc_int_literal* nnc_int_new(const char* repr);
 nnc_chr_literal* nnc_chr_new(const char* repr);
 nnc_str_literal* nnc_str_new(const char* repr);
+
+void nnc_dbl_free(nnc_dbl_literal* literal);
+void nnc_int_free(nnc_int_literal* literal);
+void nnc_chr_free(nnc_chr_literal* literal);
+void nnc_str_free(nnc_str_literal* literal);
 
 #endif
