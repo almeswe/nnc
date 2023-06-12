@@ -10,6 +10,7 @@ add_executable(
     nnc_main.c
     nnc_parse.c
     nnc_ast.c
+    nnc_ast_dump.c
     nnc_lex.c
     nnc_map.c
     nnc_error.c

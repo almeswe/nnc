@@ -192,6 +192,7 @@ static void nnc_lex_make_recovery(nnc_lex* lex) {
  */
 static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
     switch (lex->cc) {
+        case '0':   return '\0';
         case 'a':   return '\a';
         case 'b':   return '\b';
         case 'f':   return '\f';
