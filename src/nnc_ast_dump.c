@@ -124,6 +124,31 @@ static void nnc_dump_dbl(nnc_dump_data data) {
     fprintf(stderr, "<suffix %d>\n", literal->suffix);
 }
 
+static void nnc_dump_unary(nnc_dump_data data) {
+    nnc_dump_indent(data.indent);
+    const nnc_unary_expression* unary = data.exact;
+    static const char* unary_str[] = {
+        [UNARY_PLUS]        = "+ (plus)",
+        [UNARY_MINUS]       = "- (minus)",
+        [UNARY_BITWISE_NOT] = "~ (bit not)",
+        [UNARY_DEREF]       = "* (deref)",
+        [UNARY_REF]         = "& (ref)",
+        [UNARY_NOT]         = "! (not)",
+        [UNARY_SIZEOF]      = "sizeof",
+        [UNARY_LENGTHOF]    = "lengthof",
+        [UNARY_POSTFIX_AS]  = "as"
+    };
+    fprintf(stderr, TREE_BR _c(BGRN, " unary-expr") " <%s>\n", unary_str[unary->kind]);
+    switch (unary->kind) {
+        case UNARY_POSTFIX_AS:
+        case UNARY_SIZEOF:
+        case UNARY_LENGTHOF:
+            break;
+        default:
+            nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
+    }
+}
+
 static void nnc_dump_binary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_binary_expression* binary = data.exact;
@@ -131,11 +156,34 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_ADD] = "+ (add)",
         [BINARY_SUB] = "- (sub)",
         [BINARY_MUL] = "* (mul)",
-        [BINARY_DIV] = "/ (div)"
+        [BINARY_DIV] = "/ (div)",
+        [BINARY_MOD] = "%% (mod)",
+        [BINARY_SHR] = ">> (shr)",
+        [BINARY_SHL] = "<< (shl)",
+        [BINARY_LT]  = " < (lt)", 
+        [BINARY_GT]  = " > (gt)",
+        [BINARY_LTE] = "<= (lte)",
+        [BINARY_GTE] = ">= (gte)",
+        [BINARY_EQ]  = "== (eq)",
+        [BINARY_NEQ] = "== (neq)",
+        [BINARY_BW_AND] = "& (bit and)",
+        [BINARY_BW_XOR] = "^ (bit xor)",
+        [BINARY_BW_OR]  = "| (bit or)",
+        [BINARY_AND]    = "&& (and)",
+        [BINARY_OR]     = "|| (or)"
     };
     fprintf(stderr, TREE_BR _c(BGRN, " binary-expr") " <%s>\n", binary_str[binary->kind]);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->lexpr));
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->rexpr));
+}
+
+static void nnc_dump_ternary(nnc_dump_data data) {
+    nnc_dump_indent(data.indent);
+    const nnc_ternary_expression* ternary = data.exact;
+    fprintf(stderr, "%s\n", TREE_BR _c(BGRN, " ternary-expr (? :)"));
+    nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->cexpr));
+    nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->lexpr));
+    nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->rexpr));
 }
 
 static void nnc_dump_expr(nnc_dump_data data) {
@@ -145,7 +193,9 @@ static void nnc_dump_expr(nnc_dump_data data) {
         [EXPR_INT_LITERAL] = nnc_dump_int,
         [EXPR_CHR_LITERAL] = nnc_dump_chr,
         [EXPR_STR_LITERAL] = nnc_dump_str,
-        [EXPR_BINARY]      = nnc_dump_binary
+        [EXPR_UNARY]       = nnc_dump_unary,
+        [EXPR_BINARY]      = nnc_dump_binary,
+        [EXPR_TERNARY]     = nnc_dump_ternary
     };
     dumpers[expr->kind](DUMP_DATA(data.indent, expr->exact));
 } 

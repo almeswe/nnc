@@ -6,6 +6,7 @@
  * @brief Stores string representation of each nnc_tok_kind.
  */
 static const char* nnc_tok_strs[] = {
+    [TOK_AS]            = "TOK_AS",
     [TOK_AMPERSAND]     = "TOK_AMPERSAND",
     [TOK_AND]           = "TOK_AND",
     [TOK_ASSIGN]        = "TOK_ASSIGN",
@@ -99,7 +100,7 @@ static const char* nnc_tok_strs[] = {
  * @brief Stores keywords supported by nnc.
  */
 static const char* nnc_keywords[] = {
-    "break", "case", "cast", "continue",
+    "as", "break", "case", "cast", "continue",
     "default", "enum", "elif", "ent", "ext",
     "for", "fn", "from", "f32", "f64", "goto",
     "if", "i8", "i16", "i32", "i64", "import",
@@ -665,7 +666,7 @@ void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
         nnc_keywods_map = map_init();
         const nnc_u64 nnc_keywords_size = sizeof(nnc_keywords)/sizeof(*nnc_keywords);
         for (nnc_u64 i = 0ull; i < nnc_keywords_size; i++) {
-            nnc_tok_kind kind = (nnc_tok_kind)(TOK_BREAK + i);
+            nnc_tok_kind kind = (nnc_tok_kind)(TOK_AS + i);
             map_put_s(nnc_keywods_map, nnc_keywords[i], kind);
         }
         assert(nnc_keywods_map->len == nnc_keywords_size);

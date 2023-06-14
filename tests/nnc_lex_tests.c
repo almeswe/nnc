@@ -338,6 +338,7 @@ TEST(test_5, nnclex) {
 TEST(keywords_test, nnclex) {
     nnc_arena_init(&glob_arena);
     nnc_lex_init(&lex, NNC_LEX_KEYWORDS_TEST_FILE);
+    assert(nnc_lex_next(&lex) == TOK_AS);
     assert(nnc_lex_next(&lex) == TOK_BREAK);
     assert(nnc_lex_next(&lex) == TOK_CASE);
     assert(nnc_lex_next(&lex) == TOK_CAST);
