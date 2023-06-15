@@ -1,5 +1,13 @@
 #include "nnc_ast.h"
 
+nnc_ident* nnc_ident_new(const nnc_byte* from) {
+    nnc_ident* ptr = new(nnc_ident);
+    ptr->size = strlen(from);
+    ptr->name = cnew(nnc_byte, ptr->size + 1);
+    strcpy(ptr->name, from);
+    return ptr;
+}
+
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind) {
     nnc_unary_expression* ptr = new(nnc_unary_expression);
     ptr->kind = kind;

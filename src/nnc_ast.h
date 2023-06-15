@@ -9,7 +9,7 @@ typedef enum _nnc_expression_kind {
     EXPR_INT_LITERAL,
     EXPR_CHR_LITERAL,
     EXPR_STR_LITERAL,
-
+    EXPR_IDENT,
     EXPR_UNARY,
     EXPR_BINARY,
     EXPR_TERNARY    
@@ -20,6 +20,11 @@ typedef struct _nnc_expression {
     nnc_expression_kind kind;
 } nnc_expression;
 
+typedef struct _nnc_ident {
+    nnc_u64 size;
+    nnc_byte* name;
+} nnc_ident;
+
 typedef enum _nnc_unary_expression_kind {
     UNARY_PLUS,
     UNARY_MINUS,
@@ -29,7 +34,8 @@ typedef enum _nnc_unary_expression_kind {
     UNARY_NOT,
     UNARY_SIZEOF,
     UNARY_LENGTHOF,
-    UNARY_POSTFIX_AS
+    UNARY_POSTFIX_AS,
+    UNARY_POSTFIX_CALL
 } nnc_unary_expression_kind;
 
 typedef struct _nnc_unary_expression {
@@ -46,6 +52,10 @@ typedef struct _nnc_unary_expression {
         struct _nnc_unary_cast {
             nnc_heap_ptr to;
         } cast;
+        struct _nnc_unary_call {
+            nnc_u64 argc;
+            _vec_(nnc_expression*) args;
+        } call;
     } exact;
 } nnc_unary_expression;
 
@@ -68,6 +78,8 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_BW_OR,
     BINARY_AND,
     BINARY_OR,
+    BINARY_DOT,
+    BINARY_IDX
 } nnc_binary_expression_kind;
 
 typedef struct _nnc_binary_expression {
@@ -91,6 +103,8 @@ typedef struct _nnc_ast {
 void nnc_dump_ast(const nnc_ast* ast);
 
 nnc_ast* nnc_ast_new(const char* file);
+
+nnc_ident* nnc_ident_new(const nnc_byte* from);
 
 nnc_unary_expression*   nnc_unary_expr_new(nnc_unary_expression_kind kind);
 nnc_binary_expression*  nnc_binary_expr_new(nnc_binary_expression_kind kind);

@@ -29,6 +29,7 @@ nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
 nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     nnc_tok_kind current = nnc_parser_peek(parser);
     if (current != kind) {
+        // todo: pass ctx to exception
         THROW(NNC_SYNTAX, sformat("expected <%s>, but met <%s>.", 
             nnc_tok_str(kind), nnc_tok_str(current)));
     }
@@ -50,14 +51,6 @@ static nnc_expression* nnc_parse_int(nnc_parser* parser) {
     return nnc_expr_new(EXPR_INT_LITERAL, exact);
 }
 
-static nnc_expression* nnc_parse_number(nnc_parser* parser) {
-    const nnc_tok* tok = nnc_parser_get(parser);
-    if (strchr(tok->lexeme, '.') != NULL) {
-        return nnc_parse_dbl(parser);
-    }
-    return nnc_parse_int(parser);
-}
-
 static nnc_expression* nnc_parse_chr(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_heap_ptr exact = nnc_chr_new(tok->lexeme);
@@ -72,6 +65,21 @@ static nnc_expression* nnc_parse_str(nnc_parser* parser) {
     return nnc_expr_new(EXPR_STR_LITERAL, exact);
 }
 
+static nnc_expression* nnc_parse_ident(nnc_parser* parser) {
+    const nnc_tok* tok = nnc_parser_get(parser);
+    nnc_heap_ptr exact = nnc_ident_new(tok->lexeme);
+    nnc_parser_next(parser);
+    return nnc_expr_new(EXPR_IDENT, exact);
+}
+
+static nnc_expression* nnc_parse_number(nnc_parser* parser) {
+    const nnc_tok* tok = nnc_parser_get(parser);
+    if (strchr(tok->lexeme, '.') != NULL) {
+        return nnc_parse_dbl(parser);
+    }
+    return nnc_parse_int(parser);
+}
+
 static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
     nnc_parser_next(parser);
     nnc_expression* expr = nnc_parse_expr(parser);
@@ -80,14 +88,16 @@ static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
 }
 
 static nnc_expression* nnc_parse_primary(nnc_parser* parser) {
-    switch (nnc_parser_peek(parser)) {
+    const nnc_tok* tok = nnc_parser_get(parser);
+    switch (tok->kind) {
         case TOK_STR:    return nnc_parse_str(parser);
         case TOK_CHR:    return nnc_parse_chr(parser);
+        case TOK_IDENT:  return nnc_parse_ident(parser);
         case TOK_NUMBER: return nnc_parse_number(parser);
         case TOK_OPAREN: return nnc_parse_parens(parser);
         default:
             THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_expr -> %s.\n", 
-                nnc_tok_str(nnc_parser_peek(parser))));
+                nnc_tok_str(tok->kind)));
     }
     return NULL;
 }
@@ -155,9 +165,10 @@ static nnc_expression* nnc_parse_lengthof(nnc_parser* parser) {
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
-static nnc_expression* nnc_parse_as(nnc_parser* parser) {
-    nnc_parser_next(parser);    
+static nnc_expression* nnc_parse_as(nnc_parser* parser, nnc_expression* prefix) {
+    nnc_parser_next(parser);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_AS);
+    expr->expr = prefix;
     //todo: insert type parsing here.
     fprintf(stderr, "type repr: %s\n", nnc_parser_get(parser)->lexeme);
     nnc_parser_next(parser);
@@ -166,16 +177,67 @@ static nnc_expression* nnc_parse_as(nnc_parser* parser) {
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
-static nnc_expression* nnc_parse_postfix(nnc_parser* parser) {
-    nnc_expression* expr = nnc_parse_primary(parser);
-    //nnc_unresolved_stack_push_stage_1(UNRESOLVED_TYPE, "usertype", CONTEXT_AS, as_expr);
-    const nnc_tok* tok = nnc_parser_get(parser);
-    switch (tok->kind) {
-        case TOK_AS:    return nnc_parse_as(parser);
-        default:
-            return expr;
+static nnc_expression* nnc_parse_dot(nnc_parser* parser, nnc_expression* prefix) {
+    nnc_parser_next(parser);
+    if (!nnc_parser_match(parser, TOK_IDENT)) {
+        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.");
     }
-    //THROW(NNC_UNINPLEMENTED, "nnc_parse_postfix");
+    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_DOT);
+    expr->lexpr = prefix;
+    expr->rexpr = nnc_parse_primary(parser);
+    return nnc_expr_new(EXPR_BINARY, expr);
+}
+
+static nnc_expression* nnc_parse_call(nnc_parser* parser, nnc_expression* prefix) {
+    nnc_parser_expect(parser, TOK_OPAREN);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_CALL);
+    expr->expr = prefix;
+    while (!nnc_parser_match(parser, TOK_CPAREN) &&
+           !nnc_parser_match(parser, TOK_EOF)) {
+        // todo: comma expression collision may occur here
+        // chnage `nnc_parse_expr` call to another one once 
+        // comma expression will be added.
+        buf_add(expr->exact.call.args, nnc_parse_expr(parser));
+        if (nnc_parser_match(parser, TOK_CPAREN) ||
+            nnc_parser_match(parser, TOK_EOF)) {
+            continue;
+        }
+        nnc_parser_expect(parser, TOK_COMMA);
+    }
+    expr->exact.call.argc = buf_len(expr->exact.call.args);
+    nnc_parser_expect(parser, TOK_CPAREN);
+    return nnc_expr_new(EXPR_UNARY, expr);
+}
+
+static nnc_expression* nnc_parse_index(nnc_parser* parser, nnc_expression* prefix) {
+    nnc_parser_expect(parser, TOK_OBRACKET);
+    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_IDX);
+    expr->lexpr = prefix;
+    expr->rexpr = nnc_parse_expr(parser);
+    nnc_parser_expect(parser, TOK_CBRACKET);
+    return nnc_expr_new(EXPR_BINARY, expr);
+}
+
+static nnc_expression* nnc_parse_postfix(nnc_parser* parser) {
+    nnc_expression* postfix = NULL;
+    nnc_expression* primary = nnc_parse_primary(parser);
+    if (nnc_parser_match(parser, TOK_AS)) {
+        return nnc_parse_as(parser, primary);
+    }
+    while (nnc_parser_match(parser, TOK_DOT)    ||
+           nnc_parser_match(parser, TOK_OPAREN) ||
+           nnc_parser_match(parser, TOK_OBRACKET)) {
+        const nnc_tok* tok = nnc_parser_get(parser);
+        nnc_expression* prefix = postfix ? postfix : primary;
+        switch (tok->kind) {
+            case TOK_DOT:       postfix = nnc_parse_dot(parser, prefix);    break;
+            case TOK_OPAREN:    postfix = nnc_parse_call(parser, prefix);   break;
+            case TOK_OBRACKET:  postfix = nnc_parse_index(parser, prefix);  break;
+            default:
+                nnc_abort_no_ctx("nnc_parse_postfix: bug detected.\n");
+        }
+    }
+    return postfix ? postfix : primary;
 }
 
 static nnc_expression* nnc_parse_unary(nnc_parser* parser) {
@@ -235,6 +297,7 @@ static nnc_expression* nnc_parse_arith_addition(nnc_parser* parser) {
         if (nnc_parser_match(parser, TOK_MINUS)) {
             kind = BINARY_SUB;
         }
+        // pub let pi = 3.141592f64;
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
         temp->lexpr = nether_expr;

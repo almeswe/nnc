@@ -88,6 +88,13 @@ static void nnc_dump_str(nnc_dump_data data) {
     fprintf(stderr, "<len %lu>\n", literal->length);
 }
 
+static void nnc_dump_ident(nnc_dump_data data) {
+    nnc_dump_indent(data.indent);
+    const nnc_ident* ident = data.exact;
+    fprintf(stderr, TREE_BR _c(BCYN, " ident") "=");
+    fprintf(stderr, "\"%s\"<%lu>\n", ident->name, ident->size);
+}
+
 static void nnc_dump_int(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_int_literal* literal = data.exact;
@@ -124,26 +131,41 @@ static void nnc_dump_dbl(nnc_dump_data data) {
     fprintf(stderr, "<suffix %d>\n", literal->suffix);
 }
 
+static void nnc_dump_call(nnc_dump_data data) {
+    nnc_dump_indent(data.indent);
+    const nnc_unary_expression* unary = data.exact;
+    nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
+    nnc_dump_indent(data.indent + 2);
+    fprintf(stderr, "%s", TREE_BR _c(BCYN, " args") "=\n");
+    for (nnc_u64 i = 0; i < unary->exact.call.argc; i++) {
+        const nnc_expression* arg = unary->exact.call.args[i];
+        nnc_dump_expr(DUMP_DATA(data.indent + 3, arg));
+    }
+}
+
 static void nnc_dump_unary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_unary_expression* unary = data.exact;
     static const char* unary_str[] = {
-        [UNARY_PLUS]        = "+ (plus)",
-        [UNARY_MINUS]       = "- (minus)",
-        [UNARY_BITWISE_NOT] = "~ (bit not)",
-        [UNARY_DEREF]       = "* (deref)",
-        [UNARY_REF]         = "& (ref)",
-        [UNARY_NOT]         = "! (not)",
-        [UNARY_SIZEOF]      = "sizeof",
-        [UNARY_LENGTHOF]    = "lengthof",
-        [UNARY_POSTFIX_AS]  = "as"
+        [UNARY_PLUS]         = "+ (plus)",
+        [UNARY_MINUS]        = "- (minus)",
+        [UNARY_BITWISE_NOT]  = "~ (bit not)",
+        [UNARY_DEREF]        = "* (deref)",
+        [UNARY_REF]          = "& (ref)",
+        [UNARY_NOT]          = "! (not)",
+        [UNARY_SIZEOF]       = "sizeof",
+        [UNARY_LENGTHOF]     = "lengthof",
+        [UNARY_POSTFIX_AS]   = "as",
+        [UNARY_POSTFIX_CALL] = "call"
     };
     fprintf(stderr, TREE_BR _c(BGRN, " unary-expr") " <%s>\n", unary_str[unary->kind]);
     switch (unary->kind) {
         case UNARY_POSTFIX_AS:
+            break;
         case UNARY_SIZEOF:
         case UNARY_LENGTHOF:
             break;
+        case UNARY_POSTFIX_CALL: nnc_dump_call(data); break;
         default:
             nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
     }
@@ -170,7 +192,11 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_BW_XOR] = "^ (bit xor)",
         [BINARY_BW_OR]  = "| (bit or)",
         [BINARY_AND]    = "&& (and)",
-        [BINARY_OR]     = "|| (or)"
+        [BINARY_OR]     = "|| (or)",
+        [BINARY_DOT]  = "accessor (.)",
+        [BINARY_IDX]  = "array accessor ([])",
+        //[UNARY_POSTFIX_CALL] = "call (())"
+
     };
     fprintf(stderr, TREE_BR _c(BGRN, " binary-expr") " <%s>\n", binary_str[binary->kind]);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->lexpr));
@@ -193,6 +219,7 @@ static void nnc_dump_expr(nnc_dump_data data) {
         [EXPR_INT_LITERAL] = nnc_dump_int,
         [EXPR_CHR_LITERAL] = nnc_dump_chr,
         [EXPR_STR_LITERAL] = nnc_dump_str,
+        [EXPR_IDENT]       = nnc_dump_ident,
         [EXPR_UNARY]       = nnc_dump_unary,
         [EXPR_BINARY]      = nnc_dump_binary,
         [EXPR_TERNARY]     = nnc_dump_ternary
