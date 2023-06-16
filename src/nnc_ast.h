@@ -26,6 +26,7 @@ typedef struct _nnc_ident {
 } nnc_ident;
 
 typedef enum _nnc_unary_expression_kind {
+    UNARY_CAST,
     UNARY_PLUS,
     UNARY_MINUS,
     UNARY_BITWISE_NOT,
@@ -79,7 +80,8 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_AND,
     BINARY_OR,
     BINARY_DOT,
-    BINARY_IDX
+    BINARY_IDX,
+    BINARY_COMMA
 } nnc_binary_expression_kind;
 
 typedef struct _nnc_binary_expression {

@@ -147,6 +147,7 @@ static void nnc_dump_unary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_unary_expression* unary = data.exact;
     static const char* unary_str[] = {
+        [UNARY_CAST]         = "cast",
         [UNARY_PLUS]         = "+ (plus)",
         [UNARY_MINUS]        = "- (minus)",
         [UNARY_BITWISE_NOT]  = "~ (bit not)",
@@ -175,28 +176,27 @@ static void nnc_dump_binary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_binary_expression* binary = data.exact;
     static const char* binary_str[] = {
-        [BINARY_ADD] = "+ (add)",
-        [BINARY_SUB] = "- (sub)",
-        [BINARY_MUL] = "* (mul)",
-        [BINARY_DIV] = "/ (div)",
-        [BINARY_MOD] = "%% (mod)",
-        [BINARY_SHR] = ">> (shr)",
-        [BINARY_SHL] = "<< (shl)",
-        [BINARY_LT]  = " < (lt)", 
-        [BINARY_GT]  = " > (gt)",
-        [BINARY_LTE] = "<= (lte)",
-        [BINARY_GTE] = ">= (gte)",
-        [BINARY_EQ]  = "== (eq)",
-        [BINARY_NEQ] = "== (neq)",
+        [BINARY_ADD]    = "+ (add)",
+        [BINARY_SUB]    = "- (sub)",
+        [BINARY_MUL]    = "* (mul)",
+        [BINARY_DIV]    = "/ (div)",
+        [BINARY_MOD]    = "%% (mod)",
+        [BINARY_SHR]    = ">> (shr)",
+        [BINARY_SHL]    = "<< (shl)",
+        [BINARY_LT]     = " < (lt)", 
+        [BINARY_GT]     = " > (gt)",
+        [BINARY_LTE]    = "<= (lte)",
+        [BINARY_GTE]    = ">= (gte)",
+        [BINARY_EQ]     = "== (eq)",
+        [BINARY_NEQ]    = "== (neq)",
         [BINARY_BW_AND] = "& (bit and)",
         [BINARY_BW_XOR] = "^ (bit xor)",
         [BINARY_BW_OR]  = "| (bit or)",
         [BINARY_AND]    = "&& (and)",
         [BINARY_OR]     = "|| (or)",
-        [BINARY_DOT]  = "accessor (.)",
-        [BINARY_IDX]  = "array accessor ([])",
-        //[UNARY_POSTFIX_CALL] = "call (())"
-
+        [BINARY_DOT]    = "accessor (.)",
+        [BINARY_IDX]    = "array accessor ([])",
+        [BINARY_COMMA]  = ", (comma)"
     };
     fprintf(stderr, TREE_BR _c(BGRN, " binary-expr") " <%s>\n", binary_str[binary->kind]);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->lexpr));
