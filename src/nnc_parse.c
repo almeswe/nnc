@@ -2,6 +2,7 @@
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     nnc_lex_init(&out_parser->lex, file);
+    out_parser->lookup.is_first = true;
 }
 
 void nnc_parser_fini(nnc_parser* parser) {
@@ -11,11 +12,19 @@ void nnc_parser_fini(nnc_parser* parser) {
 }
 
 nnc_tok* nnc_parser_get(nnc_parser* parser) {
-    return &parser->lex.ctok;
+    return &parser->current.tok;
+}
+
+nnc_tok* nnc_parser_get_lookup(nnc_parser* parser) {
+    return &parser->lookup.tok;
 }
 
 nnc_tok_kind nnc_parser_peek(nnc_parser* parser) {
-    return parser->lex.ctok.kind;
+    return nnc_parser_get(parser)->kind;
+}
+
+nnc_tok_kind nnc_parser_peek_lookup(nnc_parser* parser) {
+    return nnc_parser_get_lookup(parser)->kind;
 }
 
 nnc_bool nnc_parser_match(nnc_parser* parser, nnc_tok_kind kind) {
@@ -23,7 +32,17 @@ nnc_bool nnc_parser_match(nnc_parser* parser, nnc_tok_kind kind) {
 }
 
 nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
-    return nnc_lex_next(&parser->lex);
+    nnc_lex_next(&parser->lex);
+    if (!parser->lookup.is_first) {
+        parser->current.tok = parser->lookup.tok;
+    }
+    else {
+        parser->lookup.is_first = false;
+        parser->current.tok = parser->lex.ctok;
+        nnc_lex_next(&parser->lex);
+    }
+    parser->lookup.tok = parser->lex.ctok;
+    return parser->current.tok.kind;
 }
 
 nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
@@ -35,6 +54,20 @@ nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     }
     nnc_parser_next(parser);
     return nnc_parser_peek(parser);
+}
+
+static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
+    switch (kind) {
+        case TOK_VOID:
+        case TOK_I8:  case TOK_I16:
+        case TOK_I32: case TOK_I64:
+        case TOK_U8:  case TOK_U16:
+        case TOK_U32: case TOK_U64:
+        case TOK_F32: case TOK_F64:
+            return true;
+        default:
+            return false;
+    }
 }
 
 static nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
@@ -89,6 +122,7 @@ static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
 
 static nnc_expression* nnc_parse_primary(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
+    printf("%s\n", nnc_tok_str(tok->kind));
     switch (tok->kind) {
         case TOK_STR:    return nnc_parse_str(parser);
         case TOK_CHR:    return nnc_parse_chr(parser);
@@ -103,6 +137,19 @@ static nnc_expression* nnc_parse_primary(nnc_parser* parser) {
 }
 
 static nnc_expression* nnc_parse_unary(nnc_parser* parser);
+
+static nnc_expression* nnc_parse_cast(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_OPAREN);
+    //todo: type parsing here
+    nnc_tok_kind type = nnc_parser_peek(parser);
+    nnc_parser_next(parser);
+    //-----------------------
+    nnc_parser_expect(parser, TOK_CPAREN);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_CAST);
+    expr->expr = nnc_parse_unary(parser);
+    printf("cast to: %s\n", nnc_tok_str(type));
+    return nnc_expr_new(EXPR_UNARY, expr);    
+}
 
 static nnc_expression* nnc_parse_plus(nnc_parser* parser) {
     nnc_parser_next(parser);
@@ -194,10 +241,7 @@ static nnc_expression* nnc_parse_call(nnc_parser* parser, nnc_expression* prefix
     expr->expr = prefix;
     while (!nnc_parser_match(parser, TOK_CPAREN) &&
            !nnc_parser_match(parser, TOK_EOF)) {
-        // todo: comma expression collision may occur here
-        // chnage `nnc_parse_expr` call to another one once 
-        // comma expression will be added.
-        buf_add(expr->exact.call.args, nnc_parse_expr(parser));
+        buf_add(expr->exact.call.args, nnc_parse_expr_reduced(parser));
         if (nnc_parser_match(parser, TOK_CPAREN) ||
             nnc_parser_match(parser, TOK_EOF)) {
             continue;
@@ -241,6 +285,12 @@ static nnc_expression* nnc_parse_postfix(nnc_parser* parser) {
 }
 
 static nnc_expression* nnc_parse_unary(nnc_parser* parser) {
+    if (nnc_parser_match(parser, TOK_OPAREN)) {
+        nnc_tok_kind lookup = nnc_parser_peek_lookup(parser);
+        if (nnc_parser_match_type(lookup)) {
+            return nnc_parse_cast(parser);
+        }
+    }
     const nnc_tok* tok = nnc_parser_get(parser);
     switch (tok->kind) {
         case TOK_PLUS:      return nnc_parse_plus(parser);
@@ -513,8 +563,32 @@ static nnc_expression* nnc_parse_ternary(nnc_parser* parser) {
     return nether_expr;
 }
 
-nnc_expression* nnc_parse_expr(nnc_parser* parser) {
+static nnc_expression* nnc_parse_comma(nnc_parser* parser) {
+    nnc_expression* nether_expr = nnc_parse_ternary(parser);
+    nnc_binary_expression* temp = NULL;
+    nnc_binary_expression* expr = NULL;
+    while (nnc_parser_match(parser, TOK_COMMA)) {
+        nnc_parser_next(parser);
+        temp = nnc_binary_expr_new(BINARY_COMMA);
+        temp->lexpr = nether_expr;
+        temp->rexpr = nnc_parse_ternary(parser);
+        if (expr != NULL) {
+            temp->lexpr = nnc_expr_new(EXPR_BINARY, expr);
+        }
+        expr = temp;
+    }
+    if (expr != NULL) {
+        return nnc_expr_new(EXPR_BINARY, expr);
+    }
+    return nether_expr;
+}
+
+nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
     return nnc_parse_ternary(parser);
+}
+
+nnc_expression* nnc_parse_expr(nnc_parser* parser) {
+    return nnc_parse_comma(parser);
 }
 
 nnc_ast* nnc_parse(const char* file) {
