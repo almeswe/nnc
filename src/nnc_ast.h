@@ -2,6 +2,7 @@
 #define _NNC_AST_H
 
 #include "nnc_buf.h"
+#include "nnc_type.h"
 #include "nnc_literal.h"
 
 typedef enum _nnc_expression_kind {
@@ -43,15 +44,14 @@ typedef struct _nnc_unary_expression {
     nnc_expression* expr;
     nnc_unary_expression_kind kind;
     union {
-        // todo: 'nnc_type' type here
         struct _nnc_unary_sizeof {
-            nnc_heap_ptr of;    
+            nnc_type* of;    
         } size;
         struct _nnc_unary_lengthof {
             nnc_expression* of;
         } length;
         struct _nnc_unary_cast {
-            nnc_heap_ptr to;
+            nnc_type* to;
         } cast;
         struct _nnc_unary_call {
             nnc_u64 argc;

@@ -11,7 +11,6 @@ typedef struct _nnc_parser {
     } current;
     struct _nnc_parser_lookup {
         nnc_tok tok;
-        nnc_bool is_set;
         nnc_bool is_first;
     } lookup;
 } nnc_parser;

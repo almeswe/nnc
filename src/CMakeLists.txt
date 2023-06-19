@@ -20,4 +20,5 @@ add_executable(
     nnc_format.c
     nnc_buf.c
     nnc_literal.c
+    nnc_type.c
 )

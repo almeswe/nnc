@@ -59,6 +59,10 @@ static void nnc_dump_indent(nnc_i64 indent) {
     //fprintf(stderr, "%s", buf);
 }
 
+static void nnc_dump_type(nnc_type* type) {
+    fprintf(stderr, "%s", nnc_type_tostr(type));
+}
+
 static void nnc_dump_chr(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_chr_literal* literal = data.exact;
@@ -143,6 +147,13 @@ static void nnc_dump_call(nnc_dump_data data) {
     }
 }
 
+static void nnc_dump_as(nnc_dump_data data) {
+    nnc_dump_indent(data.indent);
+    const nnc_unary_expression* unary = data.exact;
+    fprintf(stderr, TREE_BR "as type: %s\n", nnc_type_tostr(unary->exact.cast.to));
+    nnc_dump_expr(DUMP_DATA(data.indent, unary->expr));
+}
+
 static void nnc_dump_unary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_unary_expression* unary = data.exact;
@@ -161,8 +172,7 @@ static void nnc_dump_unary(nnc_dump_data data) {
     };
     fprintf(stderr, TREE_BR _c(BGRN, " unary-expr") " <%s>\n", unary_str[unary->kind]);
     switch (unary->kind) {
-        case UNARY_POSTFIX_AS:
-            break;
+        case UNARY_POSTFIX_AS:  nnc_dump_as(DUMP_DATA(data.indent + 1, unary)); break;
         case UNARY_SIZEOF:
         case UNARY_LENGTHOF:
             break;
