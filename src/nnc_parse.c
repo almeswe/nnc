@@ -70,6 +70,44 @@ static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
     }
 }
 
+static nnc_type* nnc_parse_type(nnc_parser* parser) {
+    nnc_type* type = NULL;
+    const nnc_tok* tok = nnc_parser_get(parser);
+    switch (tok->kind) {
+        case TOK_I8:    type = &i8_type;  break;
+        case TOK_U8:    type = &u8_type;  break;
+        case TOK_I16:   type = &i16_type; break;
+        case TOK_U16:   type = &u16_type; break;
+        case TOK_I32:   type = &i32_type; break;
+        case TOK_U32:   type = &u32_type; break;
+        case TOK_F32:   type = &f32_type; break;
+        case TOK_I64:   type = &i64_type; break;
+        case TOK_U64:   type = &u64_type; break;
+        case TOK_F64:   type = &f64_type; break;
+        default: 
+            printf("%s\n", nnc_tok_str(tok->kind));
+            THROW(NNC_UNINPLEMENTED, "nnc_parse_type: default\n");
+    }
+    nnc_parser_next(parser);
+    while (nnc_parser_match(parser, TOK_ASTERISK) ||
+           nnc_parser_match(parser, TOK_OBRACKET)) {
+        nnc_tok_kind kind = nnc_parser_peek(parser);
+        nnc_parser_next(parser);
+        if (kind == TOK_ASTERISK) {
+            if (type->kind == TYPE_ARRAY) {
+                THROW(NNC_SYNTAX, "cannot declare this type.\n");
+            }
+            type = nnc_ptr_type_new(type);
+        }
+        else {
+            type = nnc_arr_type_new(type);
+            type->exact.array.dim = nnc_parse_expr_reduced(parser);
+            nnc_parser_expect(parser, TOK_CBRACKET);
+        }
+    }
+    return type;
+}
+
 static nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_heap_ptr exact = nnc_dbl_new(tok->lexeme);
@@ -122,7 +160,6 @@ static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
 
 static nnc_expression* nnc_parse_primary(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    printf("%s\n", nnc_tok_str(tok->kind));
     switch (tok->kind) {
         case TOK_STR:    return nnc_parse_str(parser);
         case TOK_CHR:    return nnc_parse_chr(parser);
@@ -140,15 +177,11 @@ static nnc_expression* nnc_parse_unary(nnc_parser* parser);
 
 static nnc_expression* nnc_parse_cast(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_OPAREN);
-    //todo: type parsing here
-    nnc_tok_kind type = nnc_parser_peek(parser);
-    nnc_parser_next(parser);
-    //-----------------------
-    nnc_parser_expect(parser, TOK_CPAREN);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_CAST);
+    expr->exact.cast.to = nnc_parse_type(parser);
+    nnc_parser_expect(parser, TOK_CPAREN);
     expr->expr = nnc_parse_unary(parser);
-    printf("cast to: %s\n", nnc_tok_str(type));
-    return nnc_expr_new(EXPR_UNARY, expr);    
+    return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 static nnc_expression* nnc_parse_plus(nnc_parser* parser) {
@@ -197,10 +230,8 @@ static nnc_expression* nnc_parse_sizeof(nnc_parser* parser) {
     nnc_parser_next(parser);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_SIZEOF);
     nnc_parser_expect(parser, TOK_OPAREN);
-    //todo: insert type parsing here. 
-    nnc_parser_next(parser);    
-    expr->exact.size.of = (nnc_heap_ptr)0xBAD;
-    //-------------------------------
+    nnc_parser_next(parser);
+    expr->exact.size.of = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_CPAREN);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
@@ -213,14 +244,10 @@ static nnc_expression* nnc_parse_lengthof(nnc_parser* parser) {
 }
 
 static nnc_expression* nnc_parse_as(nnc_parser* parser, nnc_expression* prefix) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_AS);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_AS);
     expr->expr = prefix;
-    //todo: insert type parsing here.
-    fprintf(stderr, "type repr: %s\n", nnc_parser_get(parser)->lexeme);
-    nnc_parser_next(parser);
-    expr->exact.cast.to = (nnc_heap_ptr)0xBAD;
-    //-------------------------------
+    expr->exact.cast.to = nnc_parse_type(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 

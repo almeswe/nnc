@@ -1,7 +1,7 @@
 #ifndef _NNC_AST_LITERALS_H
 #define _NNC_AST_LITERALS_H
 
-#include "nnc_types.h"
+#include "nnc_typedefs.h"
 #include "nnc_try_catch.h"
 
 #define dbl_literal(expr) (nnc_dbl_literal*)expr->exact

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "nnc_types.h"
+#include "nnc_typedefs.h"
 
 #define new(type)           (type*)nnc_alloc(sizeof(type))
 #define cnew(type, size)    (type*)nnc_alloc(sizeof(type) * (size))

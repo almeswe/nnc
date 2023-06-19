@@ -22,4 +22,6 @@ typedef double      nnc_f64;
 
 typedef bool        nnc_bool;
 
+typedef char*       nnc_str;
+
 #endif
