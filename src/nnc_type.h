@@ -46,22 +46,23 @@ typedef struct _nnc_type {
     struct _nnc_type* base;
 } nnc_type;
 
-static nnc_type i8_type  = { .size=sizeof(nnc_i8),  .kind=TYPE_PRIMITIVE, .repr="i8"  };
-static nnc_type u8_type  = { .size=sizeof(nnc_u8),  .kind=TYPE_PRIMITIVE, .repr="u8"  };
-static nnc_type i16_type = { .size=sizeof(nnc_i16), .kind=TYPE_PRIMITIVE, .repr="i16" };
-static nnc_type u16_type = { .size=sizeof(nnc_u16), .kind=TYPE_PRIMITIVE, .repr="u16" };
-static nnc_type i32_type = { .size=sizeof(nnc_i32), .kind=TYPE_PRIMITIVE, .repr="i32" };
-static nnc_type u32_type = { .size=sizeof(nnc_u32), .kind=TYPE_PRIMITIVE, .repr="u32" };
-static nnc_type f32_type = { .size=sizeof(nnc_f32), .kind=TYPE_PRIMITIVE, .repr="f32" };
-static nnc_type i64_type = { .size=sizeof(nnc_i64), .kind=TYPE_PRIMITIVE, .repr="i64" };
-static nnc_type u64_type = { .size=sizeof(nnc_u64), .kind=TYPE_PRIMITIVE, .repr="u64" };
-static nnc_type f64_type = { .size=sizeof(nnc_f64), .kind=TYPE_PRIMITIVE, .repr="f64" };
+static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=TYPE_PRIMITIVE, .repr="i8"   };
+static nnc_type u8_type   __attribute__((unused)) = { .size=sizeof(nnc_u8),  .kind=TYPE_PRIMITIVE, .repr="u8"   };
+static nnc_type i16_type  __attribute__((unused)) = { .size=sizeof(nnc_i16), .kind=TYPE_PRIMITIVE, .repr="i16"  };
+static nnc_type u16_type  __attribute__((unused)) = { .size=sizeof(nnc_u16), .kind=TYPE_PRIMITIVE, .repr="u16"  };
+static nnc_type i32_type  __attribute__((unused)) = { .size=sizeof(nnc_i32), .kind=TYPE_PRIMITIVE, .repr="i32"  };
+static nnc_type u32_type  __attribute__((unused)) = { .size=sizeof(nnc_u32), .kind=TYPE_PRIMITIVE, .repr="u32"  };
+static nnc_type f32_type  __attribute__((unused)) = { .size=sizeof(nnc_f32), .kind=TYPE_PRIMITIVE, .repr="f32"  };
+static nnc_type i64_type  __attribute__((unused)) = { .size=sizeof(nnc_i64), .kind=TYPE_PRIMITIVE, .repr="i64"  };
+static nnc_type u64_type  __attribute__((unused)) = { .size=sizeof(nnc_u64), .kind=TYPE_PRIMITIVE, .repr="u64"  };
+static nnc_type f64_type  __attribute__((unused)) = { .size=sizeof(nnc_f64), .kind=TYPE_PRIMITIVE, .repr="f64"  };
+static nnc_type void_type __attribute__((unused)) = { .size=0,               .kind=TYPE_VOID,      .repr="void" };
 //static nnc_type incomplete_type = { sizeof(nnc_i8),  TYPE_INCOMPLETE, "incomplete" };
 
 nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);
 nnc_type* nnc_arr_type_new(nnc_type* base);
-nnc_type* nnc_fn_type_new(nnc_type* ret, nnc_type** params);
+nnc_type* nnc_fn_type_new();
 
 nnc_str nnc_type_tostr(const nnc_type* type);
 

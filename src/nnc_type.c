@@ -22,22 +22,20 @@ nnc_type* nnc_arr_type_new(nnc_type* base) {
     return ptr;
 }
 
-nnc_type* nnc_fn_type_new(nnc_type* ret, nnc_type** params) {
+nnc_type* nnc_fn_type_new() {
     nnc_type* ptr = nnc_type_new(NULL);
     ptr->kind = TYPE_FUNCTION;
     ptr->size = sizeof(nnc_heap_ptr);
-    ptr->exact.fn.ret = ret;
-    ptr->exact.fn.params = params;
     return ptr;
 }
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     if (type->kind == TYPE_FUNCTION) {
-        nnc_str repr = sformat("fn(%s)( ", nnc_type_tostr(type->exact.fn.ret));
+        nnc_str repr = sformat("fn( %s )( ", nnc_type_tostr(type->exact.fn.ret));
         for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
-            repr = sformat("%s ", nnc_type_tostr(type->exact.fn.params[i]));
+            repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
         }
-        return sformat("%s )", repr);
+        return sformat("%s)", repr);
     }
     switch (type->kind) {
         case TYPE_ENUM:    return sformat("enum %s",   type->repr);
@@ -48,5 +46,4 @@ nnc_str nnc_type_tostr(const nnc_type* type) {
         default:
             return type->repr;
     }
-    return type->repr;
 }
