@@ -51,7 +51,7 @@ nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
         // todo: pass ctx to exception
         THROW(NNC_SYNTAX, sformat("expected <%s>, but met <%s>.", 
             nnc_tok_str(kind), nnc_tok_str(current)));
-    }
+    }   
     nnc_parser_next(parser);
     return nnc_parser_peek(parser);
 }
@@ -70,34 +70,67 @@ static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
     }
 }
 
+static nnc_type* nnc_parse_type(nnc_parser* parser);
+
+static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_FN);
+    nnc_parser_expect(parser, TOK_OPAREN);
+    nnc_type* type = nnc_fn_type_new();
+    type->exact.fn.ret = nnc_parse_type(parser);
+    nnc_parser_expect(parser, TOK_CPAREN);
+    nnc_parser_expect(parser, TOK_OPAREN);
+    while (!nnc_parser_match(parser, TOK_CPAREN) &&
+           !nnc_parser_match(parser, TOK_EOF)) {
+        buf_add(type->exact.fn.params, nnc_parse_type(parser));
+        if (nnc_parser_match(parser, TOK_CPAREN)) {
+            break;
+        }
+        nnc_parser_expect(parser, TOK_COMMA);
+    }
+    type->exact.fn.paramc = buf_len(type->exact.fn.params);
+    nnc_parser_expect(parser, TOK_CPAREN);
+    return type;
+}
+
+static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_IDENT);
+    nnc_tok* tok = nnc_parser_get(parser);
+    return nnc_type_new(tok->lexeme);
+}
+
 static nnc_type* nnc_parse_type(nnc_parser* parser) {
     nnc_type* type = NULL;
-    const nnc_tok* tok = nnc_parser_get(parser);
-    switch (tok->kind) {
-        case TOK_I8:    type = &i8_type;  break;
-        case TOK_U8:    type = &u8_type;  break;
-        case TOK_I16:   type = &i16_type; break;
-        case TOK_U16:   type = &u16_type; break;
-        case TOK_I32:   type = &i32_type; break;
-        case TOK_U32:   type = &u32_type; break;
-        case TOK_F32:   type = &f32_type; break;
-        case TOK_I64:   type = &i64_type; break;
-        case TOK_U64:   type = &u64_type; break;
-        case TOK_F64:   type = &f64_type; break;
+    const nnc_tok_kind kind = nnc_parser_peek(parser);
+    switch (kind) {
+        case TOK_I8:    type = &i8_type;   break;
+        case TOK_U8:    type = &u8_type;   break;
+        case TOK_I16:   type = &i16_type;  break;
+        case TOK_U16:   type = &u16_type;  break;
+        case TOK_I32:   type = &i32_type;  break;
+        case TOK_U32:   type = &u32_type;  break;
+        case TOK_F32:   type = &f32_type;  break;
+        case TOK_I64:   type = &i64_type;  break;
+        case TOK_U64:   type = &u64_type;  break;
+        case TOK_F64:   type = &f64_type;  break;
+        case TOK_VOID:  type = &void_type; break;
+        case TOK_FN:    type = nnc_parse_fn_type(parser);   break;
+        case TOK_IDENT: type = nnc_parse_user_type(parser); break;
         default: 
-            printf("%s\n", nnc_tok_str(tok->kind));
-            THROW(NNC_UNINPLEMENTED, "nnc_parse_type: default\n");
+            nnc_abort_no_ctx("nnc_parse_type: unknown type kind met.");
     }
-    nnc_parser_next(parser);
+    if (kind != TOK_FN &&
+        kind != TOK_IDENT) {
+        nnc_parser_next(parser);
+    }
     while (nnc_parser_match(parser, TOK_ASTERISK) ||
            nnc_parser_match(parser, TOK_OBRACKET)) {
         nnc_tok_kind kind = nnc_parser_peek(parser);
         nnc_parser_next(parser);
         if (kind == TOK_ASTERISK) {
-            if (type->kind == TYPE_ARRAY) {
-                THROW(NNC_SYNTAX, "cannot declare this type.\n");
-            }
             type = nnc_ptr_type_new(type);
+            if (type->base->kind == TYPE_ARRAY) {
+                THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
+            }
         }
         else {
             type = nnc_arr_type_new(type);
@@ -230,7 +263,6 @@ static nnc_expression* nnc_parse_sizeof(nnc_parser* parser) {
     nnc_parser_next(parser);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_SIZEOF);
     nnc_parser_expect(parser, TOK_OPAREN);
-    nnc_parser_next(parser);
     expr->exact.size.of = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_CPAREN);
     return nnc_expr_new(EXPR_UNARY, expr);
@@ -238,8 +270,8 @@ static nnc_expression* nnc_parse_sizeof(nnc_parser* parser) {
 
 static nnc_expression* nnc_parse_lengthof(nnc_parser* parser) {
     nnc_parser_next(parser);
-    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_SIZEOF);
-    expr->exact.length.of = nnc_parse_expr(parser);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_LENGTHOF);
+    expr->expr = nnc_parse_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 

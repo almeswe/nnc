@@ -47,9 +47,6 @@ typedef struct _nnc_unary_expression {
         struct _nnc_unary_sizeof {
             nnc_type* of;    
         } size;
-        struct _nnc_unary_lengthof {
-            nnc_expression* of;
-        } length;
         struct _nnc_unary_cast {
             nnc_type* to;
         } cast;

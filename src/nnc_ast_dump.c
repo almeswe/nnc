@@ -60,7 +60,12 @@ static void nnc_dump_indent(nnc_i64 indent) {
 }
 
 static void nnc_dump_type(nnc_type* type) {
-    fprintf(stderr, "%s", nnc_type_tostr(type));
+    if (type == NULL || type->kind == TYPE_UNKNOWN) {
+        fprintf(stderr, _c(RED, "?"));
+    }
+    else {
+        fprintf(stderr, _c(BBLU, "%s"), nnc_type_tostr(type));
+    }
 }
 
 static void nnc_dump_chr(nnc_dump_data data) {
@@ -147,13 +152,6 @@ static void nnc_dump_call(nnc_dump_data data) {
     }
 }
 
-static void nnc_dump_as(nnc_dump_data data) {
-    nnc_dump_indent(data.indent);
-    const nnc_unary_expression* unary = data.exact;
-    fprintf(stderr, TREE_BR "as type: %s\n", nnc_type_tostr(unary->exact.cast.to));
-    nnc_dump_expr(DUMP_DATA(data.indent, unary->expr));
-}
-
 static void nnc_dump_unary(nnc_dump_data data) {
     nnc_dump_indent(data.indent);
     const nnc_unary_expression* unary = data.exact;
@@ -170,13 +168,21 @@ static void nnc_dump_unary(nnc_dump_data data) {
         [UNARY_POSTFIX_AS]   = "as",
         [UNARY_POSTFIX_CALL] = "call"
     };
-    fprintf(stderr, TREE_BR _c(BGRN, " unary-expr") " <%s>\n", unary_str[unary->kind]);
+    fprintf(stderr, TREE_BR _c(BGRN, " unary-expr") 
+        " <%s>\n", unary_str[unary->kind]);
     switch (unary->kind) {
-        case UNARY_POSTFIX_AS:  nnc_dump_as(DUMP_DATA(data.indent + 1, unary)); break;
+        case UNARY_CAST:
         case UNARY_SIZEOF:
-        case UNARY_LENGTHOF:
-            break;
-        case UNARY_POSTFIX_CALL: nnc_dump_call(data); break;
+        case UNARY_POSTFIX_AS:
+            nnc_dump_indent(data.indent + 1);
+            fprintf(stderr, TREE_BR _c(BYEL, " %s") "=", "type");
+            if (unary->kind == UNARY_SIZEOF) {
+                nnc_dump_type(unary->exact.size.of);
+            }
+            else {
+                nnc_dump_type(unary->exact.cast.to);
+            }
+            fprintf(stderr, "%s", "\n");
         default:
             nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
     }
@@ -234,7 +240,9 @@ static void nnc_dump_expr(nnc_dump_data data) {
         [EXPR_BINARY]      = nnc_dump_binary,
         [EXPR_TERNARY]     = nnc_dump_ternary
     };
-    dumpers[expr->kind](DUMP_DATA(data.indent, expr->exact));
+    if (expr != NULL) {
+        dumpers[expr->kind](DUMP_DATA(data.indent, expr->exact));
+    }
 } 
 
 void nnc_dump_ast(const nnc_ast* ast) {
