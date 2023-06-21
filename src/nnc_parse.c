@@ -98,6 +98,26 @@ static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
     return nnc_type_new(tok->lexeme);
 }
 
+static nnc_type* nnc_parse_type_declarators(nnc_parser* parser, nnc_type* type) {
+    while (nnc_parser_match(parser, TOK_ASTERISK) ||
+           nnc_parser_match(parser, TOK_OBRACKET)) {
+        nnc_tok_kind kind = nnc_parser_peek(parser);
+        nnc_parser_next(parser);
+        if (kind == TOK_ASTERISK) {
+            type = nnc_ptr_type_new(type);
+            if (type->base->kind == TYPE_ARRAY) {
+                THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
+            }
+        }
+        else {
+            type = nnc_arr_type_new(type);
+            type->exact.array.dim = nnc_parse_expr_reduced(parser);
+            nnc_parser_expect(parser, TOK_CBRACKET);
+        }
+    }
+    return type;
+}
+
 static nnc_type* nnc_parse_type(nnc_parser* parser) {
     nnc_type* type = NULL;
     const nnc_tok_kind kind = nnc_parser_peek(parser);
@@ -122,23 +142,7 @@ static nnc_type* nnc_parse_type(nnc_parser* parser) {
         kind != TOK_IDENT) {
         nnc_parser_next(parser);
     }
-    while (nnc_parser_match(parser, TOK_ASTERISK) ||
-           nnc_parser_match(parser, TOK_OBRACKET)) {
-        nnc_tok_kind kind = nnc_parser_peek(parser);
-        nnc_parser_next(parser);
-        if (kind == TOK_ASTERISK) {
-            type = nnc_ptr_type_new(type);
-            if (type->base->kind == TYPE_ARRAY) {
-                THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
-            }
-        }
-        else {
-            type = nnc_arr_type_new(type);
-            type->exact.array.dim = nnc_parse_expr_reduced(parser);
-            nnc_parser_expect(parser, TOK_CBRACKET);
-        }
-    }
-    return type;
+    return nnc_parse_type_declarators(parser, type);
 }
 
 static nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
@@ -650,12 +654,39 @@ nnc_expression* nnc_parse_expr(nnc_parser* parser) {
     return nnc_parse_comma(parser);
 }
 
+nnc_statement* nnc_parse_let_stmt(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_LET);
+    nnc_let_statement* vardecl = new(nnc_let_statement);
+    const nnc_tok* tok = nnc_parser_get(parser);
+    vardecl->var = nnc_ident_new(tok->lexeme);
+    nnc_parser_expect(parser, TOK_IDENT);
+    nnc_parser_expect(parser, TOK_COLON);
+    vardecl->type = nnc_parse_type(parser);
+    if (nnc_parser_match(parser, TOK_ASSIGN)) {
+        nnc_parser_expect(parser, TOK_ASSIGN);
+        vardecl->init = nnc_parse_expr(parser);
+    }
+    return nnc_stmt_new(STMT_LET, vardecl);
+}
+
+nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
+    nnc_statement* stmt = NULL;
+    const nnc_tok* tok = nnc_parser_get(parser);
+    switch (tok->kind) {
+        case TOK_LET: stmt = nnc_parse_let_stmt(parser); break;
+        default:
+            THROW(NNC_SYNTAX, "statement expected.\n");
+    }
+    nnc_parser_expect(parser, TOK_SEMICOLON);
+    return stmt;
+}
+
 nnc_ast* nnc_parse(const char* file) {
     nnc_parser parser = { 0 };
     nnc_parser_init(&parser, file);
     nnc_parser_next(&parser);
     nnc_ast* ast = nnc_ast_new(file);
-    ast->expr = nnc_parse_expr(&parser);
+    ast->root = nnc_parse_stmt(&parser);
     nnc_parser_fini(&parser);
     return ast;
 }
