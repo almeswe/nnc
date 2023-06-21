@@ -31,6 +31,17 @@ nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact) {
     return ptr;
 }
 
+nnc_let_statement* nnc_let_stmt_new() {
+    return new(nnc_let_statement);
+}
+
+nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact) {
+    nnc_statement* ptr = new(nnc_statement);
+    ptr->kind = kind;
+    ptr->exact = exact;
+    return ptr;
+}
+
 nnc_ast* nnc_ast_new(const char* file) {
     nnc_ast* ptr = new(nnc_ast);
     ptr->file = file;
