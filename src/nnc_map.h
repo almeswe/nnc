@@ -12,7 +12,8 @@
 */
 #define _map_(keytype, valtype)   nnc_map*
 
-#define map_init()              nncmap_init()
+#define map_init()              nncmap_init(NNC_MAP_INICAP)
+#define map_init_with(exact)    nncmap_init(exact)
 #define map_fini(map)           nncmap_fini(map)
 #define map_has(map, key)       nncmap_has(map, (nnc_map_key)(key))
 #define map_get(map, key)       nncmap_get(map, (nnc_map_key)(key))
@@ -45,7 +46,7 @@ typedef struct _nnc_map {
 nnc_map_hash nncmap_hash(nnc_map_key key);
 nnc_map_hash nncmap_hash_str(const char* key);
 
-nnc_map* nncmap_init();
+nnc_map* nncmap_init(nnc_u64 inicap);
 nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key);
 void nncmap_pop(nnc_map* map, nnc_map_key key);
 void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val);
