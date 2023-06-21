@@ -75,7 +75,10 @@ static void nncmap_buckets_fini(nnc_map* map) {
  * @return `true` if map needs rehashing, `false` otherwise.
  */
 static nnc_bool nncmap_needs_rehash(nnc_map* map) {
-    double used = ((double)map->len) / map->cap;
+    if (map->cap == 0) {
+        return map->cap = 4, true;
+    }
+    nnc_f64 used = ((nnc_f64)map->len) / map->cap;
     return used >= NNC_MAP_MAX_LOAD;
 }
 
@@ -107,12 +110,13 @@ static void nncmap_rehash(nnc_map* map) {
 
 /**
  * @brief Initializes new instance of `nnc_map`.
+ * @param inicap Initial capacity.
  * @return Allocated & initialized instance of `nnc_map`. 
  */
-nnc_map* nncmap_init() {
+nnc_map* nncmap_init(nnc_u64 inicap) {
     nnc_map* map = nnc_alloc(sizeof(nnc_map));
     map->len = 0;
-    map->cap = NNC_MAP_INICAP;
+    map->cap = inicap;
     // preallocate initial number of buckets.
     map->buckets = nnc_alloc(sizeof(nnc_map_bucket) * map->cap);
     return map;
