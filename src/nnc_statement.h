@@ -15,7 +15,7 @@ typedef enum _nnc_statement_kind {
 	STMT_IMPORT,
 	STMT_LET,
     STMT_NAMESPACE,
-	STMT_TYPE_DECL,
+	STMT_TYPE,
     STMT_ENUM_DECL,
 	STMT_FUNC_DECL,
 	STMT_LABEL_DECL,
@@ -37,6 +37,11 @@ typedef struct _nnc_let_statement {
     nnc_type* type;
     nnc_expression* init;
 } nnc_let_statement;
+
+typedef struct _nnc_type_statement {
+	nnc_type* type;
+	nnc_type* as;
+} nnc_type_statement;
 
 nnc_let_statement* nnc_let_stmt_new();
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact);

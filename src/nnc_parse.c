@@ -93,9 +93,10 @@ static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
 }
 
 static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
-    nnc_parser_expect(parser, TOK_IDENT);
     nnc_tok* tok = nnc_parser_get(parser);
-    return nnc_type_new(tok->lexeme);
+    nnc_ident* ident = nnc_ident_new(tok->lexeme);
+    nnc_parser_expect(parser, TOK_IDENT);
+    return nnc_type_new(ident->name);
 }
 
 static nnc_type* nnc_parse_type_declarators(nnc_parser* parser, nnc_type* type) {
@@ -669,11 +670,21 @@ nnc_statement* nnc_parse_let_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_LET, vardecl);
 }
 
+nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_TYPE);
+    nnc_type_statement* typedecl = new(nnc_type_statement);
+    typedecl->type = nnc_parse_type(parser);
+    nnc_parser_expect(parser, TOK_AS);
+    typedecl->as = nnc_parse_type(parser);
+    return nnc_stmt_new(STMT_TYPE, typedecl);
+}
+
 nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
     nnc_statement* stmt = NULL;
     const nnc_tok* tok = nnc_parser_get(parser);
     switch (tok->kind) {
-        case TOK_LET: stmt = nnc_parse_let_stmt(parser); break;
+        case TOK_LET:  stmt = nnc_parse_let_stmt(parser);  break;
+        case TOK_TYPE: stmt = nnc_parse_type_stmt(parser); break;
         default:
             THROW(NNC_SYNTAX, "statement expected.\n");
     }
