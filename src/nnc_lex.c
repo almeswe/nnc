@@ -80,7 +80,7 @@ static const char* nnc_tok_strs[] = {
     [TOK_STRUCT]        = "TOK_STRUCT",
     [TOK_SWITCH]        = "TOK_SWITCH",
     [TOK_SIZEOF]        = "TOK_SIZEOF",
-    [TOK_TYPEDEF]       = "TOK_TYPEDEF",
+    [TOK_TYPE]       = "TOK_TYPE",
     [TOK_UNION]         = "TOK_UNION",
     [TOK_U8]            = "TOK_U8",
     [TOK_U16]           = "TOK_U16",
@@ -105,7 +105,7 @@ static const char* nnc_keywords[] = {
     "for", "fn", "from", "f32", "f64", "goto",
     "if", "i8", "i16", "i32", "i64", "import",
     "namespace", "pub", "return", "struct", 
-    "switch", "sizeof", "typedef", "union", 
+    "switch", "sizeof", "type", "union", 
     "u8", "u16", "u32", "u64", "let", "label",
     "lengthof", "var", "void", "while", "do", "else"
 };

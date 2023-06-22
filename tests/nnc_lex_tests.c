@@ -366,7 +366,7 @@ TEST(keywords_test, nnclex) {
     assert(nnc_lex_next(&lex) == TOK_STRUCT);
     assert(nnc_lex_next(&lex) == TOK_SWITCH);
     assert(nnc_lex_next(&lex) == TOK_SIZEOF);
-    assert(nnc_lex_next(&lex) == TOK_TYPEDEF);
+    assert(nnc_lex_next(&lex) == TOK_TYPE);
     assert(nnc_lex_next(&lex) == TOK_UNION);
     assert(nnc_lex_next(&lex) == TOK_U8);
     assert(nnc_lex_next(&lex) == TOK_U16);
