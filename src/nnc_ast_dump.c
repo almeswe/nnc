@@ -240,10 +240,20 @@ static void nnc_dump_let_stmt(nnc_dump_data data) {
     }
 }
 
+static void nnc_dump_type_stmt(nnc_dump_data data) {
+    const nnc_type_statement* type_stmt = data.exact;
+    fprintf(stderr, _c(BMAG, "type-stmt ") "<type=");
+    nnc_dump_type(type_stmt->type);
+    fprintf(stderr, ",as=");
+    nnc_dump_type(type_stmt->as);
+    fprintf(stderr, ">\n");
+}
+
 static void nnc_dump_stmt(nnc_dump_data data) {
     const nnc_statement* stmt = data.exact;
     static const nnc_dump_fn dumpers[] = {
-        [STMT_LET] = nnc_dump_let_stmt
+        [STMT_LET]  = nnc_dump_let_stmt,
+        [STMT_TYPE] = nnc_dump_type_stmt
     };
     if (stmt != NULL) {
         dumpers[stmt->kind](DUMP_DATA(data.indent, stmt->exact));
