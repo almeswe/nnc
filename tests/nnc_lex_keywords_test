@@ -26,7 +26,7 @@ return
 struct
 switch
 sizeof
-typedef
+type
 union
 u8
 u16
