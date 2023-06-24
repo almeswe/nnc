@@ -78,6 +78,7 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_OR,
     BINARY_DOT,
     BINARY_IDX,
+    BINARY_ASSIGN,
     BINARY_COMMA
 } nnc_binary_expression_kind;
 
