@@ -5,17 +5,18 @@
 
 typedef enum _nnc_statement_kind {
     STMT_IF,
+	STMT_DO,
     STMT_FOR,
 	STMT_EXPR,
-	STMT_JUMP,
 	STMT_WHILE,
-	STMT_BLOCK,
 	STMT_EMPTY,
 	STMT_SWITCH,
+	STMT_RETURN,
 	STMT_IMPORT,
 	STMT_LET,
     STMT_NAMESPACE,
 	STMT_TYPE,
+	STMT_COMPOUND,
     STMT_ENUM_DECL,
 	STMT_FUNC_DECL,
 	STMT_LABEL_DECL,
@@ -28,10 +29,6 @@ typedef struct _nnc_statement {
     nnc_heap_ptr exact;
 } nnc_statement;
 
-typedef struct _nnc_expression_statement {
-    nnc_expression* expr;
-} _nnc_expression_statement;
-
 typedef struct _nnc_let_statement {
     nnc_ident* var;
     nnc_type* type;
@@ -42,6 +39,44 @@ typedef struct _nnc_type_statement {
 	nnc_type* type;
 	nnc_type* as;
 } nnc_type_statement;
+
+typedef struct _nnc_expression_statement {
+    nnc_expression* expr;
+} nnc_expression_statement;
+
+typedef struct _nnc_compound_statement {
+	//todo: incomplete
+	nnc_statement** stmts;
+} nnc_compound_statement;
+
+typedef struct _nnc_cond_n_body {
+	nnc_expression* cond;
+	nnc_statement* body;
+} nnc_cond_n_body;
+
+typedef nnc_cond_n_body nnc_if_branch;  
+typedef nnc_cond_n_body nnc_elif_branch;
+typedef nnc_cond_n_body nnc_else_branch;
+
+typedef struct _nnc_if_stmt {
+	nnc_if_branch* if_br;
+	nnc_elif_branch** elif_brs;
+	nnc_statement* else_br;
+} nnc_if_stmt;
+
+typedef nnc_cond_n_body nnc_while_stmt;
+typedef nnc_cond_n_body nnc_do_while_stmt;
+
+typedef struct _nnc_for_stmt {
+	nnc_statement* init;
+	nnc_statement* cond;
+	nnc_statement* step;
+	nnc_statement* body;
+} nnc_for_stmt;
+
+typedef struct _nnc_return_statement {
+	nnc_statement* body;
+} nnc_return_statement;
 
 nnc_let_statement* nnc_let_stmt_new();
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact);

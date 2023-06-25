@@ -105,7 +105,7 @@ static void nnc_dump_int(nnc_dump_data data) {
         fprintf(stderr, "signed,");
     }
     else {
-        fprintf(stderr, "%lu", literal->exact.u);
+        fprintf(stderr, "val=%lu,", literal->exact.u);
     }
     fprintf(stderr, "base=%d,", literal->base);
     fprintf(stderr, "suff=%d>\n", literal->suffix);
@@ -229,34 +229,60 @@ static void nnc_dump_expr(nnc_dump_data data) {
     }
 } 
 
+static void nnc_dump_if_stmt(nnc_dump_data data) {
+    const nnc_if_stmt* if_stmt = data.exact;
+    fprintf(stderr, _c(BMAG, "if-stmt\n"));
+    nnc_dump_indent(data.indent + 1);
+    fprintf(stderr, TREE_BR "if-cond=");
+    nnc_dump_expr(DUMP_DATA(data.indent+1, if_stmt->if_br->cond));
+    nnc_dump_indent(data.indent + 1);
+    fprintf(stderr, TREE_BR "if-body=");
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, if_stmt->if_br->body));
+    for (nnc_u64 i = 0; i < buf_len(if_stmt->elif_brs); i++) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR _c(BMAG, "elif%lu-stmt\n"), i+1);
+        nnc_dump_indent(data.indent + 2);
+        fprintf(stderr, TREE_BR "elif-cond=");
+        nnc_dump_expr(DUMP_DATA(data.indent+2, if_stmt->elif_brs[i]->cond));
+        nnc_dump_indent(data.indent + 2);
+        fprintf(stderr, TREE_BR "elif-body=");
+        nnc_dump_stmt(DUMP_DATA(data.indent+2, if_stmt->elif_brs[i]->body));
+    }
+    if (if_stmt->else_br != NULL) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR _c(BMAG, "else-stmt\n"));
+        nnc_dump_indent(data.indent + 2);
+        fprintf(stderr, TREE_BR "else-body=");
+        nnc_dump_stmt(DUMP_DATA(data.indent+2, if_stmt->else_br));
+    }
+}
+
 static void nnc_dump_do_stmt(nnc_dump_data data) {
     const nnc_do_while_stmt* do_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "do-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "body=");
-    nnc_dump_compound_stmt(DUMP_DATA(data.indent+1, do_stmt->body));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, do_stmt->body));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "cond=");
     nnc_dump_expr(DUMP_DATA(data.indent+1, do_stmt->cond));
 }
 
 static void nnc_dump_for_stmt(nnc_dump_data data) {
-    // todo: allow empty expressions
-    // todo: allow variable declaration in init part
     const nnc_for_stmt* for_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "for-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "init=");
-    nnc_dump_expr(DUMP_DATA(data.indent+1, for_stmt->init));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, for_stmt->init));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "cond=");
-    nnc_dump_expr(DUMP_DATA(data.indent+1, for_stmt->cond));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, for_stmt->cond));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "step=");
-    nnc_dump_expr(DUMP_DATA(data.indent+1, for_stmt->step));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, for_stmt->step));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "body=");
-    nnc_dump_compound_stmt(DUMP_DATA(data.indent+1, for_stmt->body));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, for_stmt->body));
 }
 
 static void nnc_dump_let_stmt(nnc_dump_data data) {
@@ -290,7 +316,19 @@ static void nnc_dump_while_stmt(nnc_dump_data data) {
     nnc_dump_expr(DUMP_DATA(data.indent+1, while_stmt->cond));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "body=");
-    nnc_dump_compound_stmt(DUMP_DATA(data.indent+1, while_stmt->body));
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, while_stmt->body));
+}
+
+static void nnc_dump_empty_stmt(nnc_dump_data data) {
+    fprintf(stderr, _c(BMAG, "empty-stmt\n"));
+}
+
+static void nnc_dump_return_stmt(nnc_dump_data data) {
+    const nnc_return_statement* ret_stmt = data.exact;
+    fprintf(stderr, _c(BMAG, "return-stmt\n"));
+    nnc_dump_indent(data.indent + 1);
+    fprintf(stderr, TREE_BR "what=");
+    nnc_dump_stmt(DUMP_DATA(data.indent+1, ret_stmt->body));
 }
 
 static void nnc_dump_expr_stmt(nnc_dump_data data) {
@@ -315,12 +353,15 @@ static void nnc_dump_compound_stmt(nnc_dump_data data) {
 static void nnc_dump_stmt(nnc_dump_data data) {
     const nnc_statement* stmt = data.exact;
     static const nnc_dump_fn dumpers[] = {
+        [STMT_IF]       = nnc_dump_if_stmt,
         [STMT_DO]       = nnc_dump_do_stmt,
         [STMT_FOR]      = nnc_dump_for_stmt,
         [STMT_LET]      = nnc_dump_let_stmt,
         [STMT_TYPE]     = nnc_dump_type_stmt,
-        [STMT_WHILE]    = nnc_dump_while_stmt,
         [STMT_EXPR]     = nnc_dump_expr_stmt,
+        [STMT_WHILE]    = nnc_dump_while_stmt,
+        [STMT_EMPTY]    = nnc_dump_empty_stmt,
+        [STMT_RETURN]   = nnc_dump_return_stmt,
         [STMT_COMPOUND] = nnc_dump_compound_stmt
     };
     if (stmt != NULL) {

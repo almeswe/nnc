@@ -31,11 +31,11 @@ nnc_type* nnc_fn_type_new() {
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     if (type->kind == TYPE_FUNCTION) {
-        nnc_str repr = sformat("fn( %s )( ", nnc_type_tostr(type->exact.fn.ret));
+        nnc_str repr = "fn( ";
         for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
             repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
         }
-        return sformat("%s)", repr);
+        return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
     }
     switch (type->kind) {
         case TYPE_ENUM:    return sformat("enum %s",   type->repr);
