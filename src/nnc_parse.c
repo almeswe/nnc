@@ -747,14 +747,37 @@ nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_FOR, for_stmt);
 }
 
+nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
+    if (nnc_parser_match(parser, TOK_SEMICOLON)) {
+        nnc_parser_next(parser);
+        return nnc_stmt_new(STMT_EMPTY, NULL);
+    }
+    nnc_expression_statement* exprstmt = new(nnc_expression_statement);
+    exprstmt->expr = nnc_parse_expr(parser);
+    nnc_parser_expect(parser, TOK_SEMICOLON);
+    return nnc_stmt_new(STMT_EXPR, exprstmt);
+}
+
+nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_GOTO);
+    nnc_goto_statement* goto_stmt = new(nnc_goto_statement);
+    goto_stmt->body = nnc_parse_expr_stmt(parser);
+    nnc_expression_statement* body = goto_stmt->body->exact;
+    if (goto_stmt->body->kind == STMT_EMPTY || 
+        body->expr->kind != EXPR_IDENT) {
+        THROW(NNC_SYNTAX, "expected label name.");
+    }
+    return nnc_stmt_new(STMT_GOTO, goto_stmt);
+}
+
 nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_TYPE);
-    nnc_type_statement* typedecl = new(nnc_type_statement);
-    typedecl->type = nnc_parse_type(parser);
+    nnc_type_statement* type_stmt = new(nnc_type_statement);
+    type_stmt->type = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_AS);
-    typedecl->as = nnc_parse_type(parser);
+    type_stmt->as = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    return nnc_stmt_new(STMT_TYPE, typedecl);
+    return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
 nnc_statement* nnc_parse_while_stmt(nnc_parser* parser) {
@@ -765,15 +788,11 @@ nnc_statement* nnc_parse_while_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_WHILE, while_stmt);
 }
 
-nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
-    if (nnc_parser_match(parser, TOK_SEMICOLON)) {
-        nnc_parser_next(parser);
-        return nnc_stmt_new(STMT_EMPTY, NULL);
-    }
-    nnc_expression_statement* exprstmt = new(nnc_expression_statement);
-    exprstmt->expr = nnc_parse_expr(parser);
+nnc_statement* nnc_parse_break_stmt(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_BREAK);
+    nnc_break_statement* break_stmt = new(nnc_break_statement);
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    return nnc_stmt_new(STMT_EXPR, exprstmt);
+    return nnc_stmt_new(STMT_BREAK, break_stmt);
 }
 
 nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
@@ -793,18 +812,29 @@ nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_COMPOUND, compound);
 }
 
+nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_CONTINUE);
+    nnc_continue_statement* continue_stmt = new(nnc_continue_statement);
+    nnc_parser_expect(parser, TOK_SEMICOLON);
+    return nnc_stmt_new(STMT_CONTINUE, continue_stmt);
+}
+
 nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
     nnc_statement* stmt = NULL;
+    // todo: replace `break` & `stmt` with `return`
     const nnc_tok* tok = nnc_parser_get(parser);
     switch (tok->kind) {
-        case TOK_IF:     stmt = nnc_parse_if_stmt(parser);       break;
-        case TOK_DO:     stmt = nnc_parse_do_stmt(parser);       break;
-        case TOK_LET:    stmt = nnc_parse_let_stmt(parser);      break;
-        case TOK_FOR:    stmt = nnc_parse_for_stmt(parser);      break;
-        case TOK_TYPE:   stmt = nnc_parse_type_stmt(parser);     break;
-        case TOK_WHILE:  stmt = nnc_parse_while_stmt(parser);    break;
-        case TOK_RETURN: stmt = nnc_parse_return_stmt(parser);   break;
-        case TOK_OBRACE: stmt = nnc_parse_compound_stmt(parser); break;
+        case TOK_IF:       stmt = nnc_parse_if_stmt(parser);       break;
+        case TOK_DO:       stmt = nnc_parse_do_stmt(parser);       break;
+        case TOK_LET:      stmt = nnc_parse_let_stmt(parser);      break;
+        case TOK_FOR:      stmt = nnc_parse_for_stmt(parser);      break;
+        case TOK_GOTO:     stmt = nnc_parse_goto_stmt(parser);     break;
+        case TOK_TYPE:     stmt = nnc_parse_type_stmt(parser);     break;
+        case TOK_WHILE:    stmt = nnc_parse_while_stmt(parser);    break;
+        case TOK_BREAK:    stmt = nnc_parse_break_stmt(parser);    break;
+        case TOK_RETURN:   stmt = nnc_parse_return_stmt(parser);   break;
+        case TOK_OBRACE:   stmt = nnc_parse_compound_stmt(parser); break;
+        case TOK_CONTINUE: stmt = nnc_parse_continue_stmt(parser); break;
         default:
             stmt = nnc_parse_expr_stmt(parser);
     }

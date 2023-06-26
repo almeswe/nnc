@@ -299,6 +299,13 @@ static void nnc_dump_let_stmt(nnc_dump_data data) {
     }
 }
 
+static void nnc_dump_goto_stmt(nnc_dump_data data) {
+    const nnc_goto_statement* goto_stmt = data.exact;
+    fprintf(stderr, _c(BMAG, "goto-stmt ") "<label=");
+    const nnc_expression_statement* body = goto_stmt->body->exact;
+    nnc_dump_expr(DUMP_DATA(data.indent+1, body->expr));
+}
+
 static void nnc_dump_type_stmt(nnc_dump_data data) {
     const nnc_type_statement* type_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "type-stmt ") "<type=");
@@ -321,6 +328,10 @@ static void nnc_dump_while_stmt(nnc_dump_data data) {
 
 static void nnc_dump_empty_stmt(nnc_dump_data data) {
     fprintf(stderr, _c(BMAG, "empty-stmt\n"));
+}
+
+static void nnc_dump_break_stmt(nnc_dump_data data) {
+    fprintf(stderr, _c(BMAG, "break-stmt\n"));
 }
 
 static void nnc_dump_return_stmt(nnc_dump_data data) {
@@ -350,6 +361,10 @@ static void nnc_dump_compound_stmt(nnc_dump_data data) {
     }
 }
 
+static void nnc_dump_continue_stmt(nnc_dump_data data) {
+    fprintf(stderr, _c(BMAG, "continue-stmt\n"));
+}
+
 static void nnc_dump_stmt(nnc_dump_data data) {
     const nnc_statement* stmt = data.exact;
     static const nnc_dump_fn dumpers[] = {
@@ -357,12 +372,15 @@ static void nnc_dump_stmt(nnc_dump_data data) {
         [STMT_DO]       = nnc_dump_do_stmt,
         [STMT_FOR]      = nnc_dump_for_stmt,
         [STMT_LET]      = nnc_dump_let_stmt,
+        [STMT_GOTO]     = nnc_dump_goto_stmt,
         [STMT_TYPE]     = nnc_dump_type_stmt,
         [STMT_EXPR]     = nnc_dump_expr_stmt,
         [STMT_WHILE]    = nnc_dump_while_stmt,
         [STMT_EMPTY]    = nnc_dump_empty_stmt,
+        [STMT_BREAK]    = nnc_dump_break_stmt,
         [STMT_RETURN]   = nnc_dump_return_stmt,
-        [STMT_COMPOUND] = nnc_dump_compound_stmt
+        [STMT_COMPOUND] = nnc_dump_compound_stmt,
+        [STMT_CONTINUE] = nnc_dump_continue_stmt
     };
     if (stmt != NULL) {
         dumpers[stmt->kind](DUMP_DATA(data.indent, stmt->exact));
