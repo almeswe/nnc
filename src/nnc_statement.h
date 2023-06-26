@@ -14,8 +14,10 @@ typedef enum _nnc_statement_kind {
 	STMT_RETURN,
 	STMT_IMPORT,
 	STMT_LET,
-    STMT_NAMESPACE,
 	STMT_TYPE,
+	STMT_GOTO,
+	STMT_BREAK,
+	STMT_CONTINUE,
 	STMT_COMPOUND,
     STMT_ENUM_DECL,
 	STMT_FUNC_DECL,
@@ -45,7 +47,6 @@ typedef struct _nnc_expression_statement {
 } nnc_expression_statement;
 
 typedef struct _nnc_compound_statement {
-	//todo: incomplete
 	nnc_statement** stmts;
 } nnc_compound_statement;
 
@@ -74,9 +75,14 @@ typedef struct _nnc_for_stmt {
 	nnc_statement* body;
 } nnc_for_stmt;
 
-typedef struct _nnc_return_statement {
+typedef struct _nnc_jump_statement {
 	nnc_statement* body;
-} nnc_return_statement;
+} nnc_jump_statement;
+
+typedef nnc_jump_statement nnc_return_statement;
+typedef nnc_jump_statement nnc_break_statement;
+typedef nnc_jump_statement nnc_continue_statement;
+typedef nnc_jump_statement nnc_goto_statement;
 
 nnc_let_statement* nnc_let_stmt_new();
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact);
