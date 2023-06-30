@@ -365,22 +365,54 @@ static void nnc_dump_continue_stmt(nnc_dump_data data) {
     fprintf(stderr, _c(BMAG, "continue-stmt\n"));
 }
 
+static void nnc_dump_namespace_stmt(nnc_dump_data data) {
+    const nnc_namespace_statement* namespace = data.exact;
+    fprintf(stderr, _c(BRED, "namespace-stmt ") "<name=%s>\n", namespace->var->name);
+    for (nnc_u64 i = 0; i < buf_len(namespace->stmts); i++) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "<topmost stmt%lu>=", i+1);
+        nnc_dump_stmt(DUMP_DATA(data.indent+1, namespace->stmts[i]));
+    }
+}
+
+static void nnc_dump_fn_stmt(nnc_dump_data data) {
+    const nnc_fn_statement* fn_stmt = data.exact;
+    fprintf(stderr, _c(BRED, "fn-stmt ") "<name=%s, paramc=%lu, ret-type=",
+        fn_stmt->var->name, buf_len(fn_stmt->params));
+    nnc_dump_type(fn_stmt->ret);
+    fprintf(stderr, ">\n");
+    for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "<param%lu>=", i+1);
+        fprintf(stderr, "%s: ", fn_stmt->params[i]->var->name);
+        nnc_dump_type(fn_stmt->params[i]->type);
+        fprintf(stderr, "\n");
+    }
+    for (nnc_u64 i = 0; i < buf_len(fn_stmt->body); i++) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "<stmt%lu>=", i+1);
+        nnc_dump_stmt(DUMP_DATA(data.indent+1, fn_stmt->body[i]));
+    }
+}
+
 static void nnc_dump_stmt(nnc_dump_data data) {
     const nnc_statement* stmt = data.exact;
     static const nnc_dump_fn dumpers[] = {
-        [STMT_IF]       = nnc_dump_if_stmt,
-        [STMT_DO]       = nnc_dump_do_stmt,
-        [STMT_FOR]      = nnc_dump_for_stmt,
-        [STMT_LET]      = nnc_dump_let_stmt,
-        [STMT_GOTO]     = nnc_dump_goto_stmt,
-        [STMT_TYPE]     = nnc_dump_type_stmt,
-        [STMT_EXPR]     = nnc_dump_expr_stmt,
-        [STMT_WHILE]    = nnc_dump_while_stmt,
-        [STMT_EMPTY]    = nnc_dump_empty_stmt,
-        [STMT_BREAK]    = nnc_dump_break_stmt,
-        [STMT_RETURN]   = nnc_dump_return_stmt,
-        [STMT_COMPOUND] = nnc_dump_compound_stmt,
-        [STMT_CONTINUE] = nnc_dump_continue_stmt
+        [STMT_IF]        = nnc_dump_if_stmt,
+        [STMT_DO]        = nnc_dump_do_stmt,
+        [STMT_FOR]       = nnc_dump_for_stmt,
+        [STMT_LET]       = nnc_dump_let_stmt,
+        [STMT_GOTO]      = nnc_dump_goto_stmt,
+        [STMT_TYPE]      = nnc_dump_type_stmt,
+        [STMT_EXPR]      = nnc_dump_expr_stmt,
+        [STMT_WHILE]     = nnc_dump_while_stmt,
+        [STMT_EMPTY]     = nnc_dump_empty_stmt,
+        [STMT_BREAK]     = nnc_dump_break_stmt,
+        [STMT_RETURN]    = nnc_dump_return_stmt,
+        [STMT_COMPOUND]  = nnc_dump_compound_stmt,
+        [STMT_CONTINUE]  = nnc_dump_continue_stmt,
+        [STMT_NAMESPACE] = nnc_dump_namespace_stmt,
+        [STMT_FUNC_DECL] = nnc_dump_fn_stmt
     };
     if (stmt != NULL) {
         dumpers[stmt->kind](DUMP_DATA(data.indent, stmt->exact));
