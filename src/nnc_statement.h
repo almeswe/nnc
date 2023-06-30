@@ -19,6 +19,7 @@ typedef enum _nnc_statement_kind {
 	STMT_BREAK,
 	STMT_CONTINUE,
 	STMT_COMPOUND,
+	STMT_NAMESPACE,
     STMT_ENUM_DECL,
 	STMT_FUNC_DECL,
 	STMT_LABEL_DECL,
@@ -83,6 +84,28 @@ typedef nnc_jump_statement nnc_return_statement;
 typedef nnc_jump_statement nnc_break_statement;
 typedef nnc_jump_statement nnc_continue_statement;
 typedef nnc_jump_statement nnc_goto_statement;
+
+typedef nnc_statement nnc_top_statement;
+
+typedef struct _nnc_namespace_statement {
+	nnc_ident* var;
+	nnc_top_statement** stmts;
+} nnc_namespace_statement;
+
+typedef struct _nnc_fn_param {
+	nnc_ident* var;
+	nnc_type* type;
+} nnc_fn_param;
+
+typedef struct _nnc_fn_statement {
+	nnc_ident* var;
+	nnc_fn_param** params;
+	nnc_type* ret;
+	nnc_statement** body;
+} nnc_fn_statement;
+
+typedef nnc_fn_param nnc_struct_member;
+typedef nnc_fn_param nnc_union_member;
 
 nnc_let_statement* nnc_let_stmt_new();
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact);
