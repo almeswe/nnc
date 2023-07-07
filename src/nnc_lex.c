@@ -1,7 +1,5 @@
 #include "nnc_lex.h"
 
-//todo: fix context issues.
-
 /**
  * @brief Stores string representation of each nnc_tok_kind.
  */
@@ -123,6 +121,8 @@ static _map_(char*, nnc_tok_kind) nnc_keywods_map = NULL;
 static void nnc_lex_undo(nnc_lex* lex) {
     ungetc(lex->cc, lex->fp);
     lex->cc = lex->pc;
+    //todo: may cause problems when ungetting \n character
+    lex->cctx.hint_ch--;
 }
 
 /**
@@ -134,6 +134,7 @@ static char nnc_lex_grab(nnc_lex* lex) {
     if (lex->cc != EOF) {
         lex->pc = lex->cc;
         lex->cc = fgetc(lex->fp);
+        lex->cctx.hint_ch++;
     }
     return lex->cc;
 }
@@ -247,7 +248,6 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
             NNC_LEX_MATCH('\"')) {
             break;
         }
-        lex->cctx.hint_ch++;
         if (NNC_LEX_NOT_MATCH('\\')) {
             NNC_TOK_PUT_CC();
         }
@@ -270,7 +270,7 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
  */
 static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
-    // skip 'e' or 'E' character 
+    // skip 'e' or 'E' character
     nnc_lex_grab(lex);
     nnc_byte sign = lex->cc;
     if (sign != '+' && sign != '-') {
@@ -281,8 +281,6 @@ static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
         if (lex->cc < '0' || lex->cc > '9') {
             break;
         }
-        //todo: add this line before or after each addition
-        //lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     return TOK_NUMBER;
@@ -396,7 +394,6 @@ static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
             nnc_lex_grab_float_suffix(lex);
             break;
         }
-        lex->cctx.hint_ch++;
         size_after_dot++;
         NNC_TOK_PUT_CC();
     }
@@ -421,7 +418,6 @@ static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
             nnc_lex_grab_int_suffix(lex);
             break;
         }
-        lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     return TOK_NUMBER;
@@ -443,7 +439,6 @@ static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
             nnc_lex_grab_int_suffix(lex);
             break;
         }
-        lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     return TOK_NUMBER; 
@@ -462,7 +457,6 @@ static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
             nnc_lex_grab_int_suffix(lex);
             break;
         }
-        lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     return TOK_NUMBER;
@@ -481,7 +475,6 @@ static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
             nnc_lex_grab_int_suffix(lex);
             break;
         }
-        lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     return TOK_NUMBER;
@@ -528,7 +521,6 @@ static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
             (lex->cc < 'A' || lex->cc > 'Z') && lex->cc != '_') {
             break;
         }
-        lex->cctx.hint_ch++;
         NNC_TOK_PUT_CC();
     }
     nnc_lex_undo(lex);
