@@ -4,14 +4,8 @@
 #include "nnc_arena.h"
 #include "nnc_format.h"
 
-/*static nnc_str type_str[] = {
-    "i8", "i16", "i32", "i64",
-    "u8", "u16", "u32", "u64",
-    "f32", "f64",
-    "void", "unknown"
-};*/
-
 typedef struct _nnc_expression nnc_expression;
+typedef struct _nnc_var_type nnc_var_type;
 
 typedef enum _nnc_type_kind {
 	TYPE_ARRAY,
@@ -40,7 +34,8 @@ typedef struct _nnc_type {
             nnc_expression* dim;
         } array;
         struct _nnc_struct_or_union_type {
-            nnc_heap_ptr* members;
+            nnc_u64 memberc;
+            nnc_var_type** members;
         } struct_or_union;
     } exact;
     struct _nnc_type* base;
@@ -57,12 +52,12 @@ static nnc_type i64_type  __attribute__((unused)) = { .size=sizeof(nnc_i64), .ki
 static nnc_type u64_type  __attribute__((unused)) = { .size=sizeof(nnc_u64), .kind=TYPE_PRIMITIVE, .repr="u64"  };
 static nnc_type f64_type  __attribute__((unused)) = { .size=sizeof(nnc_f64), .kind=TYPE_PRIMITIVE, .repr="f64"  };
 static nnc_type void_type __attribute__((unused)) = { .size=0,               .kind=TYPE_VOID,      .repr="void" };
-//static nnc_type incomplete_type = { sizeof(nnc_i8),  TYPE_INCOMPLETE, "incomplete" };
 
 nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);
 nnc_type* nnc_arr_type_new(nnc_type* base);
 nnc_type* nnc_fn_type_new();
+nnc_type* nnc_struct_type_new();
 
 nnc_str nnc_type_tostr(const nnc_type* type);
 

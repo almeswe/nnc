@@ -72,6 +72,30 @@ static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
 
 static nnc_type* nnc_parse_type(nnc_parser* parser);
 
+static nnc_var_type* nnc_parse_var_type(nnc_parser* parser) {
+    const nnc_tok* tok = nnc_parser_get(parser);
+    nnc_var_type* var_type = new(nnc_var_type);
+    if (nnc_parser_match(parser, TOK_IDENT)) {
+        var_type->var = nnc_ident_new(tok->lexeme);
+    }
+    nnc_parser_expect(parser, TOK_IDENT);
+    nnc_parser_expect(parser, TOK_COLON);
+    var_type->type = nnc_parse_type(parser);
+    return var_type;
+}
+
+static nnc_fn_param* nnc_parse_fn_param(nnc_parser* parser) {
+    return (nnc_fn_param*)nnc_parse_var_type(parser);
+}
+
+static nnc_union_member* nnc_parse_union_member(nnc_parser* parser) {
+    return (nnc_union_member*)nnc_parse_var_type(parser);
+}
+
+static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
+    return (nnc_struct_member*)nnc_parse_var_type(parser);
+}
+
 static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FN);
     nnc_type* type = nnc_fn_type_new();
@@ -91,11 +115,27 @@ static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
     return type;
 }
 
-static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
+static nnc_type* nnc_parse_defined_type(nnc_parser* parser) {
     nnc_tok* tok = nnc_parser_get(parser);
     nnc_ident* ident = nnc_ident_new(tok->lexeme);
     nnc_parser_expect(parser, TOK_IDENT);
     return nnc_type_new(ident->name);
+}
+
+static nnc_type* nnc_parse_struct_type(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_STRUCT);
+    nnc_type* type = nnc_struct_type_new();
+    nnc_parser_expect(parser, TOK_OBRACE);
+    while (!nnc_parser_match(parser, TOK_CBRACE) &&
+           !nnc_parser_match(parser, TOK_EOF)) {
+        buf_add(type->exact.struct_or_union.members, 
+            nnc_parse_struct_member(parser));
+        nnc_parser_expect(parser, TOK_SEMICOLON);
+    }
+    nnc_parser_expect(parser, TOK_CBRACE);
+    type->exact.struct_or_union.memberc = buf_len(
+        type->exact.struct_or_union.members);
+    return type;
 }
 
 static nnc_type* nnc_parse_type_declarators(nnc_parser* parser, nnc_type* type) {
@@ -122,24 +162,26 @@ static nnc_type* nnc_parse_type(nnc_parser* parser) {
     nnc_type* type = NULL;
     const nnc_tok_kind kind = nnc_parser_peek(parser);
     switch (kind) {
-        case TOK_I8:    type = &i8_type;   break;
-        case TOK_U8:    type = &u8_type;   break;
-        case TOK_I16:   type = &i16_type;  break;
-        case TOK_U16:   type = &u16_type;  break;
-        case TOK_I32:   type = &i32_type;  break;
-        case TOK_U32:   type = &u32_type;  break;
-        case TOK_F32:   type = &f32_type;  break;
-        case TOK_I64:   type = &i64_type;  break;
-        case TOK_U64:   type = &u64_type;  break;
-        case TOK_F64:   type = &f64_type;  break;
-        case TOK_VOID:  type = &void_type; break;
-        case TOK_FN:    type = nnc_parse_fn_type(parser);   break;
-        case TOK_IDENT: type = nnc_parse_user_type(parser); break;
+        case TOK_I8:     type = &i8_type;   break;
+        case TOK_U8:     type = &u8_type;   break;
+        case TOK_I16:    type = &i16_type;  break;
+        case TOK_U16:    type = &u16_type;  break;
+        case TOK_I32:    type = &i32_type;  break;
+        case TOK_U32:    type = &u32_type;  break;
+        case TOK_F32:    type = &f32_type;  break;
+        case TOK_I64:    type = &i64_type;  break;
+        case TOK_U64:    type = &u64_type;  break;
+        case TOK_F64:    type = &f64_type;  break;
+        case TOK_VOID:   type = &void_type; break;
+        case TOK_FN:     type = nnc_parse_fn_type(parser);      break;
+        case TOK_IDENT:  type = nnc_parse_defined_type(parser); break;
+        case TOK_STRUCT: type = nnc_parse_struct_type(parser);  break;
         default: 
             nnc_abort_no_ctx("nnc_parse_type: unknown type kind met.");
     }
-    if (kind != TOK_FN &&
-        kind != TOK_IDENT) {
+    if (kind != TOK_FN    &&
+        kind != TOK_IDENT && 
+        kind != TOK_STRUCT) {
         nnc_parser_next(parser);
     }
     return nnc_parse_type_declarators(parser, type);
@@ -337,9 +379,9 @@ static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
         const nnc_tok* tok = nnc_parser_get(parser);
         nnc_expression* prefix = postfix ? postfix : primary;
         switch (tok->kind) {
-            case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);    break;
-            case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
-            case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
+            case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);   break;
+            case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);  break;
+            case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix); break;
             default:
                 nnc_abort_no_ctx("nnc_parse_postfix_expr: bug detected.\n");
         }
@@ -839,18 +881,6 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
 }
 
 nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
-
-nnc_fn_param* nnc_parse_fn_param(nnc_parser* parser) {
-    const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_fn_param* fn_param = new(nnc_fn_param);
-    if (nnc_parser_match(parser, TOK_IDENT)) {
-        fn_param->var = nnc_ident_new(tok->lexeme);
-    }
-    nnc_parser_expect(parser, TOK_IDENT);
-    nnc_parser_expect(parser, TOK_COLON);
-    fn_param->type = nnc_parse_type(parser);
-    return fn_param;
-}
 
 nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FN);

@@ -29,18 +29,33 @@ nnc_type* nnc_fn_type_new() {
     return ptr;
 }
 
-nnc_str nnc_type_tostr(const nnc_type* type) {
-    if (type->kind == TYPE_FUNCTION) {
-        nnc_str repr = "fn( ";
-        for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
-            repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
-        }
-        return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
+nnc_type* nnc_struct_type_new() {
+    nnc_type* ptr = nnc_type_new(NULL);
+    ptr->kind = TYPE_STRUCT;
+    ptr->size = 0;
+    return ptr;
+}
+
+static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
+    nnc_str repr = "fn( ";
+    for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
+        repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
     }
+    return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
+}
+
+static nnc_str nnc_struct_type_tostr(const nnc_type* type) {
+    nnc_u64 more = 0;
+    nnc_u64 count = type->exact.struct_or_union.memberc;
+    return sformat("struct { %ld }", count);
+}
+
+nnc_str nnc_type_tostr(const nnc_type* type) {
     switch (type->kind) {
-        case TYPE_ENUM:    return sformat("enum %s",   type->repr);
-        case TYPE_UNION:   return sformat("union %s",  type->repr);
-        case TYPE_STRUCT:  return sformat("struct %s", type->repr);
+        case TYPE_ENUM:     return sformat("enum %s",   type->repr);
+        case TYPE_UNION:    return sformat("union %s",  type->repr);
+        case TYPE_STRUCT:   return nnc_struct_type_tostr(type);
+        case TYPE_FUNCTION: return nnc_fn_type_tostr(type);
         case TYPE_ARRAY:   return sformat("%s[]", nnc_type_tostr(type->base));
         case TYPE_POINTER: return sformat("%s*",  nnc_type_tostr(type->base));
         default:
