@@ -24,8 +24,8 @@ char* nnc_ctx_tostr(const nnc_ctx* ctx) {
         strcpy(path, ctx->fabs);
         const char* fname = basename(path);
         return sformat("%s:%lu:%lu", fname, 
-            ctx->hint_ln + 1, ctx->hint_ch + 1); 
+            ctx->hint_ln + 1, ctx->hint_ch); 
     }
     return sformat("%lu:%lu", 
-        ctx->hint_ln + 1, ctx->hint_ch + 1); 
+        ctx->hint_ln + 1, ctx->hint_ch); 
 }
