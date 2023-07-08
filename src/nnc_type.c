@@ -29,6 +29,20 @@ nnc_type* nnc_fn_type_new() {
     return ptr;
 }
 
+nnc_type* nnc_enum_type_new() {
+    nnc_type* ptr = nnc_type_new(NULL);
+    ptr->kind = TYPE_ENUM;
+    ptr->size = i64_type.size;
+    return ptr;
+}
+
+nnc_type* nnc_union_type_new() {
+    nnc_type* ptr = nnc_type_new(NULL);
+    ptr->kind = TYPE_UNION;
+    ptr->size = 0;
+    return ptr;
+}
+
 nnc_type* nnc_struct_type_new() {
     nnc_type* ptr = nnc_type_new(NULL);
     ptr->kind = TYPE_STRUCT;
@@ -44,20 +58,33 @@ static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
 }
 
-static nnc_str nnc_struct_type_tostr(const nnc_type* type) {
+static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_u64 more = 0;
+    nnc_str repr = "{ ";
     nnc_u64 count = type->exact.struct_or_union.memberc;
-    return sformat("struct { %ld }", count);
+    if (count >= 1) {
+        nnc_var_type* member = type->exact.struct_or_union.members[0];
+        repr = sformat("%s%s:%s ", repr, member->var->name, nnc_type_tostr(member->type));
+    }
+    if (count > 2) {
+        more = count - 2;
+        repr = sformat("%s..%lu more.. ", repr, more);
+    }
+    if (count > 1) {
+        nnc_var_type* member = type->exact.struct_or_union.members[count-1];
+        repr = sformat("%s%s:%s ", repr, member->var->name, nnc_type_tostr(member->type));
+    }
+    return sformat("%s}", repr);
 }
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     switch (type->kind) {
         case TYPE_ENUM:     return sformat("enum %s",   type->repr);
-        case TYPE_UNION:    return sformat("union %s",  type->repr);
-        case TYPE_STRUCT:   return nnc_struct_type_tostr(type);
+        case TYPE_UNION:    return sformat("union %s",  nnc_struct_or_union_type_tostr(type));
+        case TYPE_STRUCT:   return sformat("struct %s", nnc_struct_or_union_type_tostr(type));
         case TYPE_FUNCTION: return nnc_fn_type_tostr(type);
-        case TYPE_ARRAY:   return sformat("%s[]", nnc_type_tostr(type->base));
-        case TYPE_POINTER: return sformat("%s*",  nnc_type_tostr(type->base));
+        case TYPE_ARRAY:    return sformat("%s[]", nnc_type_tostr(type->base));
+        case TYPE_POINTER:  return sformat("%s*",  nnc_type_tostr(type->base));
         default:
             return type->repr;
     }

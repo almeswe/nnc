@@ -21,11 +21,6 @@ typedef struct _nnc_expression {
     nnc_expression_kind kind;
 } nnc_expression;
 
-typedef struct _nnc_ident {
-    nnc_u64 size;
-    nnc_str name;
-} nnc_ident;
-
 typedef enum _nnc_unary_expression_kind {
     UNARY_CAST,
     UNARY_PLUS,

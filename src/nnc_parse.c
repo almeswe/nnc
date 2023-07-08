@@ -88,10 +88,6 @@ static nnc_fn_param* nnc_parse_fn_param(nnc_parser* parser) {
     return (nnc_fn_param*)nnc_parse_var_type(parser);
 }
 
-static nnc_union_member* nnc_parse_union_member(nnc_parser* parser) {
-    return (nnc_union_member*)nnc_parse_var_type(parser);
-}
-
 static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
     return (nnc_struct_member*)nnc_parse_var_type(parser);
 }
@@ -122,9 +118,16 @@ static nnc_type* nnc_parse_defined_type(nnc_parser* parser) {
     return nnc_type_new(ident->name);
 }
 
-static nnc_type* nnc_parse_struct_type(nnc_parser* parser) {
-    nnc_parser_expect(parser, TOK_STRUCT);
-    nnc_type* type = nnc_struct_type_new();
+static nnc_type* nnc_parse_struct_or_union_type(nnc_parser* parser) {
+    nnc_type* type = NULL;
+    nnc_tok_kind kind = nnc_parser_peek(parser);
+    switch (kind) {
+        case TOK_UNION:  type = nnc_union_type_new();  break;
+        case TOK_STRUCT: type = nnc_struct_type_new(); break;
+        default: 
+            THROW(NNC_SYNTAX, "expected <TOK_STRUCT> or <TOK_UNION>."); 
+    }
+    nnc_parser_next(parser);
     nnc_parser_expect(parser, TOK_OBRACE);
     while (!nnc_parser_match(parser, TOK_CBRACE) &&
            !nnc_parser_match(parser, TOK_EOF)) {
@@ -138,21 +141,32 @@ static nnc_type* nnc_parse_struct_type(nnc_parser* parser) {
     return type;
 }
 
+static nnc_type* nnc_parse_arr_declarator(nnc_parser* parser, nnc_type* type) {
+    nnc_parser_expect(parser, TOK_OBRACKET);
+    type = nnc_arr_type_new(type);
+    type->exact.array.dim = nnc_parse_expr_reduced(parser);
+    nnc_parser_expect(parser, TOK_CBRACKET);
+    return type;
+}
+
+static nnc_type* nnc_parse_ptr_declarator(nnc_parser* parser, nnc_type* type) {
+    nnc_parser_expect(parser, TOK_ASTERISK);
+    type = nnc_ptr_type_new(type);
+    if (type->base->kind == TYPE_ARRAY) {
+        THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
+    }
+    return type;
+}
+
 static nnc_type* nnc_parse_type_declarators(nnc_parser* parser, nnc_type* type) {
     while (nnc_parser_match(parser, TOK_ASTERISK) ||
            nnc_parser_match(parser, TOK_OBRACKET)) {
         nnc_tok_kind kind = nnc_parser_peek(parser);
         nnc_parser_next(parser);
-        if (kind == TOK_ASTERISK) {
-            type = nnc_ptr_type_new(type);
-            if (type->base->kind == TYPE_ARRAY) {
-                THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
-            }
-        }
-        else {
-            type = nnc_arr_type_new(type);
-            type->exact.array.dim = nnc_parse_expr_reduced(parser);
-            nnc_parser_expect(parser, TOK_CBRACKET);
+        switch (kind) {
+            case TOK_OBRACKET: type = nnc_parse_arr_declarator(parser, type); break;    
+            case TOK_ASTERISK: type = nnc_parse_ptr_declarator(parser, type); break;
+            default: break;
         }
     }
     return type;
@@ -175,12 +189,14 @@ static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_VOID:   type = &void_type; break;
         case TOK_FN:     type = nnc_parse_fn_type(parser);      break;
         case TOK_IDENT:  type = nnc_parse_defined_type(parser); break;
-        case TOK_STRUCT: type = nnc_parse_struct_type(parser);  break;
+        case TOK_UNION:  type = nnc_parse_struct_or_union_type(parser); break;
+        case TOK_STRUCT: type = nnc_parse_struct_or_union_type(parser); break;
         default: 
             nnc_abort_no_ctx("nnc_parse_type: unknown type kind met.");
     }
     if (kind != TOK_FN    &&
-        kind != TOK_IDENT && 
+        kind != TOK_IDENT &&
+        kind != TOK_UNION &&
         kind != TOK_STRUCT) {
         nnc_parser_next(parser);
     }
@@ -452,7 +468,6 @@ static nnc_expression* nnc_parse_arith_addition_expr(nnc_parser* parser) {
         if (nnc_parser_match(parser, TOK_MINUS)) {
             kind = BINARY_SUB;
         }
-        // pub let pi = 3.141592f64;
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
         temp->lexpr = nether_expr;

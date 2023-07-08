@@ -11,6 +11,11 @@
 
 #define SUFFIX_NONE 0xf
 
+typedef struct _nnc_ident {
+    nnc_u64 size;
+    nnc_str name;
+} nnc_ident;
+
 typedef enum _nnc_dbl_suffix {
     SUFFIX_F32, SUFFIX_F64
 } nnc_dbl_suffix;
