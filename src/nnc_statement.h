@@ -92,11 +92,6 @@ typedef struct _nnc_namespace_statement {
 	nnc_top_statement** stmts;
 } nnc_namespace_statement;
 
-typedef struct _nnc_var_type {
-	nnc_ident* var;
-	nnc_type* type;
-} nnc_var_type;
-
 typedef nnc_var_type nnc_fn_param;
 typedef nnc_var_type nnc_union_member;
 typedef nnc_var_type nnc_struct_member;

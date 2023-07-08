@@ -3,9 +3,10 @@
 
 #include "nnc_arena.h"
 #include "nnc_format.h"
+#include "nnc_literal.h"
 
+typedef struct _nnc_var_type   nnc_var_type;
 typedef struct _nnc_expression nnc_expression;
-typedef struct _nnc_var_type nnc_var_type;
 
 typedef enum _nnc_type_kind {
 	TYPE_ARRAY,
@@ -41,6 +42,11 @@ typedef struct _nnc_type {
     struct _nnc_type* base;
 } nnc_type;
 
+typedef struct _nnc_var_type {
+    nnc_ident* var;
+    nnc_type* type;
+} nnc_var_type;
+
 static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=TYPE_PRIMITIVE, .repr="i8"   };
 static nnc_type u8_type   __attribute__((unused)) = { .size=sizeof(nnc_u8),  .kind=TYPE_PRIMITIVE, .repr="u8"   };
 static nnc_type i16_type  __attribute__((unused)) = { .size=sizeof(nnc_i16), .kind=TYPE_PRIMITIVE, .repr="i16"  };
@@ -57,6 +63,7 @@ nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);
 nnc_type* nnc_arr_type_new(nnc_type* base);
 nnc_type* nnc_fn_type_new();
+nnc_type* nnc_union_type_new();
 nnc_type* nnc_struct_type_new();
 
 nnc_str nnc_type_tostr(const nnc_type* type);
