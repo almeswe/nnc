@@ -92,6 +92,20 @@ static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
     return (nnc_struct_member*)nnc_parse_var_type(parser);
 }
 
+static nnc_enum_member* nnc_parse_enum_member(nnc_parser* parser) {
+    nnc_enum_member* member = new(nnc_enum_member);
+    if (nnc_parser_match(parser, TOK_IDENT)) {
+        const nnc_tok* tok = nnc_parser_get(parser);
+        member->var = nnc_ident_new(tok->lexeme);
+    }
+    nnc_parser_expect(parser, TOK_IDENT);
+    if (nnc_parser_match(parser, TOK_ASSIGN)) {
+        nnc_parser_next(parser);
+        member->init = nnc_parse_expr_reduced(parser);
+    }
+    return member;
+}
+
 static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FN);
     nnc_type* type = nnc_fn_type_new();
@@ -111,11 +125,29 @@ static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
     return type;
 }
 
-static nnc_type* nnc_parse_defined_type(nnc_parser* parser) {
+static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
     nnc_tok* tok = nnc_parser_get(parser);
     nnc_ident* ident = nnc_ident_new(tok->lexeme);
     nnc_parser_expect(parser, TOK_IDENT);
     return nnc_type_new(ident->name);
+}
+
+static nnc_type* nnc_parse_enum_type(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_ENUM);
+    nnc_parser_expect(parser, TOK_OBRACE);
+    nnc_type* type = nnc_enum_type_new();
+    while (!nnc_parser_match(parser, TOK_CBRACE) &&
+           !nnc_parser_match(parser, TOK_EOF)) {
+        buf_add(type->exact.enumeration.members,
+            nnc_parse_enum_member(parser));
+        if (!nnc_parser_match(parser, TOK_CBRACE)) {
+            nnc_parser_expect(parser, TOK_COMMA);
+        }
+    }
+    nnc_parser_expect(parser, TOK_CBRACE);
+    type->exact.enumeration.memberc = buf_len(
+        type->exact.enumeration.members);
+    return type;
 }
 
 static nnc_type* nnc_parse_struct_or_union_type(nnc_parser* parser) {
@@ -187,17 +219,15 @@ static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_U64:    type = &u64_type;  break;
         case TOK_F64:    type = &f64_type;  break;
         case TOK_VOID:   type = &void_type; break;
-        case TOK_FN:     type = nnc_parse_fn_type(parser);      break;
-        case TOK_IDENT:  type = nnc_parse_defined_type(parser); break;
+        case TOK_FN:     type = nnc_parse_fn_type(parser);   break;
+        case TOK_IDENT:  type = nnc_parse_user_type(parser); break;
+        case TOK_ENUM:   type = nnc_parse_enum_type(parser); break;
         case TOK_UNION:  type = nnc_parse_struct_or_union_type(parser); break;
         case TOK_STRUCT: type = nnc_parse_struct_or_union_type(parser); break;
         default: 
             nnc_abort_no_ctx("nnc_parse_type: unknown type kind met.");
     }
-    if (kind != TOK_FN    &&
-        kind != TOK_IDENT &&
-        kind != TOK_UNION &&
-        kind != TOK_STRUCT) {
+    if (nnc_parser_match_type(kind)) {
         nnc_parser_next(parser);
     }
     return nnc_parse_type_declarators(parser, type);

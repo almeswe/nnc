@@ -118,17 +118,6 @@ static void nnc_dump_dbl(nnc_dump_data data) {
     fprintf(stderr, "<suff=%d>\n", literal->suffix);
 }
 
-static void nnc_dump_call(nnc_dump_data data) {
-    const nnc_unary_expression* unary = data.exact;
-    nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
-    nnc_dump_indent(data.indent + 2);
-    fprintf(stderr, "%s", TREE_BR _c(BCYN, " args") "=\n");
-    for (nnc_u64 i = 0; i < unary->exact.call.argc; i++) {
-        const nnc_expression* arg = unary->exact.call.args[i];
-        nnc_dump_expr(DUMP_DATA(data.indent + 3, arg));
-    }
-}
-
 static void nnc_dump_unary(nnc_dump_data data) {
     const nnc_unary_expression* unary = data.exact;
     static const char* unary_str[] = {

@@ -58,28 +58,45 @@ static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
 }
 
+static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
+    nnc_str repr = "{ ";
+    nnc_u64 count = type->exact.enumeration.memberc;
+    for (nnc_u64 i = 0; i < count; i++) {
+        if (i > 2) {
+            repr = sformat("%s..%lu more.. ", repr, count-i);
+            break;
+        }
+        repr = sformat("%s%s ", repr, 
+            type->exact.enumeration.members[i]->var->name);
+    }
+    return sformat("%s}", repr);
+}
+
 static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_u64 more = 0;
     nnc_str repr = "{ ";
     nnc_u64 count = type->exact.struct_or_union.memberc;
+    nnc_struct_member* member = NULL;
     if (count >= 1) {
-        nnc_var_type* member = type->exact.struct_or_union.members[0];
-        repr = sformat("%s%s:%s ", repr, member->var->name, nnc_type_tostr(member->type));
+        member = type->exact.struct_or_union.members[0];
+        repr = sformat("%s%s:%s ", repr, 
+            member->var->name, nnc_type_tostr(member->type));
     }
     if (count > 2) {
         more = count - 2;
         repr = sformat("%s..%lu more.. ", repr, more);
     }
     if (count > 1) {
-        nnc_var_type* member = type->exact.struct_or_union.members[count-1];
-        repr = sformat("%s%s:%s ", repr, member->var->name, nnc_type_tostr(member->type));
+        member = type->exact.struct_or_union.members[count-1];
+        repr = sformat("%s%s:%s ", repr, 
+            member->var->name, nnc_type_tostr(member->type));
     }
     return sformat("%s}", repr);
 }
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     switch (type->kind) {
-        case TYPE_ENUM:     return sformat("enum %s",   type->repr);
+        case TYPE_ENUM:     return sformat("enum %s",   nnc_enum_type_tostr(type));
         case TYPE_UNION:    return sformat("union %s",  nnc_struct_or_union_type_tostr(type));
         case TYPE_STRUCT:   return sformat("struct %s", nnc_struct_or_union_type_tostr(type));
         case TYPE_FUNCTION: return nnc_fn_type_tostr(type);

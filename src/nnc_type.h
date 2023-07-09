@@ -5,8 +5,22 @@
 #include "nnc_format.h"
 #include "nnc_literal.h"
 
-typedef struct _nnc_var_type   nnc_var_type;
+typedef struct _nnc_type       nnc_type;
 typedef struct _nnc_expression nnc_expression;
+
+typedef struct _nnc_enum_member {
+    nnc_ident* var;
+    nnc_expression* init;
+    union _nnc_enum_member_value {
+        nnc_u64 u;
+        nnc_i64 d;
+    } init_const;
+} nnc_enum_member;
+
+typedef struct _nnc_struct_member {
+    nnc_ident* var;
+    nnc_type* type;
+} nnc_struct_member;
 
 typedef enum _nnc_type_kind {
 	TYPE_ARRAY,
@@ -26,26 +40,25 @@ typedef struct _nnc_type {
     nnc_type_kind kind;
     nnc_str repr;
     union {
-        struct _nnc_fn_type {
-            struct _nnc_type*  ret;
-            struct _nnc_type** params;
-            nnc_u64 paramc;
-        } fn;
-        struct _nnc_array_type {
-            nnc_expression* dim;
-        } array;
-        struct _nnc_struct_or_union_type {
-            nnc_u64 memberc;
-            nnc_var_type** members;
-        } struct_or_union;
+    struct _nnc_fn_type {
+        struct _nnc_type*  ret;
+        struct _nnc_type** params;
+        nnc_u64 paramc;
+    } fn;
+    struct _nnc_array_type {
+        nnc_expression* dim;
+    } array;
+    struct _nnc_enumeration_type {
+        nnc_u64 memberc;
+        nnc_enum_member** members;
+    } enumeration;
+    struct _nnc_struct_or_union_type {
+        nnc_u64 memberc;
+        nnc_struct_member** members;
+    } struct_or_union;
     } exact;
     struct _nnc_type* base;
 } nnc_type;
-
-typedef struct _nnc_var_type {
-    nnc_ident* var;
-    nnc_type* type;
-} nnc_var_type;
 
 static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=TYPE_PRIMITIVE, .repr="i8"   };
 static nnc_type u8_type   __attribute__((unused)) = { .size=sizeof(nnc_u8),  .kind=TYPE_PRIMITIVE, .repr="u8"   };
@@ -63,6 +76,7 @@ nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);
 nnc_type* nnc_arr_type_new(nnc_type* base);
 nnc_type* nnc_fn_type_new();
+nnc_type* nnc_enum_type_new(); 
 nnc_type* nnc_union_type_new();
 nnc_type* nnc_struct_type_new();
 
