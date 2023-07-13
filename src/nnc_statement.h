@@ -47,9 +47,17 @@ typedef struct _nnc_expression_statement {
     nnc_expression* expr;
 } nnc_expression_statement;
 
+#define NNC_GET_SYMTABLE(stmt) ((nnc_compound_statement*)stmt->body->exact)->scope;
+
 typedef struct _nnc_compound_statement {
 	nnc_statement** stmts;
+	struct _nnc_st* scope;
 } nnc_compound_statement;
+
+typedef struct _nnc_scoped_body {
+	nnc_statement* stmt;
+	struct _nnc_st* scope;
+} nnc_scoped_body;
 
 typedef struct _nnc_cond_n_body {
 	nnc_expression* cond;
@@ -58,12 +66,12 @@ typedef struct _nnc_cond_n_body {
 
 typedef nnc_cond_n_body nnc_if_branch;  
 typedef nnc_cond_n_body nnc_elif_branch;
-typedef nnc_cond_n_body nnc_else_branch;
+typedef nnc_statement   nnc_else_branch;
 
 typedef struct _nnc_if_stmt {
 	nnc_if_branch* if_br;
 	nnc_elif_branch** elif_brs;
-	nnc_statement* else_br;
+	nnc_else_branch* else_br;
 } nnc_if_stmt;
 
 typedef nnc_cond_n_body nnc_while_stmt;
@@ -92,21 +100,17 @@ typedef struct _nnc_namespace_statement {
 	nnc_top_statement** stmts;
 } nnc_namespace_statement;
 
-typedef nnc_var_type nnc_fn_param;
-typedef nnc_var_type nnc_union_member;
-typedef nnc_var_type nnc_struct_member;
+typedef nnc_struct_member nnc_var_type;
+typedef nnc_struct_member nnc_fn_param;
+typedef nnc_struct_member nnc_union_member;
 
 typedef struct _nnc_fn_statement {
 	nnc_ident* var;
 	nnc_fn_param** params;
 	nnc_type* ret;
-	nnc_statement** body;
+	nnc_statement* body;
 } nnc_fn_statement;
 
-typedef nnc_fn_param nnc_struct_member;
-typedef nnc_fn_param nnc_union_member;
-
-nnc_let_statement* nnc_let_stmt_new();
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact);
 
 #endif

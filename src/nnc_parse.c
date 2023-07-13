@@ -2,6 +2,8 @@
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     nnc_lex_init(&out_parser->lex, file);
+    out_parser->table = new(nnc_st);
+    nnc_st_init(out_parser->table);
     out_parser->lookup.is_first = true;
 }
 
@@ -13,6 +15,10 @@ void nnc_parser_fini(nnc_parser* parser) {
 
 nnc_tok* nnc_parser_get(nnc_parser* parser) {
     return &parser->current.tok;
+}
+
+nnc_ctx* nnc_parser_get_ctx(nnc_parser* parser) {
+    return &parser->lex.cctx;
 }
 
 nnc_tok* nnc_parser_get_lookup(nnc_parser* parser) {
@@ -48,9 +54,8 @@ nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
 nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     nnc_tok_kind current = nnc_parser_peek(parser);
     if (current != kind) {
-        // todo: pass ctx to exception
         THROW(NNC_SYNTAX, sformat("expected <%s>, but met <%s>.", 
-            nnc_tok_str(kind), nnc_tok_str(current)));
+            nnc_tok_str(kind), nnc_tok_str(current)), nnc_parser_get_ctx(parser));
     }   
     nnc_parser_next(parser);
     return nnc_parser_peek(parser);
@@ -68,6 +73,21 @@ static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
         default:
             return false;
     }
+}
+
+static void nnc_parser_enter_scope(nnc_parser* parser) {
+    nnc_st* inner = new(nnc_st);
+    nnc_st_init(inner);
+    inner->root = parser->table;
+    buf_add(parser->table->branches, inner);
+    parser->table = inner;
+}
+
+static void nnc_parser_leave_scope(nnc_parser* parser) {
+    if (parser->table->root == NULL) {
+        nnc_abort_no_ctx("nnc_parser_leave_scope: root table is NULL.");
+    }
+    parser->table = parser->table->root;
 }
 
 static nnc_type* nnc_parse_type(nnc_parser* parser);
@@ -157,7 +177,7 @@ static nnc_type* nnc_parse_struct_or_union_type(nnc_parser* parser) {
         case TOK_UNION:  type = nnc_union_type_new();  break;
         case TOK_STRUCT: type = nnc_struct_type_new(); break;
         default: 
-            THROW(NNC_SYNTAX, "expected <TOK_STRUCT> or <TOK_UNION>."); 
+            THROW(NNC_SYNTAX, "expected <TOK_STRUCT> or <TOK_UNION>.", nnc_parser_get_ctx(parser)); 
     }
     nnc_parser_next(parser);
     nnc_parser_expect(parser, TOK_OBRACE);
@@ -185,7 +205,7 @@ static nnc_type* nnc_parse_ptr_declarator(nnc_parser* parser, nnc_type* type) {
     nnc_parser_expect(parser, TOK_ASTERISK);
     type = nnc_ptr_type_new(type);
     if (type->base->kind == TYPE_ARRAY) {
-        THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.\n", nnc_type_tostr(type)));
+        THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.", nnc_type_tostr(type)), nnc_parser_get_ctx(parser));
     }
     return type;
 }
@@ -224,8 +244,8 @@ static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_ENUM:   type = nnc_parse_enum_type(parser); break;
         case TOK_UNION:  type = nnc_parse_struct_or_union_type(parser); break;
         case TOK_STRUCT: type = nnc_parse_struct_or_union_type(parser); break;
-        default: 
-            nnc_abort_no_ctx("nnc_parse_type: unknown type kind met.");
+        default:
+            THROW(NNC_SYNTAX, "type expected.", nnc_parser_get_ctx(parser));
     }
     if (nnc_parser_match_type(kind)) {
         nnc_parser_next(parser);
@@ -292,8 +312,7 @@ static nnc_expression* nnc_parse_primary_expr(nnc_parser* parser) {
         case TOK_NUMBER: return nnc_parse_number(parser);
         case TOK_OPAREN: return nnc_parse_parens(parser);
         default:
-            THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_expr -> %s.\n", 
-                nnc_tok_str(tok->kind)));
+            THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_primary_expr: %s.", nnc_tok_str(tok->kind)));
     }
     return NULL;
 }
@@ -378,7 +397,7 @@ static nnc_expression* nnc_parse_as_expr(nnc_parser* parser, nnc_expression* pre
 static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_next(parser);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
-        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.");
+        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
     nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_DOT);
     expr->lexpr = prefix;
@@ -761,16 +780,27 @@ nnc_expression* nnc_parse_expr(nnc_parser* parser) {
     return nnc_parse_comma_expr(parser);
 }
 
-nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser);
+static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser);
 
-nnc_cond_n_body* nnc_parse_cond_n_body(nnc_parser* parser) {
+static nnc_statement* nnc_parse_body(nnc_parser* parser) {
+    nnc_statement* body = nnc_parse_stmt(parser);
+    if (body->kind != STMT_COMPOUND) {
+        if (body->kind == STMT_LET ||
+            body->kind == STMT_TYPE) {
+            THROW(NNC_SYNTAX, "cannot declare type or variable inside simplified body.", nnc_parser_get_ctx(parser));
+        }
+    }
+    return body;
+}
+
+static nnc_cond_n_body* nnc_parse_cond_n_body(nnc_parser* parser) {
     nnc_cond_n_body* cond_n_body = new(nnc_cond_n_body);
     cond_n_body->cond = nnc_parse_parens(parser);
-    cond_n_body->body = nnc_parse_stmt(parser);
+    cond_n_body->body = nnc_parse_body(parser);
     return cond_n_body;
 }
 
-nnc_statement* nnc_parse_if_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_if_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_IF);
     nnc_if_stmt* if_stmt = new(nnc_if_stmt);
     if_stmt->if_br = nnc_parse_cond_n_body(parser);
@@ -780,42 +810,49 @@ nnc_statement* nnc_parse_if_stmt(nnc_parser* parser) {
     }
     if (nnc_parser_match(parser, TOK_ELSE)) {
         nnc_parser_next(parser);
-        if_stmt->else_br = nnc_parse_stmt(parser);
+        if_stmt->else_br = nnc_parse_body(parser);
     }
     return nnc_stmt_new(STMT_IF, if_stmt);
 }
 
-nnc_statement* nnc_parse_do_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_do_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_DO);
     nnc_do_while_stmt* do_stmt = new(nnc_do_while_stmt);
-    do_stmt->body = nnc_parse_stmt(parser);
+    do_stmt->body = nnc_parse_body(parser);
     nnc_parser_expect(parser, TOK_WHILE);
     do_stmt->cond = nnc_parse_parens(parser);
     return nnc_stmt_new(STMT_DO, do_stmt);
 }
 
-nnc_statement* nnc_parse_let_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc_bool put_in_st) {
     nnc_parser_expect(parser, TOK_LET);
-    nnc_let_statement* vardecl = new(nnc_let_statement);
+    nnc_let_statement* let_stmt = new(nnc_let_statement);
     const nnc_tok* tok = nnc_parser_get(parser);
-    vardecl->var = nnc_ident_new(tok->lexeme);
+    let_stmt->var = nnc_ident_new(tok->lexeme);
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_COLON);
-    vardecl->type = nnc_parse_type(parser);
+    let_stmt->type = nnc_parse_type(parser);
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
         nnc_parser_expect(parser, TOK_ASSIGN);
-        vardecl->init = nnc_parse_expr(parser);
+        let_stmt->init = nnc_parse_expr(parser);
     }
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    return nnc_stmt_new(STMT_LET, vardecl);
+    if (put_in_st) {
+        nnc_st_put_entity(parser->table, ST_ENTITY_VAR, let_stmt);
+    }
+    return nnc_stmt_new(STMT_LET, let_stmt);
 }
 
-nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_let_stmt(nnc_parser* parser) {
+    return nnc_parse_let_stmt_with_opt_st(parser, true);
+}
+
+static nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FOR);
     nnc_for_stmt* for_stmt = new(nnc_for_stmt);
     nnc_parser_expect(parser, TOK_OPAREN);
     if (nnc_parser_match(parser, TOK_LET)) {
-        for_stmt->init = nnc_parse_let_stmt(parser);
+        for_stmt->init = nnc_parse_let_stmt_with_opt_st(parser, false);
     }
     else {
         for_stmt->init = nnc_parse_expr_stmt(parser);
@@ -825,16 +862,21 @@ nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
         for_stmt->step = nnc_stmt_new(STMT_EMPTY, NULL);
     }
     else {
-        nnc_expression_statement* exprstmt = new(nnc_expression_statement);
-        exprstmt->expr = nnc_parse_expr(parser);
-        for_stmt->step = nnc_stmt_new(STMT_EXPR, exprstmt);
+        nnc_expression_statement* expr_stmt = new(nnc_expression_statement);
+        expr_stmt->expr = nnc_parse_expr(parser);
+        for_stmt->step = nnc_stmt_new(STMT_EXPR, expr_stmt);
     }
     nnc_parser_expect(parser, TOK_CPAREN);
-    for_stmt->body = nnc_parse_stmt(parser);
+    for_stmt->body = nnc_parse_body(parser);
+    if (for_stmt->init->kind == STMT_LET &&
+        for_stmt->body->kind == STMT_COMPOUND) {
+        nnc_st* inner = NNC_GET_SYMTABLE(for_stmt);
+        nnc_st_put_entity(inner, ST_ENTITY_VAR, for_stmt->init->exact);
+    }
     return nnc_stmt_new(STMT_FOR, for_stmt);
 }
 
-nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
     if (nnc_parser_match(parser, TOK_SEMICOLON)) {
         nnc_parser_next(parser);
         return nnc_stmt_new(STMT_EMPTY, NULL);
@@ -845,19 +887,19 @@ nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_EXPR, exprstmt);
 }
 
-nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_GOTO);
     nnc_goto_statement* goto_stmt = new(nnc_goto_statement);
     goto_stmt->body = nnc_parse_expr_stmt(parser);
     nnc_expression_statement* body = goto_stmt->body->exact;
     if (goto_stmt->body->kind == STMT_EMPTY || 
         body->expr->kind != EXPR_IDENT) {
-        THROW(NNC_SYNTAX, "expected label name.");
+        nnc_parser_expect(parser, TOK_IDENT);
     }
     return nnc_stmt_new(STMT_GOTO, goto_stmt);
 }
 
-nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_TYPE);
     nnc_type_statement* type_stmt = new(nnc_type_statement);
     type_stmt->type = nnc_parse_type(parser);
@@ -867,39 +909,42 @@ nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
-nnc_statement* nnc_parse_while_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_while_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_WHILE);
     nnc_while_stmt* while_stmt = new(nnc_while_stmt);
     while_stmt->cond = nnc_parse_parens(parser);
-    while_stmt->body = nnc_parse_stmt(parser);
+    while_stmt->body = nnc_parse_body(parser);
     return nnc_stmt_new(STMT_WHILE, while_stmt);
 }
 
-nnc_statement* nnc_parse_break_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_break_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_BREAK);
     nnc_break_statement* break_stmt = new(nnc_break_statement);
     nnc_parser_expect(parser, TOK_SEMICOLON);
     return nnc_stmt_new(STMT_BREAK, break_stmt);
 }
 
-nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_RETURN);
     nnc_return_statement* ret_stmt = new(nnc_return_statement);
     ret_stmt->body = nnc_parse_expr_stmt(parser);
     return nnc_stmt_new(STMT_RETURN, ret_stmt);
 }
 
-nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser) {
-    nnc_compound_statement* compound = new(nnc_compound_statement);
+static nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser) {
+    nnc_parser_enter_scope(parser);
+    nnc_compound_statement* compound_stmt = new(nnc_compound_statement);
+    compound_stmt->scope = parser->table;
     nnc_parser_expect(parser, TOK_OBRACE);
     while (!nnc_parser_match(parser, TOK_CBRACE)) {
-        buf_add(compound->stmts, nnc_parse_stmt(parser));
+        buf_add(compound_stmt->stmts, nnc_parse_stmt(parser));
     }
     nnc_parser_expect(parser, TOK_CBRACE);
-    return nnc_stmt_new(STMT_COMPOUND, compound);
+    nnc_parser_leave_scope(parser);
+    return nnc_stmt_new(STMT_COMPOUND, compound_stmt);
 }
 
-nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_CONTINUE);
     nnc_continue_statement* continue_stmt = new(nnc_continue_statement);
     nnc_parser_expect(parser, TOK_SEMICOLON);
@@ -925,9 +970,9 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
     }
 }
 
-nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
+static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
 
-nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FN);
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_fn_statement* fn_stmt = new(nnc_fn_statement);
@@ -948,16 +993,19 @@ nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_CPAREN);
     nnc_parser_expect(parser, TOK_COLON);
     fn_stmt->ret = nnc_parse_type(parser);
-    nnc_parser_expect(parser, TOK_OBRACE);
-    while (!nnc_parser_match(parser, TOK_CBRACE) &&
-           !nnc_parser_match(parser, TOK_EOF)) {
-        buf_add(fn_stmt->body, nnc_parse_stmt(parser));
+    fn_stmt->body = nnc_parse_body(parser);
+    // put all function parameters inside inner scope of the function
+    assert(fn_stmt->body->kind == STMT_COMPOUND);
+    nnc_st* inner = NNC_GET_SYMTABLE(fn_stmt);
+    for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
+        nnc_st_put_entity(inner, ST_ENTITY_FN_PARAM, fn_stmt->params[i]);
     }
-    nnc_parser_expect(parser, TOK_CBRACE);
+    // then put function itself in parent scope
+    nnc_st_put_entity(parser->table, ST_ENTITY_FN, fn_stmt);
     return nnc_stmt_new(STMT_FUNC_DECL, fn_stmt);
 }
 
-nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_NAMESPACE);
     nnc_namespace_statement* namespace_stmt = new(nnc_namespace_statement);
     const nnc_tok* tok = nnc_parser_get(parser);
@@ -974,7 +1022,7 @@ nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
 
-nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser) {
+static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     switch (tok->kind) {
         case TOK_FN:        return nnc_parse_fn_stmt(parser);
@@ -982,7 +1030,7 @@ nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser) {
         case TOK_TYPE:      return nnc_parse_stmt(parser);
         case TOK_NAMESPACE: return nnc_parse_namespace_stmt(parser);
         default:
-            THROW(NNC_SYNTAX, "expected topmost statement.");
+            THROW(NNC_SYNTAX, "expected topmost statement.", nnc_parser_get_ctx(parser));
     }
     return NULL;
 }

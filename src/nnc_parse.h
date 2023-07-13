@@ -13,12 +13,14 @@ typedef struct _nnc_parser {
         nnc_tok tok;
         nnc_bool is_first;
     } lookup;
+    nnc_st* table;
 } nnc_parser;
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file);
 void nnc_parser_fini(nnc_parser* parser);
 
 nnc_tok* nnc_parser_get(nnc_parser* parser);
+nnc_ctx* nnc_parser_get_ctx(nnc_parser* parser);
 nnc_tok* nnc_parser_get_lookup(nnc_parser* parser);
 
 nnc_tok_kind nnc_parser_peek(nnc_parser* parser);

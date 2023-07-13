@@ -1,6 +1,7 @@
 #ifndef _NNC_AST_H
 #define _NNC_AST_H
 
+#include "nnc_symtable.h"
 #include "nnc_statement.h"
 
 typedef struct _nnc_ast {
