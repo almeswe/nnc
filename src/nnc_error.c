@@ -33,11 +33,13 @@ void nnc_error(const char* what, const nnc_ctx* ctx) {
         fprintf(stderr, "\033[1m\033[36m" "%s " "\033[0m", nnc_ctx_tostr(ctx));
     }
     fprintf(stderr, "%s", what);
+    glob_error_canarie = true;
 }
 
 void nnc_abort(const char* what, const nnc_ctx* ctx) {
     fprintf(stderr, "%s", "\033[1m\033[31m" "[abort requested] " "\033[0m");
     nnc_error(what, ctx);
+    nnc_arena_fini(&glob_arena);
     exit(EXIT_FAILURE);
 }
 
@@ -47,4 +49,12 @@ void nnc_error_no_ctx(const char* what) {
 
 void nnc_abort_no_ctx(const char* what) {
     nnc_abort(what, NULL);
+}
+
+void nnc_reset_canarie() {
+    glob_error_canarie = false;
+}
+
+nnc_bool nnc_error_occured() {
+    return glob_error_canarie;
 }

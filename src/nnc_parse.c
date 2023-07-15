@@ -1002,7 +1002,7 @@ static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     }
     // then put function itself in parent scope
     nnc_st_put_entity(parser->table, ST_ENTITY_FN, fn_stmt);
-    return nnc_stmt_new(STMT_FUNC_DECL, fn_stmt);
+    return nnc_stmt_new(STMT_FN, fn_stmt);
 }
 
 static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
