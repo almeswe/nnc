@@ -4,27 +4,24 @@
 #include "nnc_expression.h"
 
 typedef enum _nnc_statement_kind {
+	STMT_FN,
     STMT_IF,
 	STMT_DO,
+	STMT_LET,
     STMT_FOR,
+	STMT_TYPE,
+	STMT_GOTO,
 	STMT_EXPR,
 	STMT_WHILE,
 	STMT_EMPTY,
+	STMT_LABEL,
+	STMT_BREAK,
 	STMT_SWITCH,
 	STMT_RETURN,
 	STMT_IMPORT,
-	STMT_LET,
-	STMT_TYPE,
-	STMT_GOTO,
-	STMT_BREAK,
 	STMT_CONTINUE,
 	STMT_COMPOUND,
 	STMT_NAMESPACE,
-    STMT_ENUM_DECL,
-	STMT_FUNC_DECL,
-	STMT_LABEL_DECL,
-    STMT_UNION_DECL,
-	STMT_STRUCT_DECL
 } nnc_statement_kind;
 
 typedef struct _nnc_statement {

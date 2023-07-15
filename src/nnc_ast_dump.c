@@ -377,10 +377,11 @@ static void nnc_dump_fn_stmt(nnc_dump_data data) {
         nnc_dump_type(fn_stmt->params[i]->type);
         fprintf(stderr, "\n");
     }
-    for (nnc_u64 i = 0; i < buf_len(fn_stmt->body); i++) {
+    nnc_statement** stmts = ((nnc_compound_statement*)(fn_stmt->body->exact))->stmts;
+    for (nnc_u64 i = 0; i < buf_len(stmts); i++) {
         nnc_dump_indent(data.indent + 1);
         fprintf(stderr, TREE_BR "<stmt%lu>=", i+1);
-        nnc_dump_stmt(DUMP_DATA(data.indent+1, fn_stmt->body[i]));
+        nnc_dump_stmt(DUMP_DATA(data.indent+1, stmts[i]));
     }
 }
 
@@ -388,6 +389,7 @@ static void nnc_dump_stmt(nnc_dump_data data) {
     const nnc_statement* stmt = data.exact;
     static const nnc_dump_fn dumpers[] = {
         [STMT_IF]        = nnc_dump_if_stmt,
+        [STMT_FN]        = nnc_dump_fn_stmt,
         [STMT_DO]        = nnc_dump_do_stmt,
         [STMT_FOR]       = nnc_dump_for_stmt,
         [STMT_LET]       = nnc_dump_let_stmt,
@@ -400,8 +402,7 @@ static void nnc_dump_stmt(nnc_dump_data data) {
         [STMT_RETURN]    = nnc_dump_return_stmt,
         [STMT_COMPOUND]  = nnc_dump_compound_stmt,
         [STMT_CONTINUE]  = nnc_dump_continue_stmt,
-        [STMT_NAMESPACE] = nnc_dump_namespace_stmt,
-        [STMT_FUNC_DECL] = nnc_dump_fn_stmt
+        [STMT_NAMESPACE] = nnc_dump_namespace_stmt
     };
     if (stmt != NULL) {
         dumpers[stmt->kind](DUMP_DATA(data.indent, stmt->exact));

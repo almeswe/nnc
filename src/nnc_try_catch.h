@@ -18,6 +18,8 @@
 #define CATCHED                 glob_exception_stack.thrown
 #define FINALLY
 
+#define nnc_show_catched(ctx) nnc_error(sformat("%s: %s", CATCHED.repr, CATCHED.what), ctx);
+
 typedef enum _nnc_exception_kind {
     NNC_CONTEXT_SAVED   = 0x00,
     NNC_UNHANDLED       = 0x01,
