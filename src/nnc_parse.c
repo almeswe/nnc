@@ -5,6 +5,7 @@ void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     out_parser->table = new(nnc_st);
     nnc_st_init(out_parser->table);
     out_parser->lookup.is_first = true;
+    nnc_parser_next(out_parser);
 }
 
 void nnc_parser_fini(nnc_parser* parser) {
@@ -1038,7 +1039,6 @@ static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser) {
 nnc_ast* nnc_parse(const char* file) {
     nnc_parser parser = { 0 };
     nnc_parser_init(&parser, file);
-    nnc_parser_next(&parser);
     nnc_ast* ast = nnc_ast_new(file);
     ast->root = nnc_parse_topmost_stmt(&parser);
     nnc_parser_fini(&parser);

@@ -71,6 +71,7 @@ static nnc_type i64_type  __attribute__((unused)) = { .size=sizeof(nnc_i64), .ki
 static nnc_type u64_type  __attribute__((unused)) = { .size=sizeof(nnc_u64), .kind=TYPE_PRIMITIVE, .repr="u64"  };
 static nnc_type f64_type  __attribute__((unused)) = { .size=sizeof(nnc_f64), .kind=TYPE_PRIMITIVE, .repr="f64"  };
 static nnc_type void_type __attribute__((unused)) = { .size=0,               .kind=TYPE_VOID,      .repr="void" };
+static nnc_type unknown_type __attribute__((unused)) = { .size=0,            .kind=TYPE_UNKNOWN,   .repr="unknown" };
 
 nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);

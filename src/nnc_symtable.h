@@ -10,12 +10,6 @@ typedef enum _nnc_symtable_entity_kind {
     ST_ENTITY_FN_PARAM
 } nnc_st_entity_kind;
 
-typedef struct _nnc_symtable_entity {
-    const nnc_byte* name;
-    nnc_heap_ptr exact;
-    nnc_st_entity_kind kind;
-} nnc_symtable_entity;
-
 typedef struct _nnc_st {
     struct _nnc_st* root;
     struct _nnc_st** branches;
