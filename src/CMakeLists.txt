@@ -21,4 +21,6 @@ add_executable(
     nnc_buf.c
     nnc_literal.c
     nnc_type.c
+    nnc_symtable.c
+    nnc_typecheck.c
 )
