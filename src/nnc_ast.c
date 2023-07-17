@@ -2,6 +2,7 @@
 
 nnc_ident* nnc_ident_new(const nnc_byte* from) {
     nnc_ident* ptr = new(nnc_ident);
+    ptr->type = &unknown_type;
     ptr->size = strlen(from);
     ptr->name = cnew(nnc_byte, ptr->size + 1);
     strcpy(ptr->name, from);
@@ -10,18 +11,22 @@ nnc_ident* nnc_ident_new(const nnc_byte* from) {
 
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind) {
     nnc_unary_expression* ptr = new(nnc_unary_expression);
+    ptr->type = &unknown_type;
     ptr->kind = kind;
     return ptr;
 }
 
 nnc_binary_expression* nnc_binary_expr_new(nnc_binary_expression_kind kind) {
     nnc_binary_expression* ptr = new(nnc_binary_expression);
+    ptr->type = &unknown_type;
     ptr->kind = kind;
     return ptr;
 }
 
 nnc_ternary_expression* nnc_ternary_expr_new() {
-    return new(nnc_ternary_expression);
+    nnc_ternary_expression* ptr = new(nnc_ternary_expression);
+    ptr->type = &unknown_type;
+    return ptr;
 }
 
 nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact) {

@@ -25,10 +25,9 @@ nnc_bool nnc_st_has_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_str key) 
         case ST_ENTITY_VAR:      return nnc_st_has_var(table, key);
         case ST_ENTITY_FN:       return nnc_st_has_fn(table, key);
         case ST_ENTITY_FN_PARAM: return nnc_st_has_fn_param(table, key);
-        default:
-            nnc_abort_no_ctx("nnc_st_has_entity: kind is unknown.\n");
-            return false;
+        default: nnc_abort_no_ctx("nnc_st_has_entity: kind is unknown.\n");
     }
+    return false;
 }
 
 static void nnc_st_put_var(nnc_st* table, nnc_heap_ptr entity) {
@@ -96,8 +95,37 @@ void nnc_st_put_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_heap_ptr enti
         case ST_ENTITY_VAR:      nnc_st_try_put_var(table, entity);      break;
         case ST_ENTITY_FN:       nnc_st_try_put_fn(table, entity);       break;
         case ST_ENTITY_FN_PARAM: nnc_st_try_put_fn_param(table, entity); break;
-        default:
-            nnc_abort_no_ctx("nnc_st_put_entity: kind is unknown.\n");
-            break;
+        default: nnc_abort_no_ctx("nnc_st_put_entity: kind is unknown.\n");
     }
+}
+
+static nnc_let_statement* nnc_st_get_var(nnc_st* table, nnc_str key) {
+    if (nnc_st_has_var(table, key)) {
+        return (nnc_let_statement*)map_get_s(table->vars, key);
+    }
+    return NULL;
+}
+
+static nnc_fn_statement* nnc_st_get_fn(nnc_st* table, nnc_str key) {
+    if (nnc_st_has_fn(table, key)) {
+        return (nnc_fn_statement*)map_get_s(table->fns, key);
+    }
+    return NULL;
+}
+
+static nnc_fn_param* nnc_st_get_fn_param(nnc_st* table, nnc_str key) {
+    if (nnc_st_has_fn_param(table, key)) {
+        return (nnc_fn_param*)map_get_s(table->params, key);
+    }
+    return NULL;
+}
+
+nnc_heap_ptr nnc_st_get_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_str key) {
+    switch (kind) {
+        case ST_ENTITY_VAR:      return nnc_st_get_var(table, key);
+        case ST_ENTITY_FN:       return nnc_st_get_fn(table, key);
+        case ST_ENTITY_FN_PARAM: return nnc_st_get_fn_param(table, key);
+        default: nnc_abort_no_ctx("nnc_st_get_entity: kind is unknown.\n");
+    }
+    return NULL;
 }

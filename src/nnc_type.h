@@ -3,10 +3,15 @@
 
 #include "nnc_arena.h"
 #include "nnc_format.h"
-#include "nnc_literal.h"
 
 typedef struct _nnc_type       nnc_type;
 typedef struct _nnc_expression nnc_expression;
+
+typedef struct _nnc_ident {
+    nnc_u64 size;
+    nnc_str name;
+    nnc_type* type;
+} nnc_ident;
 
 typedef struct _nnc_enum_member {
     nnc_ident* var;
@@ -41,8 +46,8 @@ typedef struct _nnc_type {
     nnc_str repr;
     union {
     struct _nnc_fn_type {
-        struct _nnc_type*  ret;
-        struct _nnc_type** params;
+        nnc_type*  ret;
+        nnc_type** params;
         nnc_u64 paramc;
     } fn;
     struct _nnc_array_type {
@@ -57,7 +62,7 @@ typedef struct _nnc_type {
         nnc_struct_member** members;
     } struct_or_union;
     } exact;
-    struct _nnc_type* base;
+    nnc_type* base;
 } nnc_type;
 
 static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=TYPE_PRIMITIVE, .repr="i8"   };

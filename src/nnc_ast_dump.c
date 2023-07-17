@@ -56,7 +56,7 @@ static void nnc_dump_indent(nnc_i64 indent) {
 }
 
 static void nnc_dump_type(const nnc_type* type) {
-    if (type == NULL || type->kind == TYPE_UNKNOWN) {
+    if (type == NULL) {
         fprintf(stderr, _c(RED, "%s"), "?");
     }
     else {
@@ -72,8 +72,11 @@ static void nnc_dump_chr(nnc_dump_data data) {
         c_repr[0] = '\\';
         c_repr[1] = nnc_escape(literal->exact);
     }
-    fprintf(stderr, _c(BYEL, "chr") " <val=\'%s\',code=%d>\n", 
-        c_repr, (nnc_i32)literal->exact);
+    fprintf(stderr, _c(BYEL, "chr") " <val=\'%s\',", c_repr);
+    fprintf(stderr, "code=%d,", (nnc_i32)literal->exact);
+    fprintf(stderr, "type=");
+    nnc_dump_type(literal->type);
+    fprintf(stderr, ">\n");
 }
 
 static void nnc_dump_str(nnc_dump_data data) {
@@ -88,13 +91,20 @@ static void nnc_dump_str(nnc_dump_data data) {
             fprintf(stderr, "\\%c", nnc_escape(code));
         }
     }
-    fprintf(stderr, ",len=%lu>\n", literal->length);
+    fprintf(stderr, ",len=%lu,", literal->length);
+    fprintf(stderr, "type=");
+    nnc_dump_type(literal->type);
+    fprintf(stderr, ">\n");
 }
 
 static void nnc_dump_ident(nnc_dump_data data) {
     const nnc_ident* ident = data.exact;
     fprintf(stderr, _c(BCYN, "ident "));
-    fprintf(stderr, "<val=\"%s\",len=%lu>\n", ident->name, ident->size);
+    fprintf(stderr, "<val=\"%s\",", ident->name);
+    fprintf(stderr, "len=%lu,", ident->size);
+    fprintf(stderr, "type=");
+    nnc_dump_type(ident->type);
+    fprintf(stderr, ">\n");
 }
 
 static void nnc_dump_int(nnc_dump_data data) {
@@ -108,14 +118,20 @@ static void nnc_dump_int(nnc_dump_data data) {
         fprintf(stderr, "val=%lu,", literal->exact.u);
     }
     fprintf(stderr, "base=%d,", literal->base);
-    fprintf(stderr, "suff=%d>\n", literal->suffix);
+    fprintf(stderr, "suff=%d,", literal->suffix);
+    fprintf(stderr, "type=");
+    nnc_dump_type(literal->type);
+    fprintf(stderr, ">\n");
 }
 
 static void nnc_dump_dbl(nnc_dump_data data) {
     const nnc_dbl_literal* literal = data.exact;
     fprintf(stderr, _c(BYEL, "float "));
     fprintf(stderr, "%f", literal->exact);
-    fprintf(stderr, "<suff=%d>\n", literal->suffix);
+    fprintf(stderr, "<suff=%d,", literal->suffix);
+    fprintf(stderr, "type=");
+    nnc_dump_type(literal->type);
+    fprintf(stderr, ">\n");
 }
 
 static void nnc_dump_unary(nnc_dump_data data) {
@@ -139,10 +155,11 @@ static void nnc_dump_unary(nnc_dump_data data) {
         unary->kind == UNARY_POSTFIX_AS) {
         const nnc_type* type = unary->kind == UNARY_SIZEOF ?
             unary->exact.size.of : unary->exact.cast.to;
-        fprintf(stderr, "<type="); nnc_dump_type(type);
-        fprintf(stderr, ">");
+        fprintf(stderr, "<cast-type="); nnc_dump_type(type);
     }
-    fprintf(stderr, "\n");
+    fprintf(stderr, ",type=");
+    nnc_dump_type(unary->type);
+    fprintf(stderr, ">\n");
     nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
     if (unary->kind == UNARY_POSTFIX_CALL) {
@@ -177,10 +194,13 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_OR]         = "||",
         [BINARY_DOT]        = ".",
         [BINARY_IDX]        = "[]",
-        [BINARY_ASSIGN] = "=",
+        [BINARY_ASSIGN]     = "=",
         [BINARY_COMMA]      = ","
     };
-    fprintf(stderr, _c(BGRN, "binary-expr `%s`\n"), binary_str[binary->kind]);
+    fprintf(stderr, _c(BGRN, "binary-expr `%s` "), binary_str[binary->kind]);
+    fprintf(stderr, "<type=");
+    nnc_dump_type(binary->type);
+    fprintf(stderr, ">\n");
     nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->lexpr));
     nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
@@ -189,7 +209,10 @@ static void nnc_dump_binary(nnc_dump_data data) {
 
 static void nnc_dump_ternary(nnc_dump_data data) {
     const nnc_ternary_expression* ternary = data.exact;
-    fprintf(stderr, _c(BGRN, "ternary-expr\n"));
+    fprintf(stderr, _c(BGRN, "ternary-expr "));
+    fprintf(stderr, "<type=");
+    nnc_dump_type(ternary->type);
+    fprintf(stderr, ">\n");
     nnc_dump_indent(data.indent + 1); 
     fprintf(stderr, TREE_BR "condn=");
     nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->cexpr));
