@@ -36,6 +36,7 @@ typedef enum _nnc_unary_expression_kind {
 } nnc_unary_expression_kind;
 
 typedef struct _nnc_unary_expression {
+    nnc_type* type;
     nnc_expression* expr;
     nnc_unary_expression_kind kind;
     union {
@@ -47,7 +48,7 @@ typedef struct _nnc_unary_expression {
         } cast;
         struct _nnc_unary_call {
             nnc_u64 argc;
-            _vec_(nnc_expression*) args;
+            nnc_expression** args;
         } call;
     } exact;
 } nnc_unary_expression;
@@ -78,12 +79,14 @@ typedef enum _nnc_binary_expression_kind {
 } nnc_binary_expression_kind;
 
 typedef struct _nnc_binary_expression {
+    nnc_type* type;
     nnc_expression* lexpr;
     nnc_expression* rexpr;
     nnc_binary_expression_kind kind;
 } nnc_binary_expression;
 
 typedef struct _nnc_ternary_expression {
+    nnc_type* type;
     nnc_expression* cexpr;
     nnc_expression* rexpr;
     nnc_expression* lexpr;

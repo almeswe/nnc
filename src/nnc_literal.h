@@ -1,7 +1,7 @@
 #ifndef _NNC_AST_LITERALS_H
 #define _NNC_AST_LITERALS_H
 
-#include "nnc_typedefs.h"
+#include "nnc_type.h"
 #include "nnc_try_catch.h"
 
 #define dbl_literal(expr) (nnc_dbl_literal*)expr->exact
@@ -11,16 +11,12 @@
 
 #define SUFFIX_NONE 0xf
 
-typedef struct _nnc_ident {
-    nnc_u64 size;
-    nnc_str name;
-} nnc_ident;
-
 typedef enum _nnc_dbl_suffix {
     SUFFIX_F32, SUFFIX_F64
 } nnc_dbl_suffix;
 
 typedef struct _nnc_dbl_literal {
+    nnc_type* type;
     nnc_f64 exact;
     nnc_dbl_suffix suffix;
 } nnc_dbl_literal;
@@ -31,6 +27,7 @@ typedef enum _nnc_int_suffix {
 } nnc_int_suffix;
 
 typedef struct _nnc_int_literal {
+    nnc_type* type;
     nnc_byte base;
     nnc_bool is_signed;
     nnc_int_suffix suffix;
@@ -41,10 +38,12 @@ typedef struct _nnc_int_literal {
 } nnc_int_literal;
 
 typedef struct _nnc_chr_literal {
+    nnc_type* type;
     nnc_byte exact;
 } nnc_chr_literal;
 
 typedef struct _nnc_str_literal {
+    nnc_type* type;
     nnc_u64 length;
     nnc_byte* exact;
 } nnc_str_literal;
