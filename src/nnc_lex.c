@@ -655,15 +655,17 @@ void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     out_lex->cctx.fabs = fpath;
     if (nnc_keywods_map == NULL) {
         // initialize map of keywords, for fast identifier check
-        nnc_keywods_map = map_init();
         const nnc_u64 nnc_keywords_size = sizeof(nnc_keywords)/sizeof(*nnc_keywords);
+        const nnc_u64 nnc_keywords_map_cap = (nnc_u64)(nnc_keywords_size * NNC_MAP_REHASH_SCALAR);
+        nnc_keywods_map = map_init_with(nnc_keywords_map_cap);
         for (nnc_u64 i = 0ull; i < nnc_keywords_size; i++) {
             nnc_tok_kind kind = (nnc_tok_kind)(TOK_AS + i);
             map_put_s(nnc_keywods_map, nnc_keywords[i], kind);
         }
         assert(nnc_keywods_map->len == nnc_keywords_size);
+        assert(nnc_keywods_map->cap == nnc_keywords_map_cap);
     }
-}   
+}
 
 /**
  * @brief Finalizes instance of `nnc_lex`.
