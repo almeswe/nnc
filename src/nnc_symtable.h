@@ -23,8 +23,8 @@ typedef struct _nnc_st {
 void nnc_st_init(nnc_st* out_table);
 //todo: add finalizer
 
-nnc_bool nnc_st_has_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_str key);
+nnc_bool nnc_st_has_entity(const nnc_st* table, nnc_st_entity_kind kind, nnc_str key);
 void nnc_st_put_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_heap_ptr entity);
-nnc_heap_ptr nnc_st_get_entity(nnc_st* table, nnc_st_entity_kind kind, nnc_str key);
+nnc_heap_ptr nnc_st_get_entity(const nnc_st* table, nnc_st_entity_kind kind, nnc_str key);
 
 #endif

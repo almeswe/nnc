@@ -33,11 +33,13 @@ typedef struct _nnc_let_statement {
     nnc_ident* var;
     nnc_type* type;
     nnc_expression* init;
+	nnc_bool is_topmost;
 } nnc_let_statement;
 
 typedef struct _nnc_type_statement {
 	nnc_type* type;
 	nnc_type* as;
+	nnc_bool is_topmost;
 } nnc_type_statement;
 
 typedef struct _nnc_expression_statement {
