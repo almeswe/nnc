@@ -62,6 +62,11 @@ nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     return nnc_parser_peek(parser);
 }
 
+static void nnc_parser_deferred_stack_put(nnc_parser* parser, nnc_st_entity_kind kind, nnc_heap_ptr exact) {
+    nnc_deferred_entity* entity = nnc_deferred_entity_new(parser->table, kind, exact);
+    nnc_deferred_stack_put(&glob_deferred_stack, entity);
+}
+
 static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
     switch (kind) {
         case TOK_VOID:
@@ -286,6 +291,7 @@ static nnc_expression* nnc_parse_ident(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_heap_ptr exact = nnc_ident_new(tok->lexeme);
     nnc_parser_next(parser);
+    nnc_parser_deferred_stack_put(parser, ST_ENTITY_VAR, exact);
     return nnc_expr_new(EXPR_IDENT, exact);
 }
 
@@ -1023,12 +1029,24 @@ static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
 
+static nnc_statement* nnc_parse_topmost_let_stmt(nnc_parser* parser) {
+    nnc_statement* let_stmt = nnc_parse_let_stmt(parser);
+    ((nnc_let_statement*)(let_stmt->exact))->is_topmost = true;
+    return let_stmt;
+}
+
+static nnc_statement* nnc_parse_topmost_type_stmt(nnc_parser* parser) {
+    nnc_statement* type_stmt = nnc_parse_type_stmt(parser);
+    ((nnc_type_statement*)(type_stmt->exact))->is_topmost = true;
+    return type_stmt;
+}
+
 static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     switch (tok->kind) {
         case TOK_FN:        return nnc_parse_fn_stmt(parser);
-        case TOK_LET: 
-        case TOK_TYPE:      return nnc_parse_stmt(parser);
+        case TOK_LET:       return nnc_parse_topmost_let_stmt(parser);
+        case TOK_TYPE:      return nnc_parse_topmost_type_stmt(parser);
         case TOK_NAMESPACE: return nnc_parse_namespace_stmt(parser);
         default:
             THROW(NNC_SYNTAX, "expected topmost statement.", nnc_parser_get_ctx(parser));
