@@ -35,6 +35,8 @@ typedef enum _nnc_exception_kind {
     NNC_LEX_BAD_FLOAT,
     NNC_LEX_BAD_SUFFIX,
     NNC_SYNTAX,
+    NNC_SEMANTIC,
+    NNC_TABLE_MISS,
 } nnc_exception_kind;
 
 typedef struct _nnc_exception {

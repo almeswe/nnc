@@ -29,6 +29,12 @@ typedef struct _nnc_statement {
     nnc_heap_ptr exact;
 } nnc_statement;
 
+typedef enum _nnc_decl_context {
+	DECL_TOPMOST	= 0b00001,
+	DECL_NAMESPACE  = 0b00010,
+	DECL_LOCALLY	= 0b00100
+} nnc_decl_context;
+
 typedef struct _nnc_let_statement {
     nnc_ident* var;
     nnc_type* type;
@@ -96,7 +102,7 @@ typedef nnc_statement nnc_top_statement;
 
 typedef struct _nnc_namespace_statement {
 	nnc_ident* var;
-	nnc_top_statement** stmts;
+	nnc_statement* body;
 } nnc_namespace_statement;
 
 typedef nnc_struct_member nnc_var_type;

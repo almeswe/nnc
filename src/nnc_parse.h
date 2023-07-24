@@ -3,7 +3,7 @@
 
 #include "nnc_ast.h"
 #include "nnc_lex.h"
-#include "nnc_deferred_stack.h"
+#include "nnc_resolve.h"
 
 typedef struct _nnc_parser {
     nnc_lex lex;

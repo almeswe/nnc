@@ -104,6 +104,11 @@ static void nnc_dump_ident(nnc_dump_data data) {
     fprintf(stderr, "len=%lu,", ident->size);
     fprintf(stderr, "type=");
     nnc_dump_type(ident->type);
+    switch (ident->semantics) {
+        case IDENT_NAMESPACE:   fprintf(stderr, ",namespace");  break;
+        case IDENT_ENUMERATOR:  fprintf(stderr, ",enumerator"); break;
+        default: break;
+    }
     fprintf(stderr, ">\n");
 }
 
@@ -194,6 +199,7 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_OR]         = "||",
         [BINARY_DOT]        = ".",
         [BINARY_IDX]        = "[]",
+        [BINARY_NEST]       = "::",
         [BINARY_ASSIGN]     = "=",
         [BINARY_COMMA]      = ","
     };
@@ -378,20 +384,21 @@ static void nnc_dump_continue_stmt(nnc_dump_data data) {
 }
 
 static void nnc_dump_namespace_stmt(nnc_dump_data data) {
-    const nnc_namespace_statement* namespace = data.exact;
-    fprintf(stderr, _c(BRED, "namespace-stmt ") "<name=%s>\n", namespace->var->name);
-    for (nnc_u64 i = 0; i < buf_len(namespace->stmts); i++) {
+    const nnc_namespace_statement* namespace_stmt = data.exact;
+    fprintf(stderr, _c(BRED, "namespace-stmt ") "<name=%s>\n", namespace_stmt->var->name);
+    nnc_statement** stmts = ((nnc_compound_statement*)(namespace_stmt->body->exact))->stmts;
+    for (nnc_u64 i = 0; i < buf_len(stmts); i++) {
         nnc_dump_indent(data.indent + 1);
         fprintf(stderr, TREE_BR "<topmost stmt%lu>=", i+1);
-        nnc_dump_stmt(DUMP_DATA(data.indent+1, namespace->stmts[i]));
+        nnc_dump_stmt(DUMP_DATA(data.indent+1, stmts[i]));
     }
 }
 
 static void nnc_dump_fn_stmt(nnc_dump_data data) {
     const nnc_fn_statement* fn_stmt = data.exact;
-    fprintf(stderr, _c(BRED, "fn-stmt ") "<name=%s, paramc=%lu, ret-type=",
+    fprintf(stderr, _c(BRED, "fn-stmt ") "<name=%s, paramc=%lu, proto=",
         fn_stmt->var->name, buf_len(fn_stmt->params));
-    nnc_dump_type(fn_stmt->ret);
+    nnc_dump_type(fn_stmt->var->type);
     fprintf(stderr, ">\n");
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
         nnc_dump_indent(data.indent + 1);
