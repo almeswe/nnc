@@ -47,6 +47,7 @@ TEST(test_1, nnclex) {
     assert(nnc_lex_next(&lex) == TOK_LTE);
     assert(nnc_lex_next(&lex) == TOK_LSHIFT);
     assert(nnc_lex_next(&lex) == TOK_RSHIFT);
+    assert(nnc_lex_next(&lex) == TOK_DCOLON);
     assert(nnc_lex_next(&lex) == TOK_EOF);
     nnc_lex_fini(&lex);
     nnc_lex_keywords_map_fini();

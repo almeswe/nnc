@@ -22,6 +22,7 @@ MAP_TESTS_SRC = nnc_tests_main.c 		\
 				../src/nnc_buf.c 		\
 				../src/nnc_map.c 		\
 				../src/nnc_ctx.c		\
+				../src/nnc_lex.c		\
 				../src/nnc_format.c  	\
 				../src/nnc_error.c		\
 				../src/nnc_try_catch.c	\
