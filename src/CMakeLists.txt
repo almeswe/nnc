@@ -23,4 +23,6 @@ add_executable(
     nnc_type.c
     nnc_symtable.c
     nnc_typecheck.c
+    nnc_deferred_stack.c
+    nnc_resolve.c
 )

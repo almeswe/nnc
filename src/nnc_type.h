@@ -7,20 +7,28 @@
 typedef struct _nnc_type       nnc_type;
 typedef struct _nnc_expression nnc_expression;
 
+typedef enum _nnc_ident_semantics {
+    IDENT_DEFAULT,
+    IDENT_NAMESPACE,
+    IDENT_ENUMERATOR
+} nnc_ident_semantics;
+
 typedef struct _nnc_ident {
     nnc_u64 size;
     nnc_str name;
     nnc_type* type;
+    nnc_ident_semantics semantics;
 } nnc_ident;
 
-typedef struct _nnc_enum_member {
+typedef struct _nnc_enumerator {
     nnc_ident* var;
     nnc_expression* init;
-    union _nnc_enum_member_value {
+    union _nnc_enumerator_value {
         nnc_u64 u;
         nnc_i64 d;
     } init_const;
-} nnc_enum_member;
+    nnc_type* in_enum;
+} nnc_enumerator;
 
 typedef struct _nnc_struct_member {
     nnc_ident* var;
@@ -55,7 +63,7 @@ typedef struct _nnc_type {
     } array;
     struct _nnc_enumeration_type {
         nnc_u64 memberc;
-        nnc_enum_member** members;
+        nnc_enumerator** members;
     } enumeration;
     struct _nnc_struct_or_union_type {
         nnc_u64 memberc;

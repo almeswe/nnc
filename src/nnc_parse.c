@@ -62,11 +62,6 @@ nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     return nnc_parser_peek(parser);
 }
 
-static void nnc_parser_deferred_stack_put(nnc_parser* parser, nnc_st_entity_kind kind, nnc_heap_ptr exact) {
-    nnc_deferred_entity* entity = nnc_deferred_entity_new(parser->table, kind, exact);
-    nnc_deferred_stack_put(&glob_deferred_stack, entity);
-}
-
 static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
     switch (kind) {
         case TOK_VOID:
@@ -118,8 +113,9 @@ static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
     return (nnc_struct_member*)nnc_parse_var_type(parser);
 }
 
-static nnc_enum_member* nnc_parse_enum_member(nnc_parser* parser) {
-    nnc_enum_member* member = new(nnc_enum_member);
+static nnc_enumerator* nnc_parse_enumerator(nnc_parser* parser, nnc_type* in_enum) {
+    nnc_enumerator* member = new(nnc_enumerator);
+    member->in_enum = in_enum;
     if (nnc_parser_match(parser, TOK_IDENT)) {
         const nnc_tok* tok = nnc_parser_get(parser);
         member->var = nnc_ident_new(tok->lexeme);
@@ -164,8 +160,9 @@ static nnc_type* nnc_parse_enum_type(nnc_parser* parser) {
     nnc_type* type = nnc_enum_type_new();
     while (!nnc_parser_match(parser, TOK_CBRACE) &&
            !nnc_parser_match(parser, TOK_EOF)) {
-        buf_add(type->exact.enumeration.members,
-            nnc_parse_enum_member(parser));
+        nnc_enumerator* member = nnc_parse_enumerator(parser, type);
+        buf_add(type->exact.enumeration.members, member);
+        nnc_st_put_entity(parser->table, ST_ENTITY_ENUMERATOR, member);
         if (!nnc_parser_match(parser, TOK_CBRACE)) {
             nnc_parser_expect(parser, TOK_COMMA);
         }
@@ -220,7 +217,6 @@ static nnc_type* nnc_parse_type_declarators(nnc_parser* parser, nnc_type* type) 
     while (nnc_parser_match(parser, TOK_ASTERISK) ||
            nnc_parser_match(parser, TOK_OBRACKET)) {
         nnc_tok_kind kind = nnc_parser_peek(parser);
-        nnc_parser_next(parser);
         switch (kind) {
             case TOK_OBRACKET: type = nnc_parse_arr_declarator(parser, type); break;    
             case TOK_ASTERISK: type = nnc_parse_ptr_declarator(parser, type); break;
@@ -291,7 +287,7 @@ static nnc_expression* nnc_parse_ident(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_heap_ptr exact = nnc_ident_new(tok->lexeme);
     nnc_parser_next(parser);
-    nnc_parser_deferred_stack_put(parser, ST_ENTITY_VAR, exact);
+    //nnc_parser_deferred_stack_put(parser, DEFERRED_VAR, exact);
     return nnc_expr_new(EXPR_IDENT, exact);
 }
 
@@ -401,6 +397,8 @@ static nnc_expression* nnc_parse_as_expr(nnc_parser* parser, nnc_expression* pre
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
+static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser);
+
 static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_next(parser);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
@@ -410,6 +408,20 @@ static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* pr
     expr->lexpr = prefix;
     expr->rexpr = nnc_parse_primary_expr(parser);
     return nnc_expr_new(EXPR_BINARY, expr);
+}
+
+static nnc_expression* nnc_parse_nested_expr(nnc_parser* parser, nnc_expression* prefix) {
+    nnc_parser_next(parser);
+    if (!nnc_parser_match(parser, TOK_IDENT)) {
+        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
+    }
+    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_NEST);
+    expr->lexpr = prefix;
+    if (prefix->kind == EXPR_IDENT) {
+        ((nnc_ident*)prefix->exact)->semantics = IDENT_NAMESPACE;
+    }
+    expr->rexpr = nnc_parse_postfix_expr(parser);
+    return nnc_expr_ctx_new(EXPR_BINARY, EXPR_CTX_NAMESPACE, expr);
 }
 
 static nnc_expression* nnc_parse_call_expr(nnc_parser* parser, nnc_expression* prefix) {
@@ -446,14 +458,16 @@ static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
         return nnc_parse_as_expr(parser, primary);
     }
     while (nnc_parser_match(parser, TOK_DOT)    ||
+           nnc_parser_match(parser, TOK_DCOLON) ||
            nnc_parser_match(parser, TOK_OPAREN) ||
            nnc_parser_match(parser, TOK_OBRACKET)) {
         const nnc_tok* tok = nnc_parser_get(parser);
         nnc_expression* prefix = postfix ? postfix : primary;
         switch (tok->kind) {
-            case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);   break;
-            case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);  break;
-            case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix); break;
+            case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);    break;
+            case TOK_DCOLON:    postfix = nnc_parse_nested_expr(parser, prefix); break;
+            case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
+            case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
             default:
                 nnc_abort_no_ctx("nnc_parse_postfix_expr: bug detected.\n");
         }
@@ -473,13 +487,12 @@ static nnc_expression* nnc_parse_unary_expr(nnc_parser* parser) {
         case TOK_PLUS:      return nnc_parse_plus_expr(parser);
         case TOK_MINUS:     return nnc_parse_minus_expr(parser);
         case TOK_TILDE:     return nnc_parse_bitwise_not_expr(parser);
+        case TOK_SIZEOF:    return nnc_parse_sizeof_expr(parser);
+        case TOK_EXCMARK:   return nnc_parse_not_expr(parser);
+        case TOK_LENGTHOF:  return nnc_parse_lengthof_expr(parser);
         case TOK_ASTERISK:  return nnc_parse_dereference_expr(parser);
         case TOK_AMPERSAND: return nnc_parse_reference_expr(parser);
-        case TOK_EXCMARK:   return nnc_parse_not_expr(parser);
-        case TOK_SIZEOF:    return nnc_parse_sizeof_expr(parser);
-        case TOK_LENGTHOF:  return nnc_parse_lengthof_expr(parser);
-        default: 
-            return nnc_parse_postfix_expr(parser);
+        default:            return nnc_parse_postfix_expr(parser);
     }
 }
 
@@ -780,11 +793,13 @@ static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
 }
 
 nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
-    return nnc_parse_assignment_expr(parser);
+    nnc_expression* expr = nnc_parse_assignment_expr(parser);
+    return nnc_resolve_expr(expr, parser->table), expr;
 }
 
 nnc_expression* nnc_parse_expr(nnc_parser* parser) {
-    return nnc_parse_comma_expr(parser);
+    nnc_expression* expr = nnc_parse_comma_expr(parser);
+    return nnc_resolve_expr(expr, parser->table), expr;
 }
 
 static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser);
@@ -913,6 +928,7 @@ static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_AS);
     type_stmt->as = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_SEMICOLON);
+    nnc_st_put_entity(parser->table, ST_ENTITY_TYPE, type_stmt->as);
     return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
@@ -936,6 +952,21 @@ static nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
     nnc_return_statement* ret_stmt = new(nnc_return_statement);
     ret_stmt->body = nnc_parse_expr_stmt(parser);
     return nnc_stmt_new(STMT_RETURN, ret_stmt);
+}
+
+static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
+
+static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) {
+    nnc_parser_enter_scope(parser);
+    nnc_compound_statement* compound_stmt = new(nnc_compound_statement);
+    compound_stmt->scope = parser->table;
+    nnc_parser_expect(parser, TOK_OBRACE);
+    while (!nnc_parser_match(parser, TOK_CBRACE)) {
+        buf_add(compound_stmt->stmts, nnc_parse_topmost_stmt(parser));
+    }
+    nnc_parser_expect(parser, TOK_CBRACE);
+    nnc_parser_leave_scope(parser);
+    return nnc_stmt_new(STMT_COMPOUND, compound_stmt);
 }
 
 static nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser) {
@@ -987,11 +1018,15 @@ static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
         fn_stmt->var = nnc_ident_new(tok->lexeme);
     }
     nnc_parser_expect(parser, TOK_IDENT);
+    fn_stmt->var->type = nnc_fn_type_new();
     //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_OPAREN);
     while (!nnc_parser_match(parser, TOK_CPAREN) &&
            !nnc_parser_match(parser, TOK_EOF)) {
-        buf_add(fn_stmt->params, nnc_parse_fn_param(parser));
+        nnc_fn_param* fn_param = nnc_parse_fn_param(parser);
+        buf_add(fn_stmt->params, fn_param);
+        buf_add(fn_stmt->var->type->exact.fn.params, fn_param->type);
+        fn_stmt->var->type->exact.fn.paramc++;
         if (nnc_parser_match(parser, TOK_CPAREN)) {
             break;
         }
@@ -1000,12 +1035,16 @@ static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_CPAREN);
     nnc_parser_expect(parser, TOK_COLON);
     fn_stmt->ret = nnc_parse_type(parser);
-    fn_stmt->body = nnc_parse_body(parser);
+    fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
+    fn_stmt->body = nnc_parse_compound_stmt(parser);
+    // todo: may be somehow put inner scope to nnc_parse_body?
+    // and then put params into table before the entities from body.
+
     // put all function parameters inside inner scope of the function
     assert(fn_stmt->body->kind == STMT_COMPOUND);
     nnc_st* inner = NNC_GET_SYMTABLE(fn_stmt);
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
-        nnc_st_put_entity(inner, ST_ENTITY_FN_PARAM, fn_stmt->params[i]);
+        nnc_st_put_entity(inner, ST_ENTITY_PARAM, fn_stmt->params[i]);
     }
     // then put function itself in parent scope
     nnc_st_put_entity(parser->table, ST_ENTITY_FN, fn_stmt);
@@ -1020,12 +1059,10 @@ static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
         namespace_stmt->var = nnc_ident_new(tok->lexeme);
     }
     nnc_parser_expect(parser, TOK_IDENT);
-    nnc_parser_expect(parser, TOK_OBRACE);
-    while (!nnc_parser_match(parser, TOK_CBRACE) &&
-           !nnc_parser_match(parser, TOK_EOF)) {
-        buf_add(namespace_stmt->stmts, nnc_parse_topmost_stmt(parser));
-    }
-    nnc_parser_expect(parser, TOK_CBRACE);
+    namespace_stmt->var->semantics = IDENT_NAMESPACE;
+    // todo: namespace_stmt passed by value??
+    namespace_stmt->body = nnc_parse_namespace_compound_stmt(parser);
+    nnc_st_put_entity(parser->table, ST_ENTITY_NAMESPACE, namespace_stmt);
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
 

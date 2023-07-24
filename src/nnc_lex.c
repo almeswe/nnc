@@ -20,6 +20,7 @@ static const char* nnc_tok_strs[] = {
     [TOK_CPAREN]        = "TOK_CPAREN",
     [TOK_DOLLAR]        = "TOK_DOLLAR",
     [TOK_DOT]           = "TOK_DOT",
+    [TOK_DCOLON]        = "TOK_DCOLON",
     [TOK_EOF]           = "TOK_EOF",
     [TOK_EQ]            = "TOK_EQ",
     [TOK_EXCMARK]       = "TOK_EXCMARK",
@@ -72,13 +73,13 @@ static const char* nnc_tok_strs[] = {
     [TOK_I32]           = "TOK_I32",
     [TOK_I64]           = "TOK_I64",
     [TOK_IMPORT]        = "TOK_IMPORT",
-    [TOK_NAMESPACE]    = "TOK_NAMESPACE",
+    [TOK_NAMESPACE]     = "TOK_NAMESPACE",
     [TOK_PUB]           = "TOK_PUB",
     [TOK_RETURN]        = "TOK_RETURN",
     [TOK_STRUCT]        = "TOK_STRUCT",
     [TOK_SWITCH]        = "TOK_SWITCH",
     [TOK_SIZEOF]        = "TOK_SIZEOF",
-    [TOK_TYPE]       = "TOK_TYPE",
+    [TOK_TYPE]          = "TOK_TYPE",
     [TOK_UNION]         = "TOK_UNION",
     [TOK_U8]            = "TOK_U8",
     [TOK_U16]           = "TOK_U16",
@@ -564,7 +565,6 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case '}':   NNC_LEX_COMMIT(TOK_CBRACE);
             case ']':   NNC_LEX_COMMIT(TOK_CBRACKET);
             case '^':   NNC_LEX_COMMIT(TOK_CIRCUMFLEX);
-            case ':':   NNC_LEX_COMMIT(TOK_COLON);
             case ',':   NNC_LEX_COMMIT(TOK_COMMA);
             case ')':   NNC_LEX_COMMIT(TOK_CPAREN);
             case '$':   NNC_LEX_COMMIT(TOK_DOLLAR);
@@ -581,17 +581,17 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case '#':   NNC_LEX_COMMIT(TOK_SIGN);
             case '/':   NNC_LEX_COMMIT(TOK_SLASH);
             case '~':   NNC_LEX_COMMIT(TOK_TILDE);
-            
             case '<':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_LTE)     : 
                         NNC_LEX_ADJUST('<') ? NNC_LEX_SET_TERN(TOK_LSHIFT)  : NNC_LEX_SET_TERNB(TOK_LT);
 
             case '>':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_GTE)     :
                         NNC_LEX_ADJUST('>') ? NNC_LEX_SET_TERN(TOK_RSHIFT)  : NNC_LEX_SET_TERNB(TOK_GT);
 
-            case '=':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_EQ)  : NNC_LEX_SET_TERNB(TOK_ASSIGN);
-            case '!':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_NEQ) : NNC_LEX_SET_TERNB(TOK_EXCMARK);
-            case '&':   NNC_LEX_ADJUST('&') ? NNC_LEX_SET_TERN(TOK_AND) : NNC_LEX_SET_TERNB(TOK_AMPERSAND);
-            case '|':   NNC_LEX_ADJUST('|') ? NNC_LEX_SET_TERN(TOK_OR)  : NNC_LEX_SET_TERNB(TOK_VLINE);
+            case ':':   NNC_LEX_ADJUST(':') ? NNC_LEX_SET_TERN(TOK_DCOLON) : NNC_LEX_SET_TERNB(TOK_COLON);
+            case '=':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_EQ)     : NNC_LEX_SET_TERNB(TOK_ASSIGN);
+            case '!':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_NEQ)    : NNC_LEX_SET_TERNB(TOK_EXCMARK);
+            case '&':   NNC_LEX_ADJUST('&') ? NNC_LEX_SET_TERN(TOK_AND)    : NNC_LEX_SET_TERNB(TOK_AMPERSAND);
+            case '|':   NNC_LEX_ADJUST('|') ? NNC_LEX_SET_TERN(TOK_OR)     : NNC_LEX_SET_TERNB(TOK_VLINE);
                 break;
             case '\'':  NNC_LEX_COMMIT(nnc_lex_grab_chr(lex));
             case '\"':  NNC_LEX_COMMIT(nnc_lex_grab_str(lex));

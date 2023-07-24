@@ -10,6 +10,14 @@ typedef struct _nnc_ast {
     const char* file;
 } nnc_ast;
 
+typedef char nnc_resolve_stack;
+
+typedef struct _nnc_unit {
+    nnc_ast* ast;
+    struct _nnc_st* table;
+    nnc_resolve_stack* stack;
+} nnc_unit;
+
 void nnc_dump_ast(const nnc_ast* ast);
 nnc_ast* nnc_ast_new(const char* file);
 

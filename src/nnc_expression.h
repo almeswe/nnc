@@ -16,9 +16,15 @@ typedef enum _nnc_expression_kind {
     EXPR_TERNARY    
 } nnc_expression_kind;
 
+typedef enum _nnc_expression_ctx {
+    EXPR_CTX_NONE,
+    EXPR_CTX_NAMESPACE
+} nnc_expression_ctx;
+
 typedef struct _nnc_expression {
     nnc_heap_ptr exact;
     nnc_expression_kind kind;
+    nnc_expression_ctx ctx;
 } nnc_expression;
 
 typedef enum _nnc_unary_expression_kind {
@@ -74,6 +80,7 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_OR,
     BINARY_DOT,
     BINARY_IDX,
+    BINARY_NEST,
     BINARY_ASSIGN,
     BINARY_COMMA
 } nnc_binary_expression_kind;
@@ -99,5 +106,6 @@ nnc_binary_expression* nnc_binary_expr_new(nnc_binary_expression_kind kind);
 nnc_ternary_expression* nnc_ternary_expr_new();
 
 nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact);
+nnc_expression* nnc_expr_ctx_new(nnc_expression_kind kind, nnc_expression_ctx ctx, nnc_heap_ptr exact);
 
 #endif

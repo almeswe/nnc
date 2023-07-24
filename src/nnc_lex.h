@@ -29,7 +29,7 @@ typedef enum _nnc_tok_kind {
     TOK_ASTERISK,   TOK_ATPERSAND,  TOK_CBRACE,
     TOK_CBRACKET,   TOK_CHR,        TOK_CIRCUMFLEX,
     TOK_COLON,      TOK_COMMA,      TOK_CPAREN,
-    TOK_DOLLAR,     TOK_DOT,        TOK_EOF,
+    TOK_DOLLAR,     TOK_DOT,        TOK_DCOLON, TOK_EOF,
     TOK_EQ,         TOK_EXCMARK,    TOK_GRAVE,
     TOK_GT,         TOK_GTE,        TOK_IDENT,
     TOK_LSHIFT,     TOK_LT,         TOK_LTE,

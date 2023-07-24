@@ -5,6 +5,7 @@ nnc_ident* nnc_ident_new(const nnc_byte* from) {
     ptr->type = &unknown_type;
     ptr->size = strlen(from);
     ptr->name = cnew(nnc_byte, ptr->size + 1);
+    ptr->semantics = IDENT_DEFAULT;
     strcpy(ptr->name, from);
     return ptr;
 }
@@ -33,7 +34,14 @@ nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact) {
     nnc_expression* ptr = new(nnc_expression);
     ptr->kind = kind;
     ptr->exact = exact;
+    ptr->ctx = EXPR_CTX_NONE;
     return ptr;
+}
+
+nnc_expression* nnc_expr_ctx_new(nnc_expression_kind kind, nnc_expression_ctx ctx, nnc_heap_ptr exact) {
+    nnc_expression* expr = nnc_expr_new(kind, exact);
+    expr->ctx = ctx;
+    return expr;
 }
 
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact) {
