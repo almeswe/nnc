@@ -101,10 +101,12 @@ static void nnc_dump_ident(nnc_dump_data data) {
     const nnc_ident* ident = data.exact;
     fprintf(stderr, _c(BCYN, "ident "));
     fprintf(stderr, "<val=\"%s\",", ident->name);
-    fprintf(stderr, "len=%lu,", ident->size);
-    fprintf(stderr, "type=");
-    nnc_dump_type(ident->type);
-    switch (ident->semantics) {
+    fprintf(stderr, "len=%lu", ident->size);
+    if (ident->ctx != IDENT_NAMESPACE) {
+        fprintf(stderr, ",type=");
+        nnc_dump_type(ident->type);
+    }
+    switch (ident->ctx) {
         case IDENT_NAMESPACE:   fprintf(stderr, ",namespace");  break;
         case IDENT_ENUMERATOR:  fprintf(stderr, ",enumerator"); break;
         default: break;
@@ -199,7 +201,7 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_OR]         = "||",
         [BINARY_DOT]        = ".",
         [BINARY_IDX]        = "[]",
-        [BINARY_NEST]       = "::",
+        [BINARY_SCOPE]      = "::",
         [BINARY_ASSIGN]     = "=",
         [BINARY_COMMA]      = ","
     };

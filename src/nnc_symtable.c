@@ -1,16 +1,5 @@
 #include "nnc_symtable.h"
 
-/*
-    rules for name collision check
-
-    fn:             another fn, upper variable.
-    namespace:      another namespace, upper fn or variable
-    variable:       another variable, namespace, parameter, fn
-    parameter:      another parameter, upper variable, namespace, fn
-    enum member:    another enum member in this enum
-    struct member:  another struct member in this struct or union
-*/
-
 void nnc_st_init(nnc_st* out_table) {
     out_table->fns         = map_init_with(1);
     out_table->vars        = map_init_with(1);

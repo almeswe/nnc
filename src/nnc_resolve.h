@@ -19,7 +19,7 @@ typedef enum _nnc_deferred_kind {
     DEFERRED_NAMESPACE,
     DEFERRED_ENUMERATOR,
     DEFERRED_DOT_EXPR,
-    DEFERRED_NESTED_EXPR
+    DEFERRED_SCOPE_EXPR
 } nnc_deferred_kind;
 
 typedef struct _nnc_deferred_meta {

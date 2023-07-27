@@ -20,7 +20,7 @@ static nnc_bool nnc_resolve_namespace(nnc_ident* ident, nnc_st* table);
 
 static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     nnc_heap_ptr entity = NULL;
-    if (ident->semantics == IDENT_NAMESPACE) {
+    if (ident->ctx == IDENT_NAMESPACE) {
         return nnc_resolve_namespace(ident, table);
     }
     const nnc_st_entity_kind kind[] = {
@@ -33,7 +33,7 @@ static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
             //if (entity != NULL && ((nnc_let_statement*)entity)->is_topmost) {
             ident->type = nnc_st_get_type(entity, kind[i]);
             if (kind[i] == ST_ENTITY_ENUMERATOR) {
-                ident->semantics = IDENT_ENUMERATOR;
+                ident->ctx = IDENT_ENUMERATOR;
             }
             nnc_deferred_stack_pop(ident);
             return true;
@@ -57,11 +57,11 @@ static nnc_bool nnc_resolve_dot_expr(nnc_binary_expression* expr, nnc_resolve_ct
     return true;
 }
 
-static nnc_bool nnc_resolve_nested_expr(nnc_binary_expression* expr, nnc_st* table) {
+static nnc_bool nnc_resolve_scope_expr(nnc_binary_expression* expr, nnc_st* table) {
     nnc_ident* namespace_ident = expr->lexpr->exact;
     nnc_namespace_statement* namespace_stmt = NULL;
     if (!nnc_resolve_namespace(namespace_ident, table)) {
-        nnc_deferred_stack_put(table, DEFERRED_NESTED_EXPR, expr);
+        nnc_deferred_stack_put(table, DEFERRED_SCOPE_EXPR, expr);
         return false;
     }
     namespace_stmt = nnc_st_get_entity(table, ST_ENTITY_NAMESPACE, namespace_ident->name);
@@ -84,48 +84,20 @@ static nnc_bool nnc_resolve_nested_expr(nnc_binary_expression* expr, nnc_st* tab
 }
 
 static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* expr, nnc_st* table) {
-    //return true;
     switch (expr->kind) {
-        case BINARY_DOT:  return nnc_resolve_dot_expr(expr, resolve_ctx_new(table));
-        case BINARY_NEST: return nnc_resolve_nested_expr(expr, table);
+        case BINARY_DOT:   return nnc_resolve_dot_expr(expr, resolve_ctx_new(table));
+        case BINARY_SCOPE: return nnc_resolve_scope_expr(expr, table);
         default: nnc_abort_no_ctx("nnc_resolve_binary_expr: unknown kind.");
     }
     return false;
 }
-
-/*static nnc_bool nnc_resolve_namespace_expr(nnc_binary_expression* expr, nnc_st* table) {
-    //nnc_expression* member = expr;
-    //nnc_deferred_meta* meta = nnc_deferred_meta_get(expr);
-    //assert(meta != NULL);
-    //while (member->kind != EXPR_IDENT) {
-    //    member = ((nnc_binary_expression*)(expr->exact))->rexpr;
-    //}
-    //assert(member->kind == EXPR_IDENT);
-    //nnc_ident* ident = member->exact;
-    nnc_ident* namespace_ident = expr->lexpr->exact;
-    nnc_namespace_statement* namespace_stmt = nnc_st_check_entity(table, 
-        ST_ENTITY_NAMESPACE, namespace_ident->name);
-    nnc_st* inner = NNC_GET_SYMTABLE(namespace_stmt);
-    assert(inner != NULL);
-    nnc_st* inner_root = inner->root;
-    // temporarly remove parent table to disable
-    // upper check for entity, check only in scope of current table
-    inner->root = NULL;
-    nnc_bool status = nnc_resolve_expr(expr, inner);
-    if (status) {
-        nnc_deferred_stack_pop(expr);
-    }
-    // return parent table back
-    inner->root = inner_root;
-    return status;
-}*/
 
 nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
     switch (entity->kind) {
         case DEFERRED_EXPR:         return nnc_resolve_expr(entity->exact, entity->context);
         case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
         case DEFERRED_NAMESPACE:    return nnc_resolve_namespace(entity->exact, entity->context);
-        case DEFERRED_NESTED_EXPR:  return nnc_resolve_nested_expr(entity->exact, entity->context);
+        case DEFERRED_SCOPE_EXPR:   return nnc_resolve_scope_expr(entity->exact, entity->context);
         default: nnc_abort_no_ctx("nnc_resolve_entity: kind unknown.");
     }
     return false;
