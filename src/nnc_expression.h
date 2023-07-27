@@ -80,7 +80,7 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_OR,
     BINARY_DOT,
     BINARY_IDX,
-    BINARY_NEST,
+    BINARY_SCOPE,
     BINARY_ASSIGN,
     BINARY_COMMA
 } nnc_binary_expression_kind;
@@ -100,6 +100,7 @@ typedef struct _nnc_ternary_expression {
 } nnc_ternary_expression;
 
 nnc_ident* nnc_ident_new(const nnc_byte* from);
+void nnc_set_ident_ctx(nnc_ident* ident, nnc_ident_ctx ctx);
 
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind);
 nnc_binary_expression* nnc_binary_expr_new(nnc_binary_expression_kind kind);

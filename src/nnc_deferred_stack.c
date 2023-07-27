@@ -54,7 +54,7 @@ void nnc_deferred_stack_pop(nnc_heap_ptr entity) {
 void nnc_deferred_stack_update(nnc_deferred_entity* entity) {
     const static nnc_deferred_status ceiling[] = {
         [DEFERRED_EXPR]         = STATUS_INCOMPLETE3,
-        [DEFERRED_NESTED_EXPR]  = STATUS_INCOMPLETE3,
+        [DEFERRED_SCOPE_EXPR]   = STATUS_INCOMPLETE3,
         [DEFERRED_IDENT]        = STATUS_INCOMPLETE2,
         [DEFERRED_NAMESPACE]    = STATUS_INCOMPLETE2
     };

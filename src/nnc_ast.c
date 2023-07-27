@@ -5,9 +5,13 @@ nnc_ident* nnc_ident_new(const nnc_byte* from) {
     ptr->type = &unknown_type;
     ptr->size = strlen(from);
     ptr->name = cnew(nnc_byte, ptr->size + 1);
-    ptr->semantics = IDENT_DEFAULT;
+    ptr->ctx = IDENT_DEFAULT;
     strcpy(ptr->name, from);
     return ptr;
+}
+
+void nnc_ident_set_ctx(nnc_ident* ident, nnc_ident_ctx ctx) {
+    ident->ctx = ctx;
 }
 
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind) {

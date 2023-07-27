@@ -7,17 +7,17 @@
 typedef struct _nnc_type       nnc_type;
 typedef struct _nnc_expression nnc_expression;
 
-typedef enum _nnc_ident_semantics {
+typedef enum _nnc_ident_ctx {
     IDENT_DEFAULT,
     IDENT_NAMESPACE,
     IDENT_ENUMERATOR
-} nnc_ident_semantics;
+} nnc_ident_ctx;
 
 typedef struct _nnc_ident {
     nnc_u64 size;
     nnc_str name;
     nnc_type* type;
-    nnc_ident_semantics semantics;
+    nnc_ident_ctx ctx;
 } nnc_ident;
 
 typedef struct _nnc_enumerator {

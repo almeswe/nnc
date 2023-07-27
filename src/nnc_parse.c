@@ -410,16 +410,15 @@ static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* pr
     return nnc_expr_new(EXPR_BINARY, expr);
 }
 
-static nnc_expression* nnc_parse_nested_expr(nnc_parser* parser, nnc_expression* prefix) {
+static nnc_expression* nnc_parse_scope_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_next(parser);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
         THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
-    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_NEST);
+    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_SCOPE);
     expr->lexpr = prefix;
-    if (prefix->kind == EXPR_IDENT) {
-        ((nnc_ident*)prefix->exact)->semantics = IDENT_NAMESPACE;
-    }
+    assert(prefix->kind == EXPR_IDENT);
+    nnc_ident_set_ctx(prefix->exact, IDENT_NAMESPACE);
     expr->rexpr = nnc_parse_postfix_expr(parser);
     return nnc_expr_ctx_new(EXPR_BINARY, EXPR_CTX_NAMESPACE, expr);
 }
@@ -465,7 +464,7 @@ static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
         nnc_expression* prefix = postfix ? postfix : primary;
         switch (tok->kind) {
             case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);    break;
-            case TOK_DCOLON:    postfix = nnc_parse_nested_expr(parser, prefix); break;
+            case TOK_DCOLON:    postfix = nnc_parse_scope_expr(parser, prefix); break;
             case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
             case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
             default:
@@ -1059,7 +1058,7 @@ static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
         namespace_stmt->var = nnc_ident_new(tok->lexeme);
     }
     nnc_parser_expect(parser, TOK_IDENT);
-    namespace_stmt->var->semantics = IDENT_NAMESPACE;
+    namespace_stmt->var->ctx = IDENT_NAMESPACE;
     // todo: namespace_stmt passed by value??
     namespace_stmt->body = nnc_parse_namespace_compound_stmt(parser);
     nnc_st_put_entity(parser->table, ST_ENTITY_NAMESPACE, namespace_stmt);
