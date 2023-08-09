@@ -53,10 +53,6 @@ static nnc_bool nnc_resolve_namespace(nnc_ident* ident, nnc_st* table) {
     return false;
 }
 
-static nnc_bool nnc_resolve_dot_expr(nnc_binary_expression* expr, nnc_resolve_ctx ctx) {
-    return true;
-}
-
 static nnc_bool nnc_resolve_scope_expr(nnc_binary_expression* expr, nnc_st* table) {
     nnc_ident* namespace_ident = expr->lexpr->exact;
     nnc_namespace_statement* namespace_stmt = NULL;
@@ -83,11 +79,61 @@ static nnc_bool nnc_resolve_scope_expr(nnc_binary_expression* expr, nnc_st* tabl
     return status;
 }
 
+static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
+    (void)unary, (void)table;
+}
+
+//todo: make more robust errors (remove asserts)
+
+static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
+    const nnc_type* inner = nnc_expr_get_type(unary->expr);
+    assert(inner->kind == TYPE_UNION || inner->kind == TYPE_STRUCT);
+    nnc_ident* member = unary->exact.dot.member->exact;
+    for (nnc_u64 i = 0; i < inner->exact.struct_or_union.memberc; i++) {
+        nnc_struct_member* struct_member = inner->exact.struct_or_union.members[i];
+        if (strcmp(struct_member->var->name, member->name) == 0) {
+            unary->type = struct_member->type;
+            return;
+        }
+    }
+    THROW(NNC_SEMANTIC, sformat("\'%s\' is not member of \'%s\'.", member->name, nnc_type_tostr(inner)));
+}
+
+static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table) {
+    const nnc_type* inner = nnc_expr_get_type(unary->expr);
+    assert(inner->kind == TYPE_FUNCTION);
+    unary->type = inner->exact.fn.ret;
+}
+
+static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
+    const nnc_type* inner = nnc_expr_get_type(unary->expr);
+    assert(inner->kind == TYPE_ARRAY || inner->kind == TYPE_POINTER);
+    unary->type = inner->base;
+}
+
+static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
+    typedef void (unary_expr_resolver)(nnc_unary_expression*, nnc_st*);
+    static unary_expr_resolver* resolve[] = {
+        [UNARY_POSTFIX_AS]    = nnc_resolve_as_expr,
+        [UNARY_POSTFIX_DOT]   = nnc_resolve_dot_expr,
+        [UNARY_POSTFIX_CALL]  = nnc_resolve_call_expr,
+        [UNARY_POSTFIX_INDEX] = nnc_resolve_index_expr
+    };
+    if (!nnc_resolve_expr(unary->expr, table)) {
+        nnc_deferred_stack_put(table, DEFERRED_UNARY_EXPR, unary);
+        return false;
+    }
+    else {
+        resolve[unary->kind](unary, table);
+        nnc_deferred_stack_pop(unary);
+        return true;
+    }
+}
+
 static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* expr, nnc_st* table) {
     switch (expr->kind) {
-        case BINARY_DOT:   return nnc_resolve_dot_expr(expr, resolve_ctx_new(table));
         case BINARY_SCOPE: return nnc_resolve_scope_expr(expr, table);
-        default: nnc_abort_no_ctx("nnc_resolve_binary_expr: unknown kind.");
+        default: return true; //nnc_abort_no_ctx("nnc_resolve_binary_expr: unknown kind.");
     }
     return false;
 }
@@ -98,6 +144,7 @@ nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
         case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
         case DEFERRED_NAMESPACE:    return nnc_resolve_namespace(entity->exact, entity->context);
         case DEFERRED_SCOPE_EXPR:   return nnc_resolve_scope_expr(entity->exact, entity->context);
+        case DEFERRED_UNARY_EXPR:   return nnc_resolve_unary_expr(entity->exact, entity->context);
         default: nnc_abort_no_ctx("nnc_resolve_entity: kind unknown.");
     }
     return false;
@@ -106,8 +153,9 @@ nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
 nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
     switch (expr->kind) {
         case EXPR_IDENT:        return nnc_resolve_ident(expr->exact, table);
-        case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, table);
         case EXPR_INT_LITERAL:  return true;
+        case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, table);
+        case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, table);
         default: nnc_abort_no_ctx("nnc_resolve_expr: kind unknown.");
     }
     return false;

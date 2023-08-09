@@ -38,7 +38,9 @@ typedef enum _nnc_unary_expression_kind {
     UNARY_SIZEOF,
     UNARY_LENGTHOF,
     UNARY_POSTFIX_AS,
-    UNARY_POSTFIX_CALL
+    UNARY_POSTFIX_DOT,
+    UNARY_POSTFIX_CALL,
+    UNARY_POSTFIX_INDEX
 } nnc_unary_expression_kind;
 
 typedef struct _nnc_unary_expression {
@@ -52,10 +54,16 @@ typedef struct _nnc_unary_expression {
         struct _nnc_unary_cast {
             nnc_type* to;
         } cast;
-        struct _nnc_unary_call {
+        struct _nnc_unary_postfix_dot {
+            nnc_expression* member;
+        } dot;
+        struct _nnc_unary_postfix_call {
             nnc_u64 argc;
             nnc_expression** args;
         } call;
+        struct _nnc_unary_postfix_index {
+            nnc_expression* expr;
+        } index;
     } exact;
 } nnc_unary_expression;
 
@@ -78,8 +86,6 @@ typedef enum _nnc_binary_expression_kind {
     BINARY_BW_OR,
     BINARY_AND,
     BINARY_OR,
-    BINARY_DOT,
-    BINARY_IDX,
     BINARY_SCOPE,
     BINARY_ASSIGN,
     BINARY_COMMA

@@ -404,10 +404,10 @@ static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* pr
     if (!nnc_parser_match(parser, TOK_IDENT)) {
         THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
-    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_DOT);
-    expr->lexpr = prefix;
-    expr->rexpr = nnc_parse_primary_expr(parser);
-    return nnc_expr_new(EXPR_BINARY, expr);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_DOT);
+    expr->expr = prefix;
+    expr->exact.dot.member = nnc_parse_ident(parser);
+    return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 static nnc_expression* nnc_parse_scope_expr(nnc_parser* parser, nnc_expression* prefix) {
@@ -443,14 +443,15 @@ static nnc_expression* nnc_parse_call_expr(nnc_parser* parser, nnc_expression* p
 
 static nnc_expression* nnc_parse_index_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_expect(parser, TOK_OBRACKET);
-    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_IDX);
-    expr->lexpr = prefix;
-    expr->rexpr = nnc_parse_expr(parser);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_INDEX);
+    expr->expr = prefix;
+    expr->exact.index.expr = nnc_parse_expr(parser);
     nnc_parser_expect(parser, TOK_CBRACKET);
-    return nnc_expr_new(EXPR_BINARY, expr);
+    return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
+    //todo: make all postfix epxressions unary, not binary
     nnc_expression* postfix = NULL;
     nnc_expression* primary = nnc_parse_primary_expr(parser);
     if (nnc_parser_match(parser, TOK_AS)) {
@@ -464,7 +465,7 @@ static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
         nnc_expression* prefix = postfix ? postfix : primary;
         switch (tok->kind) {
             case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);    break;
-            case TOK_DCOLON:    postfix = nnc_parse_scope_expr(parser, prefix); break;
+            case TOK_DCOLON:    postfix = nnc_parse_scope_expr(parser, prefix);  break;
             case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
             case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
             default:
@@ -793,12 +794,16 @@ static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
 
 nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_assignment_expr(parser);
-    return nnc_resolve_expr(expr, parser->table), expr;
+    nnc_resolve_expr(expr, parser->table);
+    //nnc_expr_infer_type(expr, parser->table);
+    return expr;
 }
 
 nnc_expression* nnc_parse_expr(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_comma_expr(parser);
-    return nnc_resolve_expr(expr, parser->table), expr;
+    nnc_resolve_expr(expr, parser->table);
+    //nnc_expr_infer_type(expr, parser->table);
+    return expr;
 }
 
 static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser);
@@ -889,8 +894,7 @@ static nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     }
     nnc_parser_expect(parser, TOK_CPAREN);
     for_stmt->body = nnc_parse_body(parser);
-    if (for_stmt->init->kind == STMT_LET &&
-        for_stmt->body->kind == STMT_COMPOUND) {
+    if (for_stmt->init->kind == STMT_LET) {
         nnc_st* inner = NNC_GET_SYMTABLE(for_stmt);
         nnc_st_put_entity(inner, ST_ENTITY_VAR, for_stmt->init->exact);
     }
