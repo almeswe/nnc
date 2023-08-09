@@ -144,17 +144,19 @@ static void nnc_dump_dbl(nnc_dump_data data) {
 static void nnc_dump_unary(nnc_dump_data data) {
     const nnc_unary_expression* unary = data.exact;
     static const char* unary_str[] = {
-        [UNARY_CAST]         = "cast",
-        [UNARY_PLUS]         = "+",
-        [UNARY_MINUS]        = "-",
-        [UNARY_BITWISE_NOT]  = "~",
-        [UNARY_DEREF]        = "*",
-        [UNARY_REF]          = "&",
-        [UNARY_NOT]          = "!",
-        [UNARY_SIZEOF]       = "sizeof",
-        [UNARY_LENGTHOF]     = "lengthof",
-        [UNARY_POSTFIX_AS]   = "as",
-        [UNARY_POSTFIX_CALL] = "()"
+        [UNARY_CAST]          = "cast",
+        [UNARY_PLUS]          = "+",
+        [UNARY_MINUS]         = "-",
+        [UNARY_BITWISE_NOT]   = "~",
+        [UNARY_DEREF]         = "*",
+        [UNARY_REF]           = "&",
+        [UNARY_NOT]           = "!",
+        [UNARY_SIZEOF]        = "sizeof",
+        [UNARY_LENGTHOF]      = "lengthof",
+        [UNARY_POSTFIX_AS]    = "as",
+        [UNARY_POSTFIX_DOT]   = ".",
+        [UNARY_POSTFIX_CALL]  = "()",
+        [UNARY_POSTFIX_INDEX] = "[]"
     };
     fprintf(stderr, _c(BGRN, "unary-expr `%s` "), unary_str[unary->kind]);
     if (unary->kind == UNARY_CAST   ||
@@ -199,8 +201,6 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_BW_OR]      = "|",
         [BINARY_AND]        = "&&",
         [BINARY_OR]         = "||",
-        [BINARY_DOT]        = ".",
-        [BINARY_IDX]        = "[]",
         [BINARY_SCOPE]      = "::",
         [BINARY_ASSIGN]     = "=",
         [BINARY_COMMA]      = ","

@@ -14,6 +14,7 @@ typedef enum _nnc_deferred_status {
 typedef enum _nnc_deferred_kind {
     DEFERRED_FN,
     DEFERRED_EXPR,
+    DEFERRED_UNARY_EXPR,
     DEFERRED_IDENT,
     DEFERRED_PARAM,
     DEFERRED_NAMESPACE,
