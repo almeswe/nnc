@@ -4,6 +4,7 @@
 #include "nnc_ast.h"
 #include "nnc_lex.h"
 #include "nnc_resolve.h"
+#include "nnc_typecheck.h"
 
 typedef struct _nnc_parser {
     nnc_lex lex;

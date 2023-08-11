@@ -1,5 +1,11 @@
 #include "nnc_format.h"
 
+/**
+ * @brief Formats `format` string with passed arguments.
+ * @param format String to be formatted.
+ * @param __VA_ARGS__ Arguments which will be substituted accroding to format variables.
+ * @return Arena-allocated formatted string.
+ */
 char* nnc_sformat(const char* format, ...) {
     va_list args;
 	va_start(args, format);
@@ -12,4 +18,11 @@ char* nnc_sformat(const char* format, ...) {
     char* formatstr = (char*)nnc_alloc(written + 1);
     strcpy(formatstr, formatbuf);
 	return formatstr;
+}
+
+nnc_bool nnc_sequal(const char* s1, const char* s2) {
+	if (s1 == NULL || s1 == NULL) {
+		return false;
+	}
+	return strcmp(s1, s1) == 0;
 }

@@ -106,7 +106,9 @@ static nnc_var_type* nnc_parse_var_type(nnc_parser* parser) {
 }
 
 static nnc_fn_param* nnc_parse_fn_param(nnc_parser* parser) {
-    return (nnc_fn_param*)nnc_parse_var_type(parser);
+    nnc_fn_param* fn_param = nnc_parse_var_type(parser);
+    fn_param->var->ctx = IDENT_FUNCTION_PARAM;
+    return fn_param;
 }
 
 static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
@@ -119,6 +121,7 @@ static nnc_enumerator* nnc_parse_enumerator(nnc_parser* parser, nnc_type* in_enu
     if (nnc_parser_match(parser, TOK_IDENT)) {
         const nnc_tok* tok = nnc_parser_get(parser);
         member->var = nnc_ident_new(tok->lexeme);
+        member->var->ctx = IDENT_ENUMERATOR;
     }
     nnc_parser_expect(parser, TOK_IDENT);
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
@@ -162,7 +165,8 @@ static nnc_type* nnc_parse_enum_type(nnc_parser* parser) {
            !nnc_parser_match(parser, TOK_EOF)) {
         nnc_enumerator* member = nnc_parse_enumerator(parser, type);
         buf_add(type->exact.enumeration.members, member);
-        nnc_st_put_entity(parser->table, ST_ENTITY_ENUMERATOR, member);
+        nnc_st_put(parser->table, member->var);
+        //nnc_st_put_entity(parser->table, ST_ENTITY_ENUMERATOR, member);
         if (!nnc_parser_match(parser, TOK_CBRACE)) {
             nnc_parser_expect(parser, TOK_COMMA);
         }
@@ -415,12 +419,10 @@ static nnc_expression* nnc_parse_scope_expr(nnc_parser* parser, nnc_expression* 
     if (!nnc_parser_match(parser, TOK_IDENT)) {
         THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
-    nnc_binary_expression* expr = nnc_binary_expr_new(BINARY_SCOPE);
-    expr->lexpr = prefix;
-    assert(prefix->kind == EXPR_IDENT);
-    nnc_ident_set_ctx(prefix->exact, IDENT_NAMESPACE);
-    expr->rexpr = nnc_parse_postfix_expr(parser);
-    return nnc_expr_ctx_new(EXPR_BINARY, EXPR_CTX_NAMESPACE, expr);
+    nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_SCOPE);
+    expr->expr = prefix;
+    expr->exact.scope.member = nnc_parse_ident(parser);
+    return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 static nnc_expression* nnc_parse_call_expr(nnc_parser* parser, nnc_expression* prefix) {
@@ -858,13 +860,15 @@ static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc_boo
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_COLON);
     let_stmt->type = nnc_parse_type(parser);
+    let_stmt->var->type = let_stmt->type; 
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
         nnc_parser_expect(parser, TOK_ASSIGN);
         let_stmt->init = nnc_parse_expr(parser);
     }
     nnc_parser_expect(parser, TOK_SEMICOLON);
     if (put_in_st) {
-        nnc_st_put_entity(parser->table, ST_ENTITY_VAR, let_stmt);
+        nnc_st_put(parser->table, let_stmt->var);
+        //nnc_st_put_entity(parser->table, ST_ENTITY_VAR, let_stmt);
     }
     return nnc_stmt_new(STMT_LET, let_stmt);
 }
@@ -896,7 +900,8 @@ static nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     for_stmt->body = nnc_parse_body(parser);
     if (for_stmt->init->kind == STMT_LET) {
         nnc_st* inner = NNC_GET_SYMTABLE(for_stmt);
-        nnc_st_put_entity(inner, ST_ENTITY_VAR, for_stmt->init->exact);
+        nnc_st_put(inner, ((nnc_let_statement*)(for_stmt->init->exact))->var);
+        //nnc_st_put_entity(inner, ST_ENTITY_VAR, for_stmt->init->exact);
     }
     return nnc_stmt_new(STMT_FOR, for_stmt);
 }
@@ -931,7 +936,8 @@ static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_AS);
     type_stmt->as = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    nnc_st_put_entity(parser->table, ST_ENTITY_TYPE, type_stmt->as);
+    //todo: add nnc_st_put_type.
+    //nnc_st_put_entity(parser->table, ST_ENTITY_TYPE, type_stmt->as);
     return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
@@ -960,7 +966,10 @@ static nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
 static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
 
 static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) {
+    //todo: make root table swapping more robust
     nnc_parser_enter_scope(parser);
+    nnc_st* root_st = parser->table->root;
+    parser->table->root = NULL;
     nnc_compound_statement* compound_stmt = new(nnc_compound_statement);
     compound_stmt->scope = parser->table;
     nnc_parser_expect(parser, TOK_OBRACE);
@@ -968,6 +977,7 @@ static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) {
         buf_add(compound_stmt->stmts, nnc_parse_topmost_stmt(parser));
     }
     nnc_parser_expect(parser, TOK_CBRACE);
+    parser->table->root = root_st;
     nnc_parser_leave_scope(parser);
     return nnc_stmt_new(STMT_COMPOUND, compound_stmt);
 }
@@ -1021,6 +1031,7 @@ static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
         fn_stmt->var = nnc_ident_new(tok->lexeme);
     }
     nnc_parser_expect(parser, TOK_IDENT);
+    fn_stmt->var->ctx = IDENT_FUNCTION; 
     fn_stmt->var->type = nnc_fn_type_new();
     //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_OPAREN);
@@ -1043,14 +1054,13 @@ static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     // todo: may be somehow put inner scope to nnc_parse_body?
     // and then put params into table before the entities from body.
 
-    // put all function parameters inside inner scope of the function
+    nnc_st_put(parser->table, fn_stmt->var);
     assert(fn_stmt->body->kind == STMT_COMPOUND);
+    // put all function parameters inside inner scope of the function
     nnc_st* inner = NNC_GET_SYMTABLE(fn_stmt);
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
-        nnc_st_put_entity(inner, ST_ENTITY_PARAM, fn_stmt->params[i]);
+        nnc_st_put(inner, fn_stmt->params[i]->var);
     }
-    // then put function itself in parent scope
-    nnc_st_put_entity(parser->table, ST_ENTITY_FN, fn_stmt);
     return nnc_stmt_new(STMT_FN, fn_stmt);
 }
 
@@ -1063,9 +1073,11 @@ static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     }
     nnc_parser_expect(parser, TOK_IDENT);
     namespace_stmt->var->ctx = IDENT_NAMESPACE;
-    // todo: namespace_stmt passed by value??
+    namespace_stmt->var->type = nnc_namespace_type_new();
+    namespace_stmt->var->type->repr = namespace_stmt->var->name;
+    namespace_stmt->var->type->exact.name.space = namespace_stmt;
     namespace_stmt->body = nnc_parse_namespace_compound_stmt(parser);
-    nnc_st_put_entity(parser->table, ST_ENTITY_NAMESPACE, namespace_stmt);
+    nnc_st_put(parser->table, namespace_stmt->var);
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
 

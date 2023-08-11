@@ -102,15 +102,8 @@ static void nnc_dump_ident(nnc_dump_data data) {
     fprintf(stderr, _c(BCYN, "ident "));
     fprintf(stderr, "<val=\"%s\",", ident->name);
     fprintf(stderr, "len=%lu", ident->size);
-    if (ident->ctx != IDENT_NAMESPACE) {
-        fprintf(stderr, ",type=");
-        nnc_dump_type(ident->type);
-    }
-    switch (ident->ctx) {
-        case IDENT_NAMESPACE:   fprintf(stderr, ",namespace");  break;
-        case IDENT_ENUMERATOR:  fprintf(stderr, ",enumerator"); break;
-        default: break;
-    }
+    fprintf(stderr, ",type=");
+    nnc_dump_type(ident->type);
     fprintf(stderr, ">\n");
 }
 
@@ -156,7 +149,8 @@ static void nnc_dump_unary(nnc_dump_data data) {
         [UNARY_POSTFIX_AS]    = "as",
         [UNARY_POSTFIX_DOT]   = ".",
         [UNARY_POSTFIX_CALL]  = "()",
-        [UNARY_POSTFIX_INDEX] = "[]"
+        [UNARY_POSTFIX_INDEX] = "[]",
+        [UNARY_POSTFIX_SCOPE] = "::"
     };
     fprintf(stderr, _c(BGRN, "unary-expr `%s` "), unary_str[unary->kind]);
     if (unary->kind == UNARY_CAST   ||
@@ -201,7 +195,6 @@ static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_BW_OR]      = "|",
         [BINARY_AND]        = "&&",
         [BINARY_OR]         = "||",
-        [BINARY_SCOPE]      = "::",
         [BINARY_ASSIGN]     = "=",
         [BINARY_COMMA]      = ","
     };
