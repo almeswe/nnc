@@ -4,13 +4,16 @@
 #include "nnc_arena.h"
 #include "nnc_format.h"
 
-typedef struct _nnc_type       nnc_type;
-typedef struct _nnc_expression nnc_expression;
+typedef struct _nnc_type                nnc_type;
+typedef struct _nnc_expression          nnc_expression;
+typedef struct _nnc_namespace_statement nnc_namespace_statement;
 
 typedef enum _nnc_ident_ctx {
     IDENT_DEFAULT,
+    IDENT_FUNCTION,
     IDENT_NAMESPACE,
-    IDENT_ENUMERATOR
+    IDENT_ENUMERATOR,
+    IDENT_FUNCTION_PARAM
 } nnc_ident_ctx;
 
 typedef struct _nnc_ident {
@@ -52,6 +55,7 @@ typedef enum _nnc_type_kind {
 	TYPE_UNION,
 	TYPE_STRUCT,
 	TYPE_FUNCTION,
+    TYPE_NAMESPACE,
 	TYPE_INCOMPLETE,
 	TYPE_VOID,
 	TYPE_UNKNOWN
@@ -70,6 +74,9 @@ typedef struct _nnc_type {
     struct _nnc_array_type {
         nnc_expression* dim;
     } array;
+    struct _nnc_namespace_type {
+        nnc_namespace_statement* space;
+    } name; 
     struct _nnc_enumeration_type {
         nnc_u64 memberc;
         nnc_enumerator** members;
@@ -99,9 +106,10 @@ nnc_type* nnc_type_new(const nnc_str repr);
 nnc_type* nnc_ptr_type_new(nnc_type* base);
 nnc_type* nnc_arr_type_new(nnc_type* base);
 nnc_type* nnc_fn_type_new();
-nnc_type* nnc_enum_type_new(); 
+nnc_type* nnc_enum_type_new();
 nnc_type* nnc_union_type_new();
 nnc_type* nnc_struct_type_new();
+nnc_type* nnc_namespace_type_new();
 
 nnc_str nnc_type_tostr(const nnc_type* type);
 

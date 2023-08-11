@@ -10,5 +10,6 @@
 #define FORMAT_BUF_SIZE 2048
 
 char* nnc_sformat(const char* format, ...);
+nnc_bool nnc_sequal(const char* s1, const char* s2);
 
 #endif

@@ -50,6 +50,12 @@ nnc_type* nnc_struct_type_new() {
     return ptr;
 }
 
+nnc_type* nnc_namespace_type_new() {
+    nnc_type* ptr = nnc_type_new(NULL);
+    ptr->kind = TYPE_NAMESPACE;
+    return ptr;
+}
+
 static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     nnc_str repr = "fn( ";
     for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
@@ -96,13 +102,13 @@ static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     switch (type->kind) {
-        case TYPE_ENUM:     return sformat("enum %s",   nnc_enum_type_tostr(type));
-        case TYPE_UNION:    return sformat("union %s",  nnc_struct_or_union_type_tostr(type));
-        case TYPE_STRUCT:   return sformat("struct %s", nnc_struct_or_union_type_tostr(type));
-        case TYPE_FUNCTION: return nnc_fn_type_tostr(type);
-        case TYPE_ARRAY:    return sformat("%s[]", nnc_type_tostr(type->base));
-        case TYPE_POINTER:  return sformat("%s*",  nnc_type_tostr(type->base));
-        default:
-            return type->repr;
+        case TYPE_ENUM:      return sformat("enum %s",   nnc_enum_type_tostr(type));
+        case TYPE_UNION:     return sformat("union %s",  nnc_struct_or_union_type_tostr(type));
+        case TYPE_STRUCT:    return sformat("struct %s", nnc_struct_or_union_type_tostr(type));
+        case TYPE_NAMESPACE: return sformat("namespace %s", type->repr);
+        case TYPE_FUNCTION:  return nnc_fn_type_tostr(type);
+        case TYPE_ARRAY:     return sformat("%s[]", nnc_type_tostr(type->base));
+        case TYPE_POINTER:   return sformat("%s*",  nnc_type_tostr(type->base));
+        default:             return type->repr;
     }
 }
