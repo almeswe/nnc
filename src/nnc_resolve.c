@@ -151,6 +151,7 @@ static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
         nnc_struct_member* struct_member = inner->exact.struct_or_union.members[i];
         if (nnc_sequal(struct_member->var->name, member->name)) {
             unary->type = struct_member->type;
+            member->type = unary->type;
             return;
         }
     }

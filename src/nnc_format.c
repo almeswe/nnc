@@ -21,8 +21,8 @@ char* nnc_sformat(const char* format, ...) {
 }
 
 nnc_bool nnc_sequal(const char* s1, const char* s2) {
-	if (s1 == NULL || s1 == NULL) {
+	if (s1 == NULL || s2 == NULL) {
 		return false;
 	}
-	return strcmp(s1, s1) == 0;
+	return strcmp(s1, s2) == 0;
 }
