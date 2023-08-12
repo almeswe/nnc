@@ -192,11 +192,10 @@ static nnc_type* nnc_parse_struct_or_union_type(nnc_parser* parser) {
            !nnc_parser_match(parser, TOK_EOF)) {
         buf_add(type->exact.struct_or_union.members, 
             nnc_parse_struct_member(parser));
+        type->exact.struct_or_union.memberc++;
         nnc_parser_expect(parser, TOK_SEMICOLON);
     }
     nnc_parser_expect(parser, TOK_CBRACE);
-    type->exact.struct_or_union.memberc = buf_len(
-        type->exact.struct_or_union.members);
     return type;
 }
 

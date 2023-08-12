@@ -159,18 +159,40 @@ static void nnc_dump_unary(nnc_dump_data data) {
         const nnc_type* type = unary->kind == UNARY_SIZEOF ?
             unary->exact.size.of : unary->exact.cast.to;
         fprintf(stderr, "<cast-type="); nnc_dump_type(type);
+        fprintf(stderr, ",type=");
+        nnc_dump_type(unary->type);
+        fprintf(stderr, ">\n");
     }
-    fprintf(stderr, ",type=");
-    nnc_dump_type(unary->type);
-    fprintf(stderr, ">\n");
-    nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
-    nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
+    else {
+        fprintf(stderr, "<type=");
+        nnc_dump_type(unary->type);
+        fprintf(stderr, ">\n");
+    }
+    if (unary->expr != NULL) {
+        nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
+        nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
+    }
+    if (unary->kind == UNARY_POSTFIX_DOT) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "field=");
+        nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.dot.member));
+    }
     if (unary->kind == UNARY_POSTFIX_CALL) {
         for (nnc_u64 i = 0; i < unary->exact.call.argc; i++) {
             nnc_dump_indent(data.indent + 1);
             fprintf(stderr, TREE_BR "arg%lu=", i+1);
             nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.call.args[i]));
         }
+    }
+    if (unary->kind == UNARY_POSTFIX_SCOPE) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "member=");
+        nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.dot.member));
+    }
+    if (unary->kind == UNARY_POSTFIX_INDEX) {
+        nnc_dump_indent(data.indent + 1);
+        fprintf(stderr, TREE_BR "index=");
+        nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.dot.member));
     }
 }
 
