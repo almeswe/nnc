@@ -38,14 +38,7 @@ nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact) {
     nnc_expression* ptr = new(nnc_expression);
     ptr->kind = kind;
     ptr->exact = exact;
-    ptr->ctx = EXPR_CTX_NONE;
     return ptr;
-}
-
-nnc_expression* nnc_expr_ctx_new(nnc_expression_kind kind, nnc_expression_ctx ctx, nnc_heap_ptr exact) {
-    nnc_expression* expr = nnc_expr_new(kind, exact);
-    expr->ctx = ctx;
-    return expr;
 }
 
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact) {
