@@ -16,6 +16,38 @@ typedef struct _nnc_resolve_ctx {
 
 #define resolve_ctx_new(st) (nnc_resolve_ctx) { .table=st, .semantics=SEMANTIC_CTX_NONE }
 
+static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
+    switch (literal->suffix) {
+        case SUFFIX_I8:  literal->type = &i8_type;  break;
+        case SUFFIX_U8:  literal->type = &u8_type;  break;
+        case SUFFIX_I16: literal->type = &i16_type; break;
+        case SUFFIX_U16: literal->type = &u16_type; break;
+        case SUFFIX_I32: literal->type = &i32_type; break;
+        case SUFFIX_U32: literal->type = &u32_type; break;
+        case SUFFIX_I64: literal->type = &i64_type; break;
+        case SUFFIX_U64: literal->type = &u64_type; break;
+    }
+    return true;
+}
+
+static nnc_bool nnc_resolve_dbl_literal(nnc_dbl_literal* literal) {
+    switch (literal->suffix) {
+        case SUFFIX_F32: literal->type = &f32_type; break;
+        case SUFFIX_F64: literal->type = &f64_type; break;
+    }
+    return true;
+}
+
+static nnc_bool nnc_resolve_chr_literal(nnc_chr_literal* literal) {
+    literal->type = &u8_type;
+    return true;
+}
+
+static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
+    literal->type = nnc_ptr_type_new(&u8_type);
+    return true; 
+}
+
 static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     nnc_symbol* sym = nnc_st_get(table, ident->name);
     if (sym == NULL) {
@@ -176,9 +208,11 @@ static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* tabl
         [UNARY_POSTFIX_SCOPE] = nnc_resolve_scope_expr,
         [UNARY_POSTFIX_INDEX] = nnc_resolve_index_expr
     };
-    if (!nnc_resolve_expr(unary->expr, table)) {
-        nnc_deferred_stack_put(table, DEFERRED_UNARY_EXPR, unary);
-        return false;
+    if (unary->expr != NULL) {
+        if (!nnc_resolve_expr(unary->expr, table)) {
+            nnc_deferred_stack_put(table, DEFERRED_UNARY_EXPR, unary);
+            return false;
+        }
     }
     assert(unary->kind >= UNARY_REF && unary->kind <= UNARY_POSTFIX_INDEX);
     resolve[unary->kind](unary, table);
@@ -206,8 +240,11 @@ nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
 
 nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
     switch (expr->kind) {
+        case EXPR_INT_LITERAL:  return nnc_resolve_int_literal(expr->exact);
+        case EXPR_DBL_LITERAL:  return nnc_resolve_dbl_literal(expr->exact);
+        case EXPR_CHR_LITERAL:  return nnc_resolve_chr_literal(expr->exact);
+        case EXPR_STR_LITERAL:  return nnc_resolve_str_literal(expr->exact);
         case EXPR_IDENT:        return nnc_resolve_ident(expr->exact, table);
-        case EXPR_INT_LITERAL:  return true;
         case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, table);
         case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, table);
         default: nnc_abort_no_ctx("nnc_resolve_expr: kind unknown.");
