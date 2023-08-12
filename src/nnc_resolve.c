@@ -16,8 +16,6 @@ typedef struct _nnc_resolve_ctx {
 
 #define resolve_ctx_new(st) (nnc_resolve_ctx) { .table=st, .semantics=SEMANTIC_CTX_NONE }
 
-static nnc_bool nnc_resolve_namespace(nnc_ident* ident, nnc_st* table);
-
 static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     nnc_symbol* sym = nnc_st_get(table, ident->name);
     if (sym == NULL) {
@@ -30,42 +28,80 @@ static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     return true;
 }
 
-static nnc_bool nnc_resolve_namespace(nnc_ident* ident, nnc_st* table) {
-    /*nnc_heap_ptr entity = nnc_st_get_entity(table, ST_ENTITY_NAMESPACE, ident->name);
-    if (entity != NULL) {
-        nnc_deferred_stack_pop(ident);
-        return true;
+static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
+    switch (expr->kind) {
+        case EXPR_STR_LITERAL: return true;
+        case EXPR_INT_LITERAL: return false;
+        case EXPR_CHR_LITERAL: return false;
+        case EXPR_DBL_LITERAL: return false;
+        case EXPR_IDENT: {
+            const nnc_ident* ident = expr->exact;
+            switch (ident->ctx) {
+                case IDENT_DEFAULT:        return true;
+                case IDENT_FUNCTION:       return true;
+                case IDENT_FUNCTION_PARAM: return true;
+                default: return false;
+            }
+        }
+        case EXPR_UNARY: {
+            const nnc_unary_expression* unary = expr->exact; 
+            switch (unary->kind) {
+                case UNARY_POSTFIX_DOT:   return true;
+                case UNARY_POSTFIX_INDEX: return true;
+                case UNARY_POSTFIX_SCOPE: return nnc_locatable_expr(unary->exact.scope.member);
+                default: return false;
+            }
+        }
+        case EXPR_BINARY:  return false;
+        case EXPR_TERNARY: return false;
+        default: return false;
     }
-    nnc_deferred_stack_put(table, DEFERRED_NAMESPACE, ident);
-    */
-    return true;
 }
 
-/*static nnc_bool nnc_resolve_scope_expr(nnc_binary_expression* expr, nnc_st* table) {
-    nnc_ident* namespace_ident = expr->lexpr->exact;
-    nnc_namespace_statement* namespace_stmt = NULL;
-    if (!nnc_resolve_namespace(namespace_ident, table)) {
-        nnc_deferred_stack_put(table, DEFERRED_SCOPE_EXPR, expr);
-        return false;
+static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
+    if (!nnc_locatable_expr(unary->expr)) {
+        THROW(NNC_SEMANTIC, "cannot reference non locatable expression.");
     }
-    namespace_stmt = nnc_st_get_entity(table, ST_ENTITY_NAMESPACE, namespace_ident->name);
-    nnc_st* namespace_st = NNC_GET_SYMTABLE(namespace_stmt);
-    assert(namespace_st != NULL);
-    nnc_st* namespace_st_root = namespace_st->root;
-    // temporarly remove parent table to disable
-    // upper check for entity, check only in scope of current table
-    namespace_st->root = NULL;
-    nnc_bool status = nnc_resolve_expr(expr->rexpr, namespace_st);
-    if (status) {
-        nnc_deferred_stack_pop(expr);
+    nnc_type* inner = nnc_expr_get_type(unary->expr);
+    unary->type = nnc_ptr_type_new(inner);
+}
+
+static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = &i8_type;
+}
+
+static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* table) {
+    // note: this is just placeholder, explicit cast 
+    // will be resolved later in process of typechecking.
+    unary->type = unary->exact.cast.to;
+}
+
+static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = nnc_expr_get_type(unary->expr);
+}
+
+static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = nnc_expr_get_type(unary->expr);
+}
+
+static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* table) {
+    const nnc_type* inner = nnc_expr_get_type(unary->expr);
+    if (inner->kind != TYPE_POINTER && inner->kind != TYPE_ARRAY) {
+        THROW(NNC_SEMANTIC, sformat("cannot dereference (non array or pointer) \'%s\' type.", nnc_type_tostr(inner)));
     }
-    else {
-        nnc_deferred_stack_put(namespace_st, DEFERRED_EXPR, expr->rexpr);
-    }
-    // return parent table back
-    namespace_st->root = namespace_st_root;
-    return status;
-}*/
+}
+
+static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = &u64_type;
+}
+
+static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = &u64_type;
+}
+
+static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+    unary->type = nnc_expr_get_type(unary->expr);
+}
 
 static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
     // note: this is just placeholder, `as` is kind of explicit cast
@@ -125,6 +161,15 @@ static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
 static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
     typedef void (unary_expr_resolver)(nnc_unary_expression*, nnc_st*);
     static unary_expr_resolver* resolve[] = {
+        [UNARY_REF]           = nnc_resolve_ref_expr,
+        [UNARY_NOT]           = nnc_resolve_not_expr,
+        [UNARY_CAST]          = nnc_resolve_cast_expr,
+        [UNARY_PLUS]          = nnc_resolve_plus_expr,
+        [UNARY_MINUS]         = nnc_resolve_minus_expr,
+        [UNARY_DEREF]         = nnc_resolve_deref_expr,
+        [UNARY_SIZEOF]        = nnc_resolve_sizeof_expr,
+        [UNARY_LENGTHOF]      = nnc_resolve_lengthof_expr,
+        [UNARY_BITWISE_NOT]   = nnc_resolve_bitwise_not_expr,
         [UNARY_POSTFIX_AS]    = nnc_resolve_as_expr,
         [UNARY_POSTFIX_DOT]   = nnc_resolve_dot_expr,
         [UNARY_POSTFIX_CALL]  = nnc_resolve_call_expr,
@@ -135,6 +180,7 @@ static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* tabl
         nnc_deferred_stack_put(table, DEFERRED_UNARY_EXPR, unary);
         return false;
     }
+    assert(unary->kind >= UNARY_REF && unary->kind <= UNARY_POSTFIX_INDEX);
     resolve[unary->kind](unary, table);
     nnc_deferred_stack_pop(unary);
     return true;
@@ -152,8 +198,6 @@ nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
     switch (entity->kind) {
         case DEFERRED_EXPR:         return nnc_resolve_expr(entity->exact, entity->context);
         case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
-        case DEFERRED_NAMESPACE:    return nnc_resolve_namespace(entity->exact, entity->context);
-        //case DEFERRED_SCOPE_EXPR:   return nnc_resolve_scope_expr(entity->exact, entity->context);
         case DEFERRED_UNARY_EXPR:   return nnc_resolve_unary_expr(entity->exact, entity->context);
         default: nnc_abort_no_ctx("nnc_resolve_entity: kind unknown.");
     }
