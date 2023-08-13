@@ -1,7 +1,7 @@
 #include "nnc_ctx.h"
 
 nnc_ctx* nnc_ctx_init(const char* fabs) {
-    nnc_ctx* ctx = nnc_alloc(sizeof(nnc_ctx));
+    nnc_ctx* ctx = (nnc_ctx*)nnc_alloc(sizeof(nnc_ctx));
     ctx->fabs = NULL;
     if (fabs != NULL) {
         ctx->fabs = fabs;

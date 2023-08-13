@@ -2,19 +2,35 @@
 #include "nnc_typecheck.h"
 #include "nnc_expression.h"
 
-typedef enum _nnc_semantic_ctx {
-    SEMANTIC_CTX_NONE,
-    SEMANTIC_CTX_UNION,
-    SEMANTIC_CTX_STRUCT,
-    SEMANTIC_CTX_NAMESPACE
-} nnc_semantic_ctx;
-
-typedef struct _nnc_resolve_ctx {
-    nnc_st* table;
-    nnc_semantic_ctx semantics;
-} nnc_resolve_ctx;
-
-#define resolve_ctx_new(st) (nnc_resolve_ctx) { .table=st, .semantics=SEMANTIC_CTX_NONE }
+static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
+    switch (expr->kind) {
+        case EXPR_STR_LITERAL: return true;
+        case EXPR_INT_LITERAL: return false;
+        case EXPR_CHR_LITERAL: return false;
+        case EXPR_DBL_LITERAL: return false;
+        case EXPR_IDENT: {
+            const nnc_ident* ident = expr->exact;
+            switch (ident->ctx) {
+                case IDENT_DEFAULT:        return true;
+                case IDENT_FUNCTION:       return true;
+                case IDENT_FUNCTION_PARAM: return true;
+                default: return false;
+            }
+        }
+        case EXPR_UNARY: {
+            const nnc_unary_expression* unary = expr->exact; 
+            switch (unary->kind) {
+                case UNARY_POSTFIX_DOT:   return true;
+                case UNARY_POSTFIX_INDEX: return true;
+                case UNARY_POSTFIX_SCOPE: return nnc_locatable_expr(unary->exact.scope.member);
+                default: return false;
+            }
+        }
+        case EXPR_BINARY:  return false;
+        case EXPR_TERNARY: return false;
+        default: return false;
+    }
+}
 
 static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
     switch (literal->suffix) {
@@ -58,36 +74,6 @@ static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     ident->type = sym->type;
     nnc_deferred_stack_pop(ident);
     return true;
-}
-
-static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
-    switch (expr->kind) {
-        case EXPR_STR_LITERAL: return true;
-        case EXPR_INT_LITERAL: return false;
-        case EXPR_CHR_LITERAL: return false;
-        case EXPR_DBL_LITERAL: return false;
-        case EXPR_IDENT: {
-            const nnc_ident* ident = expr->exact;
-            switch (ident->ctx) {
-                case IDENT_DEFAULT:        return true;
-                case IDENT_FUNCTION:       return true;
-                case IDENT_FUNCTION_PARAM: return true;
-                default: return false;
-            }
-        }
-        case EXPR_UNARY: {
-            const nnc_unary_expression* unary = expr->exact; 
-            switch (unary->kind) {
-                case UNARY_POSTFIX_DOT:   return true;
-                case UNARY_POSTFIX_INDEX: return true;
-                case UNARY_POSTFIX_SCOPE: return nnc_locatable_expr(unary->exact.scope.member);
-                default: return false;
-            }
-        }
-        case EXPR_BINARY:  return false;
-        case EXPR_TERNARY: return false;
-        default: return false;
-    }
 }
 
 static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {

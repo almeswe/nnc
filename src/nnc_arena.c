@@ -168,12 +168,12 @@ void nnc_dispose(nnc_heap_ptr ptr) {
 void nnc_arena_init(nnc_arena* out_arena) {
     *out_arena = (nnc_arena){
         .alloc_bytes = 0,
-        .entries = NULL,
         .metrics = {
             .len = 0,
             .cap = NNC_ARENA_CAP,
             .disposed = 0
-        }
+        },
+        .entries = NULL,
     };
     out_arena->entries = (nnc_arena_entry**)
         calloc(out_arena->metrics.cap, sizeof(nnc_arena_entry));

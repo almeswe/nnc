@@ -23,7 +23,6 @@
 #define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
 #define NNC_LEX_COMMIT(k)       NNC_LEX_SET(k); break
 
-
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND,  TOK_AND,        TOK_ASSIGN,
     TOK_ASTERISK,   TOK_ATPERSAND,  TOK_CBRACE,
@@ -38,8 +37,8 @@ typedef enum _nnc_tok_kind {
     TOK_PERCENT,    TOK_PLUS,       TOK_QUESTION,
     TOK_QUOTE,      TOK_QUOTES,     TOK_RSHIFT,
     TOK_SEMICOLON,  TOK_SIGN,       TOK_SLASH,
-    TOK_STR,        TOK_STRING,     TOK_TILDE,
-    TOK_UNDERSCORE, TOK_VLINE,
+    TOK_STR,        TOK_TILDE,      TOK_UNDERSCORE, 
+    TOK_VLINE,
     // keywords
     TOK_AS,         TOK_BREAK,      TOK_CASE,       TOK_CAST, 
     TOK_CONTINUE,   TOK_DEFAULT,    TOK_ENUM,
