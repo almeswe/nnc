@@ -1,7 +1,7 @@
 #include "nnc_type.h"
 
 nnc_type* nnc_type_new(const nnc_str repr) {
-    nnc_type* ptr = new(nnc_type);
+    nnc_type* ptr = anew(nnc_type);
     ptr->repr = repr;
     ptr->kind = TYPE_INCOMPLETE;
     return ptr;

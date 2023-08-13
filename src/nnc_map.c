@@ -32,7 +32,7 @@ nnc_map_hash nncmap_hash_str(const char* key) {
  * @return Allocated & initialized instance of `nnc_map_bucket`.
  */
 static nnc_map_bucket* nncmap_bucket_init() {
-    nnc_map_bucket* bucket = nnc_alloc(sizeof(nnc_map_bucket));
+    nnc_map_bucket* bucket = (nnc_map_bucket*)nnc_alloc(sizeof(nnc_map_bucket));
     bucket->key = 0;
     bucket->val = NULL;
     bucket->next = NULL;
@@ -93,7 +93,7 @@ static void nncmap_rehash(nnc_map* map) {
     map->len = 0;
     map->cap = (nnc_u64)(map->cap * NNC_MAP_REHASH_SCALAR);
     // allocate new space which will be filled due rehashing
-    map->buckets = nnc_alloc(sizeof(nnc_map_bucket) * map->cap);
+    map->buckets = (nnc_map_bucket*)nnc_alloc(sizeof(nnc_map_bucket) * map->cap);
     for (nnc_u64 i = 0; i < copy.cap; i++) {
         nnc_map_bucket* bucket = &copy.buckets[i]; 
         for (; bucket != NULL; bucket = bucket->next) {
@@ -114,11 +114,11 @@ static void nncmap_rehash(nnc_map* map) {
  * @return Allocated & initialized instance of `nnc_map`. 
  */
 nnc_map* nncmap_init(nnc_u64 inicap) {
-    nnc_map* map = nnc_alloc(sizeof(nnc_map));
+    nnc_map* map = (nnc_map*)nnc_alloc(sizeof(nnc_map));
     map->len = 0;
     map->cap = inicap;
     // preallocate initial number of buckets.
-    map->buckets = nnc_alloc(sizeof(nnc_map_bucket) * map->cap);
+    map->buckets = (nnc_map_bucket*)nnc_alloc(sizeof(nnc_map_bucket) * map->cap);
     return map;
 }
 

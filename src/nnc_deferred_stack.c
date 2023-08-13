@@ -17,7 +17,7 @@ void nnc_deferred_stack_fini(nnc_deferred_stack* stack) {
 }
 
 nnc_deferred_entity* nnc_deferred_entity_new(nnc_st* context, nnc_deferred_kind kind, nnc_heap_ptr exact) {
-    nnc_deferred_entity* entity = new(nnc_deferred_entity);
+    nnc_deferred_entity* entity = anew(nnc_deferred_entity);
     entity->kind = kind;
     entity->exact = exact;
     entity->context = context;

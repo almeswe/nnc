@@ -28,13 +28,13 @@ void* nncbuf_grow(void* buf, nnc_u64 type, nnc_u16 inicap) {
 	// if buffer is NULL it means
 	// that it must be allocated for the first time.
 	if (buf == NULL) {
-		new_hdr = nnc_alloc(new_size);
+		new_hdr = (nnc_buf*)nnc_alloc(new_size);
 	}
 	// otherwise just reallocate the existing one.
 	else {
 		old_hdr = nncbuf__hdr(buf);
 		old_size += old_hdr->cap * type;
-		new_hdr = nnc_alloc(new_size);
+		new_hdr = (nnc_buf*)nnc_alloc(new_size);
 		memcpy(new_hdr, old_hdr, old_size);
 		nnc_dispose(old_hdr);
 	}
