@@ -1,5 +1,5 @@
-#ifndef _NNC_TEST_H
-#define _NNC_TEST_H
+#ifndef _NNC_TEST_HPP
+#define _NNC_TEST_HPP
 
 extern "C" {
     #include "nnc_core.h"
@@ -8,6 +8,12 @@ extern "C" {
 #include <fstream>
 #include <iostream>
 #include <gtest/gtest.h>
+
+nnc_lex lex = {0};
+nnc_parser parser = {0};
+
+nnc_int_literal* iliteral = NULL;
+nnc_dbl_literal* fliteral = NULL;
 
 static std::string contents;
 

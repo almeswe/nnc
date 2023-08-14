@@ -27,6 +27,17 @@ nnc_deferred_stack glob_deferred_stack;
 #include "./nnc_try_catch_tests/nnc_try_catch_nest_2.cpp"
 #include "./nnc_try_catch_tests/nnc_try_catch_nest_3.cpp"
 
+#include "./nnc_literal_tests/nnc_i8_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_u8_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_i16_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_u16_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_i32_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_u32_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_i64_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_u64_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_f32_literal_tests.cpp"
+
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
