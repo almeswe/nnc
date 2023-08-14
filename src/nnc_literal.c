@@ -238,6 +238,8 @@ nnc_int_literal* nnc_int_new(const char* repr) {
     ptr->is_signed = 
         ptr->suffix >= SUFFIX_I8 && 
         ptr->suffix <= SUFFIX_I64;
+    // reset errno for future `strtoll` or `strtoull` calls.
+    errno = 0;
     if (ptr->is_signed) {
         ptr->exact.d = strtoll(repr_buf, NULL, ptr->base);
     }
