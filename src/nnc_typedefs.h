@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "nnc_static.h"
+
 typedef uint64_t    nnc_u64;
 typedef uint32_t    nnc_u32;
 typedef uint16_t    nnc_u16;

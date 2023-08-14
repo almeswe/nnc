@@ -1,6 +1,6 @@
 #include "nnc_error.h"
 
-static void nnc_show_ctx_fp(const nnc_ctx* ctx, FILE* fp) {
+nnc_static void nnc_show_ctx_fp(const nnc_ctx* ctx, FILE* fp) {
     fseek(fp, 0, SEEK_SET);
     char linebuf[FORMAT_BUF_SIZE] = { 0 };
     for (nnc_i32 i = 1; i <= ctx->hint_ln; i++) {
@@ -13,7 +13,7 @@ static void nnc_show_ctx_fp(const nnc_ctx* ctx, FILE* fp) {
     fclose(fp);
 }
 
-static void nnc_show_ctx(const nnc_ctx* ctx) {
+nnc_static void nnc_show_ctx(const nnc_ctx* ctx) {
     FILE* fp = fopen(ctx->fabs, "r");
     assert(fp != NULL);
     nnc_show_ctx_fp(ctx, fp);

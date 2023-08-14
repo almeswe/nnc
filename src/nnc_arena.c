@@ -6,7 +6,7 @@
  * @param ptr Pointer to allocted block.
  * @return Pointer to allocated & initialized arena entry.
  */
-static nnc_arena_entry* nnc_arena_entry_init(nnc_u64 size, nnc_heap_ptr ptr) {
+nnc_static nnc_arena_entry* nnc_arena_entry_init(nnc_u64 size, nnc_heap_ptr ptr) {
     nnc_arena_entry* entry = (nnc_arena_entry*)
         calloc(1, sizeof(nnc_arena_entry));
     if (entry == NULL) {
@@ -21,7 +21,7 @@ static nnc_arena_entry* nnc_arena_entry_init(nnc_u64 size, nnc_heap_ptr ptr) {
  * @brief Finalizes arena entry instance.
  * @param entry Pointer to arena entry to be freed.
  */
-static void nnc_arena_entry_fini(nnc_arena_entry* entry) {
+nnc_static void nnc_arena_entry_fini(nnc_arena_entry* entry) {
     if (entry != NULL) {
         free(entry->hptr);
         entry->hptr = NULL;
@@ -34,7 +34,7 @@ static void nnc_arena_entry_fini(nnc_arena_entry* entry) {
  * @param arena Pointer to arena instance.
  * @return `true` if arena needs compressing, otherwise `false`.
  */
-static nnc_bool nnc_arena_need_zip(nnc_arena* arena) {
+nnc_static nnc_bool nnc_arena_need_zip(nnc_arena* arena) {
     assert(arena->metrics.disposed >= 0);
     if (arena->metrics.disposed == 0) {
         return false;
@@ -49,7 +49,7 @@ static nnc_bool nnc_arena_need_zip(nnc_arena* arena) {
  *  of existing entry pointer array.
  * @param arena Pointer to arena instance.
  */
-static void nnc_arena_zip(nnc_arena* arena) {
+nnc_static void nnc_arena_zip(nnc_arena* arena) {
     nnc_u64 initial = arena->metrics.len;
     // reset len metric, because it will be recalculated.
     arena->metrics.len = 0;
@@ -71,7 +71,7 @@ static void nnc_arena_zip(nnc_arena* arena) {
  * @brief Extends arena's max capacity.
  * @param arena Pointer to arena instance.
  */
-static void nnc_arena_grow(nnc_arena* arena) {
+nnc_static void nnc_arena_grow(nnc_arena* arena) {
     arena->metrics.cap *= 2;
     nnc_u64 size = arena->metrics.cap 
         * sizeof(nnc_arena_entry*);
@@ -88,7 +88,7 @@ static void nnc_arena_grow(nnc_arena* arena) {
  * @param arena Pointer to arena instance.
  * @param entry Pointer to entry that must be pushed.
  */
-static void nnc_arena_push(nnc_arena* arena, nnc_arena_entry* entry) {
+nnc_static void nnc_arena_push(nnc_arena* arena, nnc_arena_entry* entry) {
     if (arena->metrics.cap == arena->metrics.len) {
         if (nnc_arena_need_zip(arena)) {
             nnc_arena_zip(arena);
@@ -106,7 +106,7 @@ static void nnc_arena_push(nnc_arena* arena, nnc_arena_entry* entry) {
  * @param arena Pointer to arena instance.
  * @param index Index of entry at `arena->entries` to be flushed.
  */
-static void nnc_arena_flush(nnc_arena* arena, nnc_u64 index) {
+nnc_static void nnc_arena_flush(nnc_arena* arena, nnc_u64 index) {
     assert(arena->entries[index] != NULL);
     nnc_arena_entry* entry = arena->entries[index];
     // decrease number of allocated bytes

@@ -6,7 +6,7 @@
 
 #include "nnc_typedefs.h"
 
-#define anew(type)           (type*)nnc_alloc(sizeof(type))
+#define anew(type)          (type*)nnc_alloc(sizeof(type))
 #define cnew(type, size)    (type*)nnc_alloc(sizeof(type) * (size))
 #define rem(ptr)            nnc_dispose(ptr)
 

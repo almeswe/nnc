@@ -118,7 +118,7 @@ static _map_(char*, nnc_tok_kind) nnc_keywods_map = NULL;
  * @brief Ungets last character from file, anc sets current char as previous char.
  * @param lex Pointer to `nnc_lex` instance.
  */
-static void nnc_lex_undo(nnc_lex* lex) {
+nnc_static void nnc_lex_undo(nnc_lex* lex) {
     ungetc(lex->cc, lex->fp);
     lex->cc = lex->pc;
     //todo: may cause problems when ungetting \n character
@@ -130,7 +130,7 @@ static void nnc_lex_undo(nnc_lex* lex) {
  *  If EOF character met, does nothing. (returns current character)
  * @param lex Pointer to `nnc_lex` instance.
  */
-static char nnc_lex_grab(nnc_lex* lex) {
+nnc_static char nnc_lex_grab(nnc_lex* lex) {
     if (lex->cc != EOF) {
         lex->pc = lex->cc;
         lex->cc = fgetc(lex->fp);
@@ -144,7 +144,7 @@ static char nnc_lex_grab(nnc_lex* lex) {
  *  valuable character. Simply, skips all \r,\n, ' ' until it met something that can be put in to lexeme. 
  * @param lex Pointer to `nnc_lex` instance.
  */
-static void nnc_lex_skip(nnc_lex* lex) {
+nnc_static void nnc_lex_skip(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         switch (lex->cc) {
             case ' ':  case '\a':
@@ -166,7 +166,7 @@ static void nnc_lex_skip(nnc_lex* lex) {
  * @brief Clears `lex->tok` field.
  * @param lex Pointer to `nnc_lex` instance.
  */
-static void nnc_lex_tok_clear(nnc_lex* lex) {
+nnc_static void nnc_lex_tok_clear(nnc_lex* lex) {
     if (lex->ctok.size > 0) {
         memset(lex->ctok.lexeme, 0, lex->ctok.size);
     }
@@ -177,7 +177,7 @@ static void nnc_lex_tok_clear(nnc_lex* lex) {
  * @brief Performs error-recovery, by skipping whole line of characters.
  * @param lex Pointer to `nnc_lex` instance.
  */
-static void nnc_lex_make_recovery(nnc_lex* lex) {
+nnc_static void nnc_lex_make_recovery(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         if (lex->cc == '\n') {
             break;
@@ -192,7 +192,7 @@ static void nnc_lex_make_recovery(nnc_lex* lex) {
  * @return Escape character represented by two separate characters.
  *  May throw NNC_LEX_BAD_ESC.
  */
-static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
+nnc_static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
     switch (lex->cc) {
         case '0':   return '\0';
         case 'a':   return '\a';
@@ -216,7 +216,7 @@ static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  * @return TOK_CHR value, or throws NNC_LEX_BAD_CHR.
  */
-static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     char initial = nnc_lex_grab(lex); 
     if (initial != EOF) {
@@ -241,7 +241,7 @@ static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  * @return TOK_STR value, or throws NNC_LEX_BAD_STR.
  */
-static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     while (nnc_lex_grab(lex) != EOF) {
         if (NNC_LEX_MATCH('\n') || 
@@ -268,7 +268,7 @@ static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value.
  */
-static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
     // skip 'e' or 'E' character
     nnc_lex_grab(lex);
@@ -291,7 +291,7 @@ static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @throw NNC_LEX_BAD_SUFFIX.
  */
-static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
+nnc_static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
     switch (lex->cc) {
         case 'u': case 'i': 
         case 'U': case 'I':
@@ -342,7 +342,7 @@ static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @throw NNC_LEX_BAD_SUFFIX.
  */
-static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
+nnc_static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
     switch (lex->cc) {
         case 'f': case 'F':
             NNC_TOK_PUT_CC();
@@ -381,7 +381,7 @@ static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value. 
  */
-static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
     NNC_TOK_PUT_CC();
     nnc_u64 size_after_dot = 0;
     while (nnc_lex_grab(lex) != EOF) {
@@ -408,7 +408,7 @@ static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value. 
  */
-static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
@@ -428,7 +428,7 @@ static nnc_tok_kind nnc_lex_grab_hex(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value. 
  */
-static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
@@ -449,7 +449,7 @@ static nnc_tok_kind nnc_lex_grab_dec(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value. 
  */
-static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
@@ -467,7 +467,7 @@ static nnc_tok_kind nnc_lex_grab_oct(nnc_lex* lex) {
  * @param lex Pointer to 'nnc_lex' instance.
  * @return TOK_NUMBER value. 
  */
-static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
@@ -485,7 +485,7 @@ static nnc_tok_kind nnc_lex_grab_bin(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  * @return TOK_NUMBER value.
  */
-static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
     if (lex->cc != '0') {
         return nnc_lex_grab_dec(lex);
     }
@@ -512,7 +512,7 @@ static nnc_tok_kind nnc_lex_grab_number(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  * @return TOK_IDENT value.
  */
-static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
+nnc_static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
     NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
@@ -537,7 +537,7 @@ static nnc_tok_kind nnc_lex_grab_ident(nnc_lex* lex) {
  * @param c Next character in sequence to be checked.
  * @return `true` if adjusted character is the same as specfied, `false` otherwise. 
  */
-static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
+nnc_static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
     if (lex->cc == EOF) {
         return false;
     }
@@ -642,16 +642,28 @@ const char* nnc_tok_str(nnc_tok_kind kind) {
  *  Also initializes hash map of keywords, if it is not already initialized.
  * @param out_lex Pointer to preallocated instance of `nnc_lex`.
  * @param fpath Path to target file for lexical analysis.
- *  Throws NNC_LEX_BAD_FILE if file cannot be opened for reading.
+ * @throw NNC_LEX_BAD_FILE if file cannot be opened for reading.
  */
 void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
-    out_lex->cc = '\0';
-    out_lex->fp = fopen(fpath, "r");
-    if (out_lex->fp == NULL) {
+    FILE* fp = fopen(fpath, "r");
+    if (fp == NULL) {
         THROW(NNC_LEX_BAD_FILE, fpath);
     }
+    out_lex->cc = '\0';
     out_lex->fpath = fpath;
     out_lex->cctx.fabs = fpath;
+    nnc_lex_init_with_fp(out_lex, fp);
+}
+
+/**
+ * @brief Initializes preallocated instance of `nnc_lex`.
+ *  with file pointer instead of file path.
+ * @param out_lex Pointer to preallocated instance of `nnc_lex`.
+ * @param fp Pointer to non-null instance of `FILE`.
+ */
+void nnc_lex_init_with_fp(nnc_lex* out_lex, FILE* fp) {
+    assert(fp != NULL);
+    out_lex->fp = fp;
     if (nnc_keywods_map == NULL) {
         // initialize map of keywords, for fast identifier check
         const nnc_u64 nnc_keywords_size = sizeof(nnc_keywords)/sizeof(*nnc_keywords);

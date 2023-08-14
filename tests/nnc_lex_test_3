@@ -1,7 +1,0 @@
-'\a' '\b' '\f'
-'\t' '\v' '\r'
-'\n' '\\' '\'' '\"'
-
-"\a\b\f\t\v\r\n\\\'\""
-"\'s\'\n\rtext continuation"
-"GET / HTTP/1.1\r\n"
