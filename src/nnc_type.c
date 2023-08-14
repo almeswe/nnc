@@ -56,7 +56,7 @@ nnc_type* nnc_namespace_type_new() {
     return ptr;
 }
 
-static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
+nnc_static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     nnc_str repr = "fn( ";
     for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
         repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
@@ -64,7 +64,7 @@ static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
 }
 
-static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
+nnc_static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
     nnc_str repr = "{ ";
     nnc_u64 count = type->exact.enumeration.memberc;
     for (nnc_u64 i = 0; i < count; i++) {
@@ -78,7 +78,7 @@ static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
     return sformat("%s}", repr);
 }
 
-static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
+nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_u64 more = 0;
     nnc_str repr = "{ ";
     nnc_u64 count = type->exact.struct_or_union.memberc;

@@ -73,6 +73,7 @@ typedef struct _nnc_lex {
 nnc_tok_kind nnc_lex_next(nnc_lex* lex);
 const char* nnc_tok_str(nnc_tok_kind kind);
 void nnc_lex_init(nnc_lex* out_lex, const char* fpath);
+void nnc_lex_init_with_fp(nnc_lex* out_lex, FILE* fp);
 void nnc_lex_fini(nnc_lex* lex);
 void nnc_lex_keywords_map_fini();
 

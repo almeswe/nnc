@@ -1,28 +1,30 @@
 #include "nnc_typecheck.h"
 
-static nnc_bool nnc_incomplete_type(const nnc_type* type) {
+//todo: contexts ??
+
+nnc_static nnc_bool nnc_incomplete_type(const nnc_type* type) {
     return type->kind == TYPE_VOID ||
         type->kind == TYPE_UNKNOWN ||
         type->kind == TYPE_INCOMPLETE;
 }
 
-static nnc_bool nnc_fn_type(const nnc_type* type) {
+nnc_static nnc_bool nnc_fn_type(const nnc_type* type) {
     return type->kind == TYPE_FUNCTION;
 }
 
-static nnc_bool nnc_ptr_type(const nnc_type* type) {
+nnc_static nnc_bool nnc_ptr_type(const nnc_type* type) {
     return type->kind == TYPE_POINTER;
 }
 
-static nnc_bool nnc_arr_type(const nnc_type* type) {
+nnc_static nnc_bool nnc_arr_type(const nnc_type* type) {
     return type->kind == TYPE_ARRAY;
 }
 
-static nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
+nnc_static nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
     return type->kind == TYPE_POINTER || type->kind == TYPE_ARRAY;
 }
 
-static nnc_bool nnc_primitive_type(const nnc_type* type) {
+nnc_static nnc_bool nnc_integral_type(const nnc_type* type) {
     switch (type->kind) {
         case TYPE_PRIMITIVE_I8:
         case TYPE_PRIMITIVE_U8:
@@ -32,12 +34,16 @@ static nnc_bool nnc_primitive_type(const nnc_type* type) {
         case TYPE_PRIMITIVE_U32:
         case TYPE_PRIMITIVE_I64:
         case TYPE_PRIMITIVE_U64:
-        case TYPE_PRIMITIVE_F32:
-        case TYPE_PRIMITIVE_F64:
             return true;
         default:
             return false;
-    }
+    } 
+}
+
+nnc_static nnc_bool nnc_numeric_type(const nnc_type* type) {
+    return nnc_integral_type(type) ||
+        TYPE_PRIMITIVE_F32         ||
+        TYPE_PRIMITIVE_F64;
 }
 
 const nnc_i32 nnc_rank(const nnc_type* type) {
@@ -74,7 +80,7 @@ nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to)
         [TYPE_PRIMITIVE_F32] = 8,
         [TYPE_PRIMITIVE_F64] = 9
     };
-    if (!nnc_primitive_type(from) || !nnc_primitive_type(to)) {
+    if (!nnc_numeric_type(from) || !nnc_numeric_type(to)) {
         return false;
     }
     return hierarchy[from->kind] <= hierarchy[to->kind];
@@ -132,6 +138,13 @@ nnc_type* nnc_infer_implicitly(const nnc_type* t1, const nnc_type* t2) {
     return NULL;
 }
 
+nnc_type* nnc_infer_relate_implicitly(const nnc_type* from, const nnc_type* to) {
+    if (!nnc_infer_implicitly(from, to)) {
+        THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
+    }
+    return &i8_type;
+}
+
 nnc_type* nnc_infer_assignment_implicitly(const nnc_type* from, const nnc_type* to) {
     if (!nnc_can_cast_assignment_implicitly(from, to)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
@@ -151,15 +164,15 @@ nnc_type* nnc_cast_explicitly(const nnc_type* from, const nnc_type* to) {
     return NULL;
 } 
 
-static nnc_type* nnc_chr_infer_type(nnc_chr_literal* literal) {
+nnc_static nnc_type* nnc_chr_infer_type(nnc_chr_literal* literal) {
     return literal->type = &u8_type;
 }
 
-static nnc_type* nnc_str_infer_type(nnc_str_literal* literal) {
+nnc_static nnc_type* nnc_str_infer_type(nnc_str_literal* literal) {
     return literal->type = nnc_ptr_type_new(&u8_type);
 }
 
-static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
+nnc_static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_F32: return literal->type = &f32_type;
         case SUFFIX_F64: return literal->type = &f64_type;
@@ -168,7 +181,7 @@ static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
     return &unknown_type;
 }
 
-static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
+nnc_static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_I8:  return literal->type = &i8_type;
         case SUFFIX_U8:  return literal->type = &u8_type;
@@ -183,14 +196,14 @@ static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
     return &unknown_type;
 }
 
-static nnc_type* nnc_ident_infer_type(nnc_ident* ident, nnc_st* table) {
+nnc_static nnc_type* nnc_ident_infer_type(nnc_ident* ident, nnc_st* table) {
     if (ident->ctx == IDENT_NAMESPACE) {
         return &unknown_type;
     }
     return ident->type;
 }
 
-static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_st* table) {
+nnc_static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_st* table) {
     const nnc_type* type = nnc_expr_infer_type(expr->expr, table);
     switch (expr->kind) {
         case UNARY_CAST:
@@ -201,7 +214,7 @@ static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_st* t
     }
 }
 
-static nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* table) {
+nnc_static nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* table) {
     nnc_type* ltype = nnc_expr_infer_type(expr->lexpr, table);
     nnc_type* rtype = nnc_expr_infer_type(expr->rexpr, table);
     switch (expr->kind) {
@@ -209,15 +222,27 @@ static nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st*
             return expr->type = nnc_infer_assignment_implicitly(rtype, ltype);
         case BINARY_ADD: case BINARY_SUB:
         case BINARY_MUL: case BINARY_DIV:
-        case BINARY_MOD:
             return expr->type = nnc_infer_implicitly(ltype, rtype);
+        case BINARY_OR:  case BINARY_AND:
+        case BINARY_EQ:  case BINARY_NEQ:
+        case BINARY_GT:  case BINARY_LT:
+        case BINARY_GTE: case BINARY_LTE:
+            // return value is not used here
+            // just need to be sure that types are the same
+            nnc_infer_implicitly(ltype, rtype);
+            return expr->type = &i8_type;
+        case BINARY_BW_OR:
+        case BINARY_SHL:    case BINARY_SHR:
+        case BINARY_BW_AND: case BINARY_BW_XOR:
+            
+            return expr->type = NULL;
         default:
             return &unknown_type;
     }
 }
 
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* table) {
-    nnc_type* type = nnc_expr_get_type(expr);
+    const nnc_type* type = nnc_expr_get_type(expr);
     if (type->kind != TYPE_UNKNOWN) {
         return type;
     }
@@ -234,7 +259,7 @@ nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* table) {
     return &unknown_type;
 }
 
-nnc_type* nnc_expr_get_type(nnc_expression* expr) {
+nnc_type* nnc_expr_get_type(const nnc_expression* expr) {
     switch (expr->kind) {
         case EXPR_CHR_LITERAL: return ((nnc_chr_literal*)expr->exact)->type;
         case EXPR_STR_LITERAL: return ((nnc_str_literal*)expr->exact)->type;

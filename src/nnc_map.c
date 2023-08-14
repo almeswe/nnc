@@ -31,7 +31,7 @@ nnc_map_hash nncmap_hash_str(const char* key) {
  * @brief Initializes new instance of `nnc_map_bucket`
  * @return Allocated & initialized instance of `nnc_map_bucket`.
  */
-static nnc_map_bucket* nncmap_bucket_init() {
+nnc_static nnc_map_bucket* nncmap_bucket_init() {
     nnc_map_bucket* bucket = (nnc_map_bucket*)nnc_alloc(sizeof(nnc_map_bucket));
     bucket->key = 0;
     bucket->val = NULL;
@@ -44,7 +44,7 @@ static nnc_map_bucket* nncmap_bucket_init() {
  * @brief Finalizes instance of `nnc_map_bucket`
  * @param bucket Pointer to bucket instance to be deallocated.
  */
-static void nncmap_bucket_fini(nnc_map_bucket* bucket) {
+nnc_static void nncmap_bucket_fini(nnc_map_bucket* bucket) {
     if (bucket != NULL) {
         nnc_map_bucket* temp = NULL;
         nnc_map_bucket* curr = bucket->next;
@@ -60,7 +60,7 @@ static void nncmap_bucket_fini(nnc_map_bucket* bucket) {
  * @brief Finalizes array of buckets stored at `map->buckets`.
  * @param map Pointer to map instance which buckets will be deallocated.
  */
-static void nncmap_buckets_fini(nnc_map* map) {
+nnc_static void nncmap_buckets_fini(nnc_map* map) {
     for (nnc_u64 i = 0; i < map->cap; i++) {
         if (map->buckets[i].has_key) {
             nncmap_bucket_fini(&map->buckets[i]);
@@ -74,7 +74,7 @@ static void nncmap_buckets_fini(nnc_map* map) {
  * @param map Pointer to map instance to check.
  * @return `true` if map needs rehashing, `false` otherwise.
  */
-static nnc_bool nncmap_needs_rehash(nnc_map* map) {
+nnc_static nnc_bool nncmap_needs_rehash(nnc_map* map) {
     if (map->cap == 0) {
         return map->cap = 4, true;
     }
@@ -86,7 +86,7 @@ static nnc_bool nncmap_needs_rehash(nnc_map* map) {
  * @brief Performs rehashing of the map.
  * @param map Pointer to map instance to rehash.
  */
-static void nncmap_rehash(nnc_map* map) {
+nnc_static void nncmap_rehash(nnc_map* map) {
     // copy initial map
     nnc_map copy = *map;
     // and then change the original map instance

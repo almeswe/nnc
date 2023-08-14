@@ -2,7 +2,7 @@
 #include "nnc_typecheck.h"
 #include "nnc_expression.h"
 
-static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
+nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     switch (expr->kind) {
         case EXPR_STR_LITERAL: return true;
         case EXPR_INT_LITERAL: return false;
@@ -32,7 +32,7 @@ static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     }
 }
 
-static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
+nnc_static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_I8:  literal->type = &i8_type;  break;
         case SUFFIX_U8:  literal->type = &u8_type;  break;
@@ -46,7 +46,7 @@ static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
     return true;
 }
 
-static nnc_bool nnc_resolve_dbl_literal(nnc_dbl_literal* literal) {
+nnc_static nnc_bool nnc_resolve_dbl_literal(nnc_dbl_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_F32: literal->type = &f32_type; break;
         case SUFFIX_F64: literal->type = &f64_type; break;
@@ -54,17 +54,17 @@ static nnc_bool nnc_resolve_dbl_literal(nnc_dbl_literal* literal) {
     return true;
 }
 
-static nnc_bool nnc_resolve_chr_literal(nnc_chr_literal* literal) {
+nnc_static nnc_bool nnc_resolve_chr_literal(nnc_chr_literal* literal) {
     literal->type = &u8_type;
     return true;
 }
 
-static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
+nnc_static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
     literal->type = nnc_ptr_type_new(&u8_type);
     return true; 
 }
 
-static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     nnc_symbol* sym = nnc_st_get(table, ident->name);
     if (sym == NULL) {
         nnc_deferred_stack_put(table, DEFERRED_IDENT, ident);
@@ -76,7 +76,7 @@ static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     return true;
 }
 
-static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
     if (!nnc_locatable_expr(unary->expr)) {
         THROW(NNC_SEMANTIC, "cannot reference non locatable expression.");
     }
@@ -84,50 +84,50 @@ static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = nnc_ptr_type_new(inner);
 }
 
-static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = &i8_type;
 }
 
-static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* table) {
     // note: this is just placeholder, explicit cast 
     // will be resolved later in process of typechecking.
     unary->type = unary->exact.cast.to;
 }
 
-static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (inner->kind != TYPE_POINTER && inner->kind != TYPE_ARRAY) {
         THROW(NNC_SEMANTIC, sformat("cannot dereference (non array or pointer) \'%s\' type.", nnc_type_tostr(inner)));
     }
 }
 
-static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = &u64_type;
 }
 
-static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = &u64_type;
 }
 
-static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
     // note: this is just placeholder, `as` is kind of explicit cast
     // which will be resolved later in process of typechecking.
     unary->type = unary->exact.cast.to;
 }
 
-static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (inner->kind != TYPE_UNION && inner->kind != TYPE_STRUCT) {
         THROW(NNC_SEMANTIC, sformat("cannot access member of (non union or struct) \'%s\' type.", nnc_type_tostr(inner)));
@@ -144,7 +144,7 @@ static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
     THROW(NNC_SEMANTIC, sformat("\'%s\' is not member of \'%s\'.", member->name, nnc_type_tostr(inner)));
 }
 
-static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (inner->kind != TYPE_FUNCTION) {
         THROW(NNC_SEMANTIC, sformat("cannot call (non function) \'%s\' type.", nnc_type_tostr(inner)));
@@ -152,7 +152,7 @@ static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = inner->exact.fn.ret;
 }
 
-static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner_type = nnc_expr_get_type(unary->expr);
     if (inner_type->kind != TYPE_NAMESPACE) {
         THROW(NNC_SEMANTIC, sformat("cannot reference (non namespace) \'%s\' type.", nnc_type_tostr(inner_type)));
@@ -169,7 +169,7 @@ static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = member->type;
 }
 
-static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (inner->kind != TYPE_ARRAY && inner->kind != TYPE_POINTER) {
         THROW(NNC_SEMANTIC, sformat("cannot index (non pointer or array) \'%s\' type.", nnc_type_tostr(inner)));
@@ -177,7 +177,7 @@ static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
     unary->type = inner->base;
 }
 
-static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
     typedef void (unary_expr_resolver)(nnc_unary_expression*, nnc_st*);
     static unary_expr_resolver* resolve[] = {
         [UNARY_REF]           = nnc_resolve_ref_expr,
@@ -207,7 +207,7 @@ static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* tabl
     return true;
 }
 
-static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* expr, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* expr, nnc_st* table) {
     switch (expr->kind) {
         //case BINARY_SCOPE: return nnc_resolve_scope_expr(expr, table);
         default: return true; //nnc_abort_no_ctx("nnc_resolve_binary_expr: unknown kind.");

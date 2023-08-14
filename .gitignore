@@ -42,12 +42,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 .vscode
-tests/googletest
-tests2/googletest
 
-src/CMakeCache.txt
-src/cmake_install.cmake
-src/Makefile
-src/CMakeFiles
-src/nnc
-src/tests
+tests/googletest
+tests/build
+src/build
