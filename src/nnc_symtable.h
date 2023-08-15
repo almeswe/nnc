@@ -43,5 +43,6 @@ void nnc_st_init(nnc_st* out_table);
 void nnc_st_put(nnc_st* table, nnc_symbol* sym);
 nnc_bool nnc_st_has(nnc_st* table, const char* key);
 nnc_symbol* nnc_st_get(nnc_st* table, const char* key);
+nnc_symbol* nnc_st_get_below(nnc_st* table, const char* key);
 
 #endif
