@@ -28,6 +28,14 @@ nnc_symbol* nnc_st_get(nnc_st* table, const char* key) {
     return sym;
 }
 
+nnc_symbol* nnc_st_get_below(nnc_st* table, const char* key) {
+    nnc_st* table_root = table->root;
+    table->root = NULL;
+    nnc_symbol* sym = nnc_st_get(table, key);
+    table->root = table_root;
+    return sym;
+}
+
 void nnc_st_put(nnc_st* table, nnc_symbol* sym) {
     const static char* ctxs[] = {
         [IDENT_DEFAULT]        = "variable",

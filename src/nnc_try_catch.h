@@ -37,6 +37,9 @@ typedef enum _nnc_exception_kind {
     NNC_SYNTAX,
     NNC_SEMANTIC,
     NNC_TABLE_MISS,
+    NNC_CANNOT_RESOLVE_PLUS_EXPR,
+    NNC_CANNOT_RESOLVE_MINUS_EXPR,
+    NNC_CANNOT_RESOLVE_DEREF_EXPR,
 } nnc_exception_kind;
 
 typedef struct _nnc_exception {

@@ -211,7 +211,7 @@ nnc_static void nnc_dump_binary(nnc_dump_data data) {
         [BINARY_LTE]        = "<=",
         [BINARY_GTE]        = ">=",
         [BINARY_EQ]         = "==",
-        [BINARY_NEQ]        = "==",
+        [BINARY_NEQ]        = "!=",
         [BINARY_BW_AND]     = "&",
         [BINARY_BW_XOR]     = "^",
         [BINARY_BW_OR]      = "|",
