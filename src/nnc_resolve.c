@@ -247,7 +247,7 @@ nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* tabl
     if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_SEMANTIC, "both expressions must have numeric types.");
     }
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* table) {
@@ -261,7 +261,7 @@ nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* tabl
     if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_SEMANTIC, "both expressions must have numeric types.");
     }
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* table) {
@@ -270,7 +270,7 @@ nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* ta
     if (!nnc_integral_type(ltype) || !nnc_integral_type(rtype)) {
         THROW(NNC_SEMANTIC, "both expressions must have integral types.");
     }
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* table) {
@@ -286,11 +286,11 @@ nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* tabl
         if (!nnc_integral_type(ltype)) {
             THROW(NNC_SEMANTIC, "left expression must have integral type.");
         }
-    }
+    }   
     else if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_SEMANTIC, "both expressions must have numeric types.");
     }
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* table) {
@@ -301,11 +301,11 @@ nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* t
     if (!nnc_locatable_expr(binary->lexpr)) {
         THROW(NNC_SEMANTIC, "left expression must be locatable.");
     }
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* table) {
-    binary->type = nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, table);
 }
 
 nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* table) {
@@ -343,12 +343,31 @@ nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_s
     return true;
 }
 
+nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nnc_st* table) {
+    nnc_expression* exprs[] = {
+        ternary->cexpr, ternary->lexpr, ternary->rexpr
+    };
+    for (nnc_i32 i = 0; i < 3; i++) {
+        if (!nnc_resolve_expr(exprs[i], table)) {
+            nnc_deferred_stack_put(table, DEFERRED_TERNARY_EXPR, ternary);
+            return false;
+        }
+    }
+    const nnc_type* ctype = nnc_expr_get_type(ternary->cexpr);
+    if (!nnc_integral_type(ctype)) {
+        THROW(NNC_SEMANTIC, "type of condition must be of integral type.");
+    }
+    nnc_ternary_expr_infer_type(ternary, table);
+    return true;
+}
+
 nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
     switch (entity->kind) {
         case DEFERRED_EXPR:         return nnc_resolve_expr(entity->exact, entity->context);
         case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
         case DEFERRED_UNARY_EXPR:   return nnc_resolve_unary_expr(entity->exact, entity->context);
         case DEFERRED_BINARY_EXPR:  return nnc_resolve_binary_expr(entity->exact, entity->context); 
+        case DEFERRED_TERNARY_EXPR: return nnc_resolve_ternary_expr(entity->exact, entity->context);
         default: nnc_abort_no_ctx("nnc_resolve_entity: kind unknown.");
     }
     return false;
@@ -363,6 +382,7 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
         case EXPR_IDENT:        return nnc_resolve_ident(expr->exact, table);
         case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, table);
         case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, table);
+        case EXPR_TERNARY:      return nnc_resolve_ternary_expr(expr->exact, table);
         default: nnc_abort_no_ctx("nnc_resolve_expr: kind unknown.");
     }
     return false;
