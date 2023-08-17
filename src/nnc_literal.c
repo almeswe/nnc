@@ -54,8 +54,8 @@ nnc_dbl_suffix nnc_get_dbl_suffix(const char* repr) {
  */
 nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
     static const nnc_bounds bounds[] = {
-        [SUFFIX_F32]  = { .min.f = FLT_MIN, .max.f = FLT_MAX  },
-        [SUFFIX_F64]  = { .min.f = DBL_MIN, .max.f = DBL_MAX  },
+        [SUFFIX_F32]  = { .min.f = 0.0, .max.f = FLT_MAX  },
+        [SUFFIX_F64]  = { .min.f = 0.0, .max.f = DBL_MAX  },
     };
     nnc_bounds current = bounds[literal->suffix];
     if (current.min.f > literal->exact ||
@@ -88,7 +88,7 @@ nnc_dbl_literal* nnc_dbl_new(const char* repr) {
     }
     // copy cropped representation to buffer.
     memcpy(repr_buf, repr, repr_size);
-    ptr->exact = atof(repr_buf);
+    ptr->exact = strtod(repr_buf, NULL);
     return nnc_dbl_check_overflow(ptr);
 }
 
