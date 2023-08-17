@@ -8,6 +8,14 @@ void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     nnc_parser_next(out_parser);
 }
 
+void nnc_parser_init_with_fp(nnc_parser* out_parser, FILE* fp) {
+    nnc_lex_init_with_fp(&out_parser->lex, fp);
+    out_parser->table = anew(nnc_st);
+    nnc_st_init(out_parser->table);
+    out_parser->lookup.is_first = true;
+    nnc_parser_next(out_parser);
+}
+
 void nnc_parser_fini(nnc_parser* parser) {
     if (parser != NULL) {
         nnc_lex_fini(&parser->lex);
@@ -965,10 +973,7 @@ nnc_static nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
 nnc_static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
 
 nnc_static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) {
-    //todo: make root table swapping more robust
     nnc_parser_enter_scope(parser);
-    nnc_st* root_st = parser->table->root;
-    parser->table->root = NULL;
     nnc_compound_statement* compound_stmt = anew(nnc_compound_statement);
     compound_stmt->scope = parser->table;
     nnc_parser_expect(parser, TOK_OBRACE);
@@ -976,7 +981,6 @@ nnc_static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) 
         buf_add(compound_stmt->stmts, nnc_parse_topmost_stmt(parser));
     }
     nnc_parser_expect(parser, TOK_CBRACE);
-    parser->table->root = root_st;
     nnc_parser_leave_scope(parser);
     return nnc_stmt_new(STMT_COMPOUND, compound_stmt);
 }

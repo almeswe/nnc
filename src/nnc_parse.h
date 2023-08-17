@@ -19,6 +19,7 @@ typedef struct _nnc_parser {
 } nnc_parser;
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file);
+void nnc_parser_init_with_fp(nnc_parser* out_parser, FILE* fp);
 void nnc_parser_fini(nnc_parser* parser);
 
 nnc_tok* nnc_parser_get(nnc_parser* parser);
