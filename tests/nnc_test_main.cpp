@@ -36,7 +36,11 @@ nnc_deferred_stack glob_deferred_stack;
 #include "./nnc_literal_tests/nnc_i64_literal_tests.cpp"
 #include "./nnc_literal_tests/nnc_u64_literal_tests.cpp"
 #include "./nnc_literal_tests/nnc_f32_literal_tests.cpp"
+#include "./nnc_literal_tests/nnc_f64_literal_tests.cpp"
 
+#include "./nnc_semantic_tests/nnc_resolve_plus_expr_test.cpp"
+#include "./nnc_semantic_tests/nnc_resolve_minus_expr_test.cpp"
+#include "./nnc_semantic_tests/nnc_resolve_deref_expr_test.cpp"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
