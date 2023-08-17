@@ -250,6 +250,15 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* table)
     }
 }
 
+nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* table) {
+    nnc_type* ltype = nnc_expr_infer_type(expr->lexpr, table);
+    nnc_type* rtype = nnc_expr_infer_type(expr->rexpr, table);
+    if (nnc_can_cast_assignment_implicitly(rtype, ltype)) {
+        return expr->type = nnc_infer_assignment_implicitly(rtype, ltype);
+    }
+    return expr->type = nnc_infer_assignment_implicitly(ltype, rtype);
+}
+
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* table) {
     const nnc_type* type = nnc_expr_get_type(expr);
     if (type->kind != TYPE_UNKNOWN) {
