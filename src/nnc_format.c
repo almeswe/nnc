@@ -26,3 +26,10 @@ nnc_bool nnc_sequal(const char* s1, const char* s2) {
 	}
 	return strcmp(s1, s2) == 0;
 }
+
+char* nnc_sdup(const char* s) {
+	nnc_u64 size = strlen(s);
+	char* dup = (char*)cnew(char, size+1);
+	strcpy(dup, s);
+	return dup;
+}

@@ -11,5 +11,6 @@
 
 char* nnc_sformat(const char* format, ...);
 nnc_bool nnc_sequal(const char* s1, const char* s2);
+char* nnc_sdup(const char* s);
 
 #endif

@@ -43,6 +43,12 @@ nnc_type* nnc_union_type_new() {
     return ptr;
 }
 
+nnc_type* nnc_alias_type_new() {
+    nnc_type* ptr = nnc_type_new(NULL);
+    ptr->kind = TYPE_ALIAS;
+    return ptr;
+}
+
 nnc_type* nnc_struct_type_new() {
     nnc_type* ptr = nnc_type_new(NULL);
     ptr->kind = TYPE_STRUCT;
@@ -78,6 +84,14 @@ nnc_static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
     return sformat("%s}", repr);
 }
 
+nnc_static nnc_str nnc_alias_type_tostr(const nnc_type* type) {
+    nnc_type* alias = type->base;
+    while (alias->kind == TYPE_ALIAS) {
+        alias = alias->base;
+    }
+    return nnc_type_tostr(alias);
+}
+
 nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_u64 more = 0;
     nnc_str repr = "{ ";
@@ -102,6 +116,7 @@ nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
 
 nnc_str nnc_type_tostr(const nnc_type* type) {
     switch (type->kind) {
+        case TYPE_ALIAS:     return sformat("%s (aka %s)", type->repr, nnc_alias_type_tostr(type));
         case TYPE_ENUM:      return sformat("enum %s",   nnc_enum_type_tostr(type));
         case TYPE_UNION:     return sformat("union %s",  nnc_struct_or_union_type_tostr(type));
         case TYPE_STRUCT:    return sformat("struct %s", nnc_struct_or_union_type_tostr(type));

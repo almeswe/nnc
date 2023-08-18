@@ -937,14 +937,20 @@ nnc_static nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
 }
 
 nnc_static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
+    //todo: resolve type inside namespace?
     nnc_parser_expect(parser, TOK_TYPE);
     nnc_type_statement* type_stmt = anew(nnc_type_statement);
     type_stmt->type = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_AS);
-    type_stmt->as = nnc_parse_type(parser);
+    type_stmt->as = nnc_alias_type_new();
+    type_stmt->as->base = type_stmt->type;
+    if (nnc_parser_match(parser, TOK_IDENT)) {
+        const nnc_tok* tok = nnc_parser_get(parser);
+        type_stmt->as->repr = nnc_sdup(tok->lexeme);
+    }
+    nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    //todo: add nnc_st_put_type.
-    //nnc_st_put_entity(parser->table, ST_ENTITY_TYPE, type_stmt->as);
+    nnc_st_put_type(parser->table, type_stmt->as);
     return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
