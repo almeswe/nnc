@@ -56,6 +56,7 @@ typedef enum _nnc_type_kind {
 	TYPE_STRUCT,
 	TYPE_FUNCTION,
     TYPE_NAMESPACE,
+    TYPE_ALIAS,
 	TYPE_INCOMPLETE,
 	TYPE_VOID,
 	TYPE_UNKNOWN
@@ -108,6 +109,7 @@ nnc_type* nnc_arr_type_new(nnc_type* base);
 nnc_type* nnc_fn_type_new();
 nnc_type* nnc_enum_type_new();
 nnc_type* nnc_union_type_new();
+nnc_type* nnc_alias_type_new();
 nnc_type* nnc_struct_type_new();
 nnc_type* nnc_namespace_type_new();
 

@@ -38,6 +38,34 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     }
 }
 
+nnc_static nnc_bool nnc_resolve_alias_type(nnc_type* type, nnc_st* table) {
+    assert(type->kind == TYPE_ALIAS);
+    nnc_type* from_st = nnc_st_get_type(table, type->repr);
+    if (from_st == NULL) {
+        return false;
+    }
+    type->base = from_st;
+    return true;
+}
+
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table) {
+    switch (type->kind) {
+        case TYPE_ALIAS:         return nnc_resolve_alias_type(type, table);
+        case TYPE_PRIMITIVE_I8:  return true;
+        case TYPE_PRIMITIVE_U8:  return true;
+        case TYPE_PRIMITIVE_I16: return true;
+        case TYPE_PRIMITIVE_U16: return true;
+        case TYPE_PRIMITIVE_I32: return true;
+        case TYPE_PRIMITIVE_U32: return true;
+        case TYPE_PRIMITIVE_I64: return true;
+        case TYPE_PRIMITIVE_U64: return true;
+        case TYPE_PRIMITIVE_F32: return true;
+        case TYPE_PRIMITIVE_F64: return true;
+        default: return false;
+    }
+    return false;
+}
+
 nnc_static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_I8:  literal->type = &i8_type;  break;
@@ -84,7 +112,7 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
 
 nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
     if (!nnc_locatable_expr(unary->expr)) {
-        THROW(NNC_SEMANTIC, "cannot reference non locatable expression.");
+        THROW(NNC_CANNOT_RESOLVE_REF_EXPR, "cannot reference non locatable expression.");
     }
     nnc_type* inner = nnc_expr_get_type(unary->expr);
     unary->type = nnc_ptr_type_new(inner);
@@ -93,14 +121,13 @@ nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table)
 nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_integral_type(inner) && !nnc_arr_or_ptr_type(inner)) {
-        THROW(NNC_SEMANTIC, "cannot use logical not for this expression.");
+        THROW(NNC_CANNOT_RESOLVE_NOT_EXPR, "cannot use logical not for this expression.");
     }
     unary->type = &i8_type;
 }
 
 nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* table) {
-    // note: this is just placeholder, explicit cast 
-    // will be resolved later in process of typechecking.
+    //todo: check for explicit cast
     unary->type = unary->exact.cast.to;
 }
 
@@ -144,8 +171,10 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
 }
 
 nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
-    // note: this is just placeholder, `as` is kind of explicit cast
-    // which will be resolved later in process of typechecking.
+    if (!nnc_resolve_type(unary->exact.cast.to, table)) {
+        //todo: actually put it to deferred_stack (later)
+        THROW(NNC_CANNOT_RESOLVE_TYPE, "cannot resolve type.");
+    }
     unary->type = unary->exact.cast.to;
 }
 

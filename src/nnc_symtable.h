@@ -28,12 +28,6 @@ typedef nnc_ident nnc_symbol;
 typedef struct _nnc_st {
     struct _nnc_st* root;
     struct _nnc_st** branches;
-    _map_(nnc_str, nnc_fn_statement*) fns;
-    _map_(nnc_str, nnc_let_statement*) vars;
-    _map_(nnc_str, nnc_fn_param*) params;
-    _map_(nnc_str, nnc_namespace_statement*) namespaces;
-    _map_(nnc_str, nnc_enumerator*) enumerators;
-
     _map_(nnc_str, nnc_type*) types;
     _map_(nnc_str, nnc_symbol*) syms;
 } nnc_st;
@@ -41,8 +35,11 @@ typedef struct _nnc_st {
 void nnc_st_init(nnc_st* out_table);
 
 void nnc_st_put(nnc_st* table, nnc_symbol* sym);
+void nnc_st_put_type(nnc_st* table, nnc_type* type);
 nnc_bool nnc_st_has(nnc_st* table, const char* key);
+nnc_bool nnc_st_has_type(nnc_st* table, const char* key);
 nnc_symbol* nnc_st_get(nnc_st* table, const char* key);
+nnc_type* nnc_st_get_type(nnc_st* table, const char* key); 
 nnc_symbol* nnc_st_get_below(nnc_st* table, const char* key);
 
 #endif
