@@ -53,6 +53,9 @@ void nnc_deferred_stack_pop(nnc_heap_ptr entity) {
 
 void nnc_deferred_stack_update(nnc_deferred_entity* entity) {
     const static nnc_deferred_status ceiling[] = {
+        //todo: change this logic to smth with `lifetime`
+        // also increase and descrease it when smth is resolved/not resolved
+        [DEFERRED_TYPE]         = STATUS_INCOMPLETE2,
         [DEFERRED_EXPR]         = STATUS_INCOMPLETE2,
         [DEFERRED_SCOPE_EXPR]   = STATUS_INCOMPLETE2,
         [DEFERRED_UNARY_EXPR]   = STATUS_INCOMPLETE2,

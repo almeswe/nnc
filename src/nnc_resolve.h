@@ -14,6 +14,7 @@ typedef enum _nnc_deferred_status {
 typedef enum _nnc_deferred_kind {
     DEFERRED_FN,
     DEFERRED_EXPR,
+    DEFERRED_TYPE,
     DEFERRED_UNARY_EXPR,
     DEFERRED_BINARY_EXPR,
     DEFERRED_TERNARY_EXPR,
@@ -59,5 +60,7 @@ nnc_deferred_meta* nnc_deferred_meta_get(nnc_heap_ptr entity);
 
 nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity);
 nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table);
+
+nnc_bool nnc_resolve_stmt(nnc_statement* stmt, nnc_st* table);
 
 #endif

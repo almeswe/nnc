@@ -32,6 +32,19 @@ nnc_bool nnc_struct_or_union_type(const nnc_type* type) {
     return type->kind == TYPE_STRUCT || type->kind == TYPE_UNION;
 }
 
+nnc_bool nnc_primitive_type(const nnc_type* type) {
+    switch (type->kind) {
+        case TYPE_PRIMITIVE_I8:  case TYPE_PRIMITIVE_U8:
+        case TYPE_PRIMITIVE_I16: case TYPE_PRIMITIVE_U16:
+        case TYPE_PRIMITIVE_I32: case TYPE_PRIMITIVE_U32:
+        case TYPE_PRIMITIVE_I64: case TYPE_PRIMITIVE_U64:
+        case TYPE_PRIMITIVE_F32: case TYPE_PRIMITIVE_F64:
+            return true;
+        default:
+            return false;
+    }
+}
+
 nnc_bool nnc_integral_type(const nnc_type* type) {
     switch (type->kind) {
         case TYPE_PRIMITIVE_I8:

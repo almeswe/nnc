@@ -38,31 +38,61 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     }
 }
 
-nnc_static nnc_bool nnc_resolve_alias_type(nnc_type* type, nnc_st* table) {
-    assert(type->kind == TYPE_ALIAS);
-    nnc_type* from_st = nnc_st_get_type(table, type->repr);
-    if (from_st == NULL) {
-        return false;
+nnc_static nnc_bool nnc_complete_type(nnc_type* type, nnc_st* table) {
+    nnc_type* st_type = NULL;
+    if (type->repr != NULL) {
+        st_type = nnc_st_get_type(table, type->repr);
+        if (st_type != NULL) {
+            *type = *st_type;
+            return true;
+        }
     }
-    type->base = from_st;
-    return true;
+    return false;
+}
+
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table);
+
+nnc_static nnc_bool nnc_resolve_alias_type(nnc_type* type, nnc_st* table) {
+    return nnc_resolve_type(type->base, table);
+}
+
+nnc_static nnc_bool nnc_resolve_struct_type(nnc_type* type, nnc_st* table) {
+    return false;
+}
+
+nnc_static nnc_bool nnc_resolve_fn_type(nnc_type* type, nnc_st* table) {
+    nnc_bool is_resolved = true;
+    for (nnc_u64 i = 0; i < type->exact.fn.paramc && is_resolved; i++) {
+        is_resolved &= nnc_resolve_type(type->exact.fn.params[i], table);
+    }
+    if (type->exact.fn.ret->kind == TYPE_VOID) {
+        return is_resolved;
+    }
+    return is_resolved && nnc_resolve_type(type->exact.fn.ret, table);
 }
 
 nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table) {
-    switch (type->kind) {
-        case TYPE_ALIAS:         return nnc_resolve_alias_type(type, table);
-        case TYPE_PRIMITIVE_I8:  return true;
-        case TYPE_PRIMITIVE_U8:  return true;
-        case TYPE_PRIMITIVE_I16: return true;
-        case TYPE_PRIMITIVE_U16: return true;
-        case TYPE_PRIMITIVE_I32: return true;
-        case TYPE_PRIMITIVE_U32: return true;
-        case TYPE_PRIMITIVE_I64: return true;
-        case TYPE_PRIMITIVE_U64: return true;
-        case TYPE_PRIMITIVE_F32: return true;
-        case TYPE_PRIMITIVE_F64: return true;
-        default: return false;
+    typedef nnc_bool (nnc_type_resolver)(nnc_type*, nnc_st*);
+    if (nnc_incomplete_type(type)) {
+        if (!nnc_complete_type(type, table)) {
+            nnc_deferred_stack_put(table, DEFERRED_TYPE, type);
+            return false;
+        }
     }
+    if (nnc_primitive_type(type)) {
+        nnc_deferred_stack_pop(type);
+        return true;
+    }
+    static nnc_type_resolver* resolve[] = {
+        [TYPE_ALIAS]    = nnc_resolve_alias_type,
+        [TYPE_STRUCT]   = nnc_resolve_struct_type,
+        [TYPE_FUNCTION] = nnc_resolve_fn_type
+    };
+    if (resolve[type->kind](type, table)) {
+        nnc_deferred_stack_pop(type);
+        return true;
+    }
+    nnc_deferred_stack_put(table, DEFERRED_TYPE, type);
     return false;
 }
 
@@ -171,10 +201,7 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
 }
 
 nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
-    if (!nnc_resolve_type(unary->exact.cast.to, table)) {
-        //todo: actually put it to deferred_stack (later)
-        THROW(NNC_CANNOT_RESOLVE_TYPE, "cannot resolve type.");
-    }
+    nnc_resolve_type(unary->exact.cast.to, table);
     unary->type = unary->exact.cast.to;
 }
 
@@ -398,6 +425,7 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
 nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
     switch (entity->kind) {
         case DEFERRED_EXPR:         return nnc_resolve_expr(entity->exact, entity->context);
+        case DEFERRED_TYPE:         return nnc_resolve_type(entity->exact, entity->context);
         case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
         case DEFERRED_UNARY_EXPR:   return nnc_resolve_unary_expr(entity->exact, entity->context);
         case DEFERRED_BINARY_EXPR:  return nnc_resolve_binary_expr(entity->exact, entity->context); 
@@ -420,6 +448,10 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
         default: nnc_abort_no_ctx("nnc_resolve_expr: kind unknown.");
     }
     return false;
+}
+
+nnc_static nnc_bool nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* table) {
+    return true;
 }
 
 nnc_bool nnc_resolve_stmt(nnc_statement* stmt, nnc_st* table) {

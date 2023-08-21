@@ -12,6 +12,7 @@ nnc_bool nnc_namespace_type(const nnc_type* type);
 nnc_bool nnc_arr_or_ptr_type(const nnc_type* type);
 nnc_bool nnc_incomplete_type(const nnc_type* type);
 nnc_bool nnc_struct_or_union_type(const nnc_type* type);
+nnc_bool nnc_primitive_type(const nnc_type* type);
 
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* table);
 nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* table);
