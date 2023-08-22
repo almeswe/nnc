@@ -7,6 +7,9 @@
 #define NNC_ARENA_CAP       4
 #define NNC_ARENA_ZIP_RATE  ((nnc_f64)0.15)
 
+#define nnc_max(a, b) ((a) >= (b) ? (a) : (b))
+#define nnc_min(a, b) ((a) <= (b) ? (a) : (b))
+
 typedef struct _nnc_arena_entry {
     nnc_u64 bytes;
     nnc_heap_ptr hptr;
