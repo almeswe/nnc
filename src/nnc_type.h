@@ -6,6 +6,7 @@
 
 typedef struct _nnc_type                nnc_type;
 typedef struct _nnc_expression          nnc_expression;
+typedef struct _nnc_enumerator          nnc_enumerator;
 typedef struct _nnc_namespace_statement nnc_namespace_statement;
 
 typedef enum _nnc_ident_ctx {
@@ -21,6 +22,9 @@ typedef struct _nnc_ident {
     nnc_str name;
     nnc_type* type;
     nnc_ident_ctx ctx;
+    union _nnc_ident_refs {
+        nnc_enumerator* enumerator;
+    } refs;
 } nnc_ident;
 
 typedef struct _nnc_enumerator {

@@ -2,6 +2,55 @@
 #include "nnc_typecheck.h"
 #include "nnc_expression.h"
 
+nnc_static nnc_u64 nnc_sizeof(const nnc_type* type) {
+    assert(!nnc_incomplete_type(type));
+    if (type->kind == TYPE_ALIAS && type->base != NULL) {
+        return type->base->size;
+    }
+    return type->size;
+}
+
+nnc_static nnc_bool nnc_wrapable_expr(const nnc_expression* expr) {
+    switch (expr->kind) {
+        case EXPR_STR_LITERAL: return false;
+        case EXPR_INT_LITERAL: return true;
+        case EXPR_CHR_LITERAL: return true;
+        case EXPR_DBL_LITERAL: return true;
+        case EXPR_IDENT: {
+            const nnc_ident* ident = expr->exact;
+            switch (ident->ctx) {
+                case IDENT_ENUMERATOR: return true;
+                default: return false;
+            }
+        }
+        case EXPR_UNARY: {
+            const nnc_unary_expression* unary = expr->exact; 
+            switch (unary->kind) {
+                case UNARY_POSTFIX_DOT:   return false;
+                case UNARY_POSTFIX_INDEX: return false;
+                case UNARY_POSTFIX_SCOPE: return nnc_wrapable_expr(unary->exact.scope.member);
+                default: break;
+            }
+            return nnc_wrapable_expr(unary->expr);
+        }
+        case EXPR_BINARY: {
+            const nnc_binary_expression* binary = expr->exact;
+            if (binary->kind == BINARY_ASSIGN) {
+                return false;
+            }
+            return nnc_wrapable_expr(binary->lexpr) &&
+                   nnc_wrapable_expr(binary->rexpr);
+        }
+        case EXPR_TERNARY: {
+            const nnc_ternary_expression* ternary = expr->exact;
+            return nnc_wrapable_expr(ternary->cexpr) &&
+                   nnc_wrapable_expr(ternary->lexpr) &&
+                   nnc_wrapable_expr(ternary->rexpr);
+        }
+        default: return false;
+    }
+}
+
 nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     switch (expr->kind) {
         case EXPR_STR_LITERAL: return true;
@@ -30,11 +79,11 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
             const nnc_binary_expression* binary = expr->exact;
             switch (binary->kind) {
                 case BINARY_ASSIGN: return nnc_locatable_expr(binary->lexpr);
-                default:            return false;
+                default: return false;
             }
         }
         case EXPR_TERNARY: return false;
-        default:           return false;
+        default: return false;
     }
 }
 
@@ -52,15 +101,85 @@ nnc_static nnc_bool nnc_complete_type(nnc_type* type, nnc_st* table) {
 
 nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table);
 
-nnc_static nnc_bool nnc_resolve_alias_type(nnc_type* type, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* table) {
+    if (!nnc_resolve_expr(enumerator->init, table) || 
+        !nnc_wrapable_expr(enumerator->init)) {
+        nnc_deferred_stack_put(table, DEFERRED_ENUMERATOR, enumerator);
+        return false;
+    }
+    const nnc_type* init_type = nnc_expr_get_type(enumerator->init);
+    if (!nnc_integral_type(init_type)) {
+        THROW(NNC_SEMANTIC, "enumerator initializer must be of intergral type.");
+    }
+    enumerator->init_const.d = nnc_evald(enumerator->init, table);
+    nnc_deferred_stack_pop(enumerator);
+    return true;
+}
+
+nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* table) {
+    nnc_bool resolved = true;
+    for (nnc_u64 i = 0; i < type->exact.enumeration.memberc; i++) {
+        nnc_enumerator* enumerator = type->exact.enumeration.members[i];
+        resolved &= nnc_resolve_enumerator(enumerator, table);
+    }
+    return resolved;
+}
+
+nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* table) {
     return nnc_resolve_type(type->base, table);
 }
 
-nnc_static nnc_bool nnc_resolve_struct_type(nnc_type* type, nnc_st* table) {
-    return false;
+nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* table) {
+    if (!nnc_resolve_type(type->base, table)) {
+        return false;
+    }
+    const nnc_expression* dim = type->exact.array.dim;
+    const nnc_type* dim_type = nnc_expr_get_type(dim);
+    if (!nnc_wrapable_expr(dim) ||
+        !nnc_integral_type(dim_type)) {
+        return false;
+    }
+    type->size = nnc_evald(dim, table) * type->base->size;
+    return true;
 }
 
-nnc_static nnc_bool nnc_resolve_fn_type(nnc_type* type, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* table) {
+    nnc_u64 size = 0;
+    nnc_bool is_resolved = true;
+    for (nnc_u64 i = 0; i < type->exact.struct_or_union.memberc; i++) {
+        nnc_union_member* member = type->exact.struct_or_union.members[i];
+        is_resolved &= nnc_resolve_type(member->type, table);
+        if (is_resolved && size < member->type->size) {
+            size = nnc_sizeof(member->type);
+        }
+    }
+    if (is_resolved) {
+        type->size = size;
+    }
+    return is_resolved;
+}
+
+nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* table) {
+    nnc_u64 size = 0;
+    nnc_bool is_resolved = true;
+    for (nnc_u64 i = 0; i < type->exact.struct_or_union.memberc; i++) {
+        nnc_struct_member* member = type->exact.struct_or_union.members[i];
+        is_resolved &= nnc_resolve_type(member->type, table);
+        if (is_resolved) {
+            size += nnc_sizeof(member->type);
+        }
+    }
+    if (is_resolved) {
+        type->size = size;
+    }
+    return is_resolved;
+}
+
+nnc_static nnc_bool nnc_resolve_pointer(nnc_type* type, nnc_st* table) {
+    return nnc_resolve_type(type->base, table);
+}
+
+nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* table) {
     nnc_bool is_resolved = true;
     for (nnc_u64 i = 0; i < type->exact.fn.paramc && is_resolved; i++) {
         is_resolved &= nnc_resolve_type(type->exact.fn.params[i], table);
@@ -79,14 +198,18 @@ nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table) {
             return false;
         }
     }
-    if (nnc_primitive_type(type)) {
+    if (nnc_primitive_type(type) || nnc_namespace_type(type)) {
         nnc_deferred_stack_pop(type);
         return true;
     }
     static nnc_type_resolver* resolve[] = {
-        [TYPE_ALIAS]    = nnc_resolve_alias_type,
-        [TYPE_STRUCT]   = nnc_resolve_struct_type,
-        [TYPE_FUNCTION] = nnc_resolve_fn_type
+        [TYPE_ENUM]     = nnc_resolve_enum,
+        [TYPE_ALIAS]    = nnc_resolve_alias,
+        [TYPE_ARRAY]    = nnc_resolve_array,
+        [TYPE_UNION]    = nnc_resolve_union,
+        [TYPE_STRUCT]   = nnc_resolve_struct,
+        [TYPE_POINTER]  = nnc_resolve_pointer,
+        [TYPE_FUNCTION] = nnc_resolve_fn
     };
     if (resolve[type->kind](type, table)) {
         nnc_deferred_stack_pop(type);
@@ -136,6 +259,10 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     }
     ident->ctx = sym->ctx;
     ident->type = sym->type;
+    if (ident->ctx == IDENT_ENUMERATOR) {
+        ident->type = &i64_type;
+        ident->refs = sym->refs;
+    }
     nnc_deferred_stack_pop(ident);
     return true;
 }
@@ -370,11 +497,8 @@ nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* ta
 }
 
 nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* table) {
-    if (!nnc_resolve_expr(binary->lexpr, table)) {
-        nnc_deferred_stack_put(table, DEFERRED_BINARY_EXPR, binary);
-        return false;
-    }
-    if (!nnc_resolve_expr(binary->rexpr, table)) {
+    if (!nnc_resolve_expr(binary->lexpr, table) || 
+        !nnc_resolve_expr(binary->rexpr, table)) {
         nnc_deferred_stack_put(table, DEFERRED_BINARY_EXPR, binary);
         return false;
     }
