@@ -2,6 +2,7 @@
 #define _NNC_SEMANTIC_H
 
 #include "nnc_symtable.h"
+#include "nnc_ast_eval.h"
 
 typedef enum _nnc_deferred_status {
     STATUS_PUSHED           = 0,

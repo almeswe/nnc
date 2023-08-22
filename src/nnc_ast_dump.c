@@ -60,7 +60,7 @@ nnc_static void nnc_dump_type(const nnc_type* type) {
         fprintf(stderr, _c(RED, "%s"), "?");
     }
     else {
-        fprintf(stderr, _c(BBLU, "%s"), nnc_type_tostr(type));
+        fprintf(stderr, _c(BBLU, "%s(%lu)"), nnc_type_tostr(type), type->size);
     }
 }
 

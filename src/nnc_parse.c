@@ -124,19 +124,20 @@ nnc_static nnc_struct_member* nnc_parse_struct_member(nnc_parser* parser) {
 }
 
 nnc_static nnc_enumerator* nnc_parse_enumerator(nnc_parser* parser, nnc_type* in_enum) {
-    nnc_enumerator* member = anew(nnc_enumerator);
-    member->in_enum = in_enum;
+    nnc_enumerator* enumerator = anew(nnc_enumerator);
+    enumerator->in_enum = in_enum;
     if (nnc_parser_match(parser, TOK_IDENT)) {
         const nnc_tok* tok = nnc_parser_get(parser);
-        member->var = nnc_ident_new(tok->lexeme);
-        member->var->ctx = IDENT_ENUMERATOR;
+        enumerator->var = nnc_ident_new(tok->lexeme);
+        enumerator->var->ctx = IDENT_ENUMERATOR;
+        enumerator->var->refs.enumerator = enumerator;
     }
     nnc_parser_expect(parser, TOK_IDENT);
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
         nnc_parser_next(parser);
-        member->init = nnc_parse_expr_reduced(parser);
+        enumerator->init = nnc_parse_expr_reduced(parser);
     }
-    return member;
+    return enumerator;
 }
 
 nnc_static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
@@ -1086,6 +1087,7 @@ nnc_static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     namespace_stmt->var->type->repr = namespace_stmt->var->name;
     namespace_stmt->var->type->exact.name.space = namespace_stmt;
     namespace_stmt->body = nnc_parse_namespace_compound_stmt(parser);
+    //todo: namespace scope is not isolated!
     nnc_st_put(parser->table, namespace_stmt->var);
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
