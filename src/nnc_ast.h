@@ -5,8 +5,8 @@
 #include "nnc_statement.h"
 
 typedef struct _nnc_ast {
-    //todo: incomplete
     nnc_statement* root;
+    struct _nnc_st* st;
     const char* file;
 } nnc_ast;
 

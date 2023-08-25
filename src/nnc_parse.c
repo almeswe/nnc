@@ -804,14 +804,14 @@ nnc_static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
 
 nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_assignment_expr(parser);
-    nnc_resolve_expr(expr, parser->table);
+    //nnc_resolve_expr(expr, parser->table);
     //nnc_expr_infer_type(expr, parser->table);
     return expr;
 }
 
 nnc_expression* nnc_parse_expr(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_comma_expr(parser);
-    nnc_resolve_expr(expr, parser->table);
+    //nnc_resolve_expr(expr, parser->table);
     //nnc_expr_infer_type(expr, parser->table);
     return expr;
 }
@@ -1122,6 +1122,7 @@ nnc_ast* nnc_parse(const char* file) {
     nnc_parser_init(&parser, file);
     nnc_ast* ast = nnc_ast_new(file);
     ast->root = nnc_parse_topmost_stmt(&parser);
+    ast->st = parser.table;
     nnc_parser_fini(&parser);
     return ast;
 }
