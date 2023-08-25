@@ -4,10 +4,11 @@
 
 nnc_static nnc_u64 nnc_sizeof(const nnc_type* type) {
     assert(!nnc_incomplete_type(type));
-    if (type->kind == TYPE_ALIAS && type->base != NULL) {
-        return type->base->size;
+    nnc_type* temp = (nnc_type*)type;
+    while (temp->kind == TYPE_ALIAS) {
+        temp = temp->base;
     }
-    return type->size;
+    return temp->size;
 }
 
 nnc_static nnc_bool nnc_wrapable_expr(const nnc_expression* expr) {
@@ -87,25 +88,118 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
     }
 }
 
-nnc_static nnc_bool nnc_complete_type(nnc_type* type, nnc_st* table) {
+nnc_static nnc_bool nnc_needs_resolve_size(const nnc_type* type) {
+    return type->kind == TYPE_ALIAS  ||
+           type->kind == TYPE_STRUCT ||
+           type->kind == TYPE_UNION  ||
+           type->kind == TYPE_ARRAY;
+}
+
+nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
+    if (type->kind != TYPE_INCOMPLETE) {
+        return;
+    } 
     nnc_type* st_type = NULL;
     if (type->repr != NULL) {
-        st_type = nnc_st_get_type(table, type->repr);
+        st_type = nnc_st_get_type(st, type->repr);
         if (st_type != NULL) {
             *type = *st_type;
-            return true;
+            nnc_complete_type(type->base, st);
+            return;
+        }
+    }
+    THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr));
+}
+
+nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_type* to, nnc_st* st) {
+    assert(to->kind == TYPE_STRUCT || to->kind == TYPE_UNION);
+    const struct _nnc_struct_or_union_type* exact = &to->exact.struct_or_union;
+    // iterate through each memeber of `to` type,  
+    // and perform circular dependency check for each member
+    for (nnc_u64 i = 0; i < exact->memberc; i++) {
+        nnc_struct_member* m = exact->members[i];
+        // complete member's type basic information
+        // `nnc_resolve_type` function here may cause
+        // stack overflow in some cases
+        nnc_complete_type(m->type, st);
+        // get pure type in context of an array type
+        nnc_type* m_ref = m->type;
+        while (m_ref->kind == TYPE_ARRAY) {
+            m_ref = m_ref->base;
+        }
+        // if type is alias, we can compare it's name with `inside` criteria.
+        if (m_ref->kind == TYPE_ALIAS) {
+            // if same type detected, circular dependency met 
+            if (nnc_sequal(inside, m_ref->repr)) {
+                return true;
+            }
+            // check circular dependency for next member,
+            // but only if this member is struct or union. 
+            if (nnc_struct_or_union_type(m_ref->base)) {
+                if (nnc_struct_has_circular_dep(inside, m_ref->base, st)) {
+                    return true;
+                }
+            }
         }
     }
     return false;
 }
 
 nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table);
+nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st);
+
+nnc_static nnc_bool nnc_resolve_aliased_union(const nnc_type* alias, nnc_type* ref_type, nnc_st* st) {
+    return nnc_resolve_aliased_struct(alias, ref_type, st);
+}
+
+nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st) {
+    const nnc_str a_name = alias->repr;
+    struct _nnc_struct_or_union_type* exact = &ref_type->exact.struct_or_union;
+    for (nnc_u64 i = 0; i < exact->memberc; i++) {
+        nnc_struct_member* m = exact->members[i];
+        // complete member's type basic information
+        // `nnc_resolve_type` function here may cause
+        // stack overflow in some cases
+        nnc_complete_type(m->type, st);
+        // then we need to get pure base type of `m->type`,
+        // because size of alias and array types will be determined
+        // based on `->base` type, we need to be sure that this `->base` type is not the same 
+        // as `alias` type. Otherwise it will cause circular dependency => crash the compiler with stack overflow
+        nnc_type* m_ref = m->type;
+        while (m_ref->kind == TYPE_ALIAS ||
+               m_ref->kind == TYPE_ARRAY) {
+            m_ref = m_ref->base;
+        }
+        // if pure type is `TYPE_STRUCT` or `TYPE_UNION`, 
+        // check it for circular dependency
+        if (nnc_struct_or_union_type(m_ref)) {
+            if (nnc_struct_has_circular_dep(a_name, m_ref, st)) {
+                THROW(NNC_SEMANTIC, sformat("circular dependency met when expanding node "
+                    "inside `%s` at `%s::%s`.", a_name, a_name, m->var->name));
+            }
+        }
+    }
+    // this made because union type is resolved
+    // by this function too (`nnc_resolve_aliased_struct`), so to resolve type further
+    // depending on it's type (struct or union), calling generic `nnc_resolve_type` here.
+    return nnc_resolve_type(ref_type, st);
+}
+
+nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st) {
+    nnc_type* ref_type = alias;
+    while (ref_type->kind == TYPE_ALIAS) {
+        ref_type = ref_type->base;
+    }
+    switch (ref_type->kind) {
+        case TYPE_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st); 
+        case TYPE_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st);
+        default: return false;
+    }
+}
 
 nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* table) {
-    if (!nnc_resolve_expr(enumerator->init, table) || 
-        !nnc_wrapable_expr(enumerator->init)) {
-        nnc_deferred_stack_put(table, DEFERRED_ENUMERATOR, enumerator);
-        return false;
+    if (!nnc_wrapable_expr(enumerator->init)) {
+        THROW(NNC_WRONG_ENUMERATOR_INITIALIZER, "enumerator initializer must be constant expression.");
     }
     const nnc_type* init_type = nnc_expr_get_type(enumerator->init);
     if (!nnc_integral_type(init_type)) {
@@ -126,53 +220,51 @@ nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* table) {
 }
 
 nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* table) {
-    return nnc_resolve_type(type->base, table);
+    return nnc_resolve_aliased_type(type, table);
 }
 
-nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* table) {
-    if (!nnc_resolve_type(type->base, table)) {
-        return false;
+nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* st) {
+    nnc_expression* dim = type->exact.array.dim;
+    nnc_resolve_expr(dim, st);
+    nnc_resolve_type(type->base, st);
+    nnc_type* dim_type = nnc_expr_get_type(dim);
+    nnc_complete_type(dim_type, st);
+    if (!nnc_wrapable_expr(dim)) {
+        THROW(NNC_SEMANTIC, "array dimension value must be constant.");
     }
-    const nnc_expression* dim = type->exact.array.dim;
-    const nnc_type* dim_type = nnc_expr_get_type(dim);
-    if (!nnc_wrapable_expr(dim) ||
-        !nnc_integral_type(dim_type)) {
-        return false;
+    if (!nnc_integral_type(dim_type)) {
+        THROW(NNC_SEMANTIC, "array dimension must be of integral type.");
     }
-    type->size = nnc_evald(dim, table) * type->base->size;
+    type->size = nnc_evald(dim, st) * nnc_sizeof(type->base);
     return true;
 }
 
-nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* table) {
-    nnc_u64 size = 0;
-    nnc_bool is_resolved = true;
-    for (nnc_u64 i = 0; i < type->exact.struct_or_union.memberc; i++) {
-        nnc_union_member* member = type->exact.struct_or_union.members[i];
-        is_resolved &= nnc_resolve_type(member->type, table);
-        if (is_resolved && size < member->type->size) {
-            size = nnc_sizeof(member->type);
+nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* st) {
+    type->size = 0;
+    struct _nnc_struct_or_union_type* exact = &type->exact.struct_or_union;
+    for (nnc_u64 i = 0; i < exact->memberc; i++) {
+        nnc_struct_member* m = exact->members[i];
+        nnc_complete_type(m->type, st);
+        if (nnc_needs_resolve_size(m->type)) {
+            nnc_resolve_type(m->type, st);
         }
+        type->size = nnc_max(type->size, nnc_sizeof(m->type));
     }
-    if (is_resolved) {
-        type->size = size;
-    }
-    return is_resolved;
+    return true;
 }
 
-nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* table) {
-    nnc_u64 size = 0;
-    nnc_bool is_resolved = true;
-    for (nnc_u64 i = 0; i < type->exact.struct_or_union.memberc; i++) {
-        nnc_struct_member* member = type->exact.struct_or_union.members[i];
-        is_resolved &= nnc_resolve_type(member->type, table);
-        if (is_resolved) {
-            size += nnc_sizeof(member->type);
+nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st) {
+    type->size = 0;
+    struct _nnc_struct_or_union_type* exact = &type->exact.struct_or_union;
+    for (nnc_u64 i = 0; i < exact->memberc; i++) {
+        nnc_struct_member* m = exact->members[i];
+        nnc_complete_type(m->type, st);
+        if (nnc_needs_resolve_size(m->type)) {
+            nnc_resolve_type(m->type, st);
         }
+        type->size += nnc_sizeof(m->type);
     }
-    if (is_resolved) {
-        type->size = size;
-    }
-    return is_resolved;
+    return true;
 }
 
 nnc_static nnc_bool nnc_resolve_pointer(nnc_type* type, nnc_st* table) {
@@ -190,33 +282,22 @@ nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* table) {
     return is_resolved && nnc_resolve_type(type->exact.fn.ret, table);
 }
 
-nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table) {
-    typedef nnc_bool (nnc_type_resolver)(nnc_type*, nnc_st*);
-    if (nnc_incomplete_type(type)) {
-        if (!nnc_complete_type(type, table)) {
-            nnc_deferred_stack_put(table, DEFERRED_TYPE, type);
-            return false;
-        }
-    }
-    if (nnc_primitive_type(type) || nnc_namespace_type(type)) {
-        nnc_deferred_stack_pop(type);
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st) {
+    nnc_complete_type(type, st);
+    if (nnc_primitive_type(type) || 
+        nnc_namespace_type(type)) {
         return true;
     }
-    static nnc_type_resolver* resolve[] = {
-        [TYPE_ENUM]     = nnc_resolve_enum,
-        [TYPE_ALIAS]    = nnc_resolve_alias,
-        [TYPE_ARRAY]    = nnc_resolve_array,
-        [TYPE_UNION]    = nnc_resolve_union,
-        [TYPE_STRUCT]   = nnc_resolve_struct,
-        [TYPE_POINTER]  = nnc_resolve_pointer,
-        [TYPE_FUNCTION] = nnc_resolve_fn
-    };
-    if (resolve[type->kind](type, table)) {
-        nnc_deferred_stack_pop(type);
-        return true;
+    switch (type->kind) {
+        case TYPE_ENUM:     return nnc_resolve_enum(type, st);
+        case TYPE_ALIAS:    return nnc_resolve_alias(type, st);
+        case TYPE_ARRAY:    return nnc_resolve_array(type, st);
+        case TYPE_UNION:    return nnc_resolve_union(type, st);
+        case TYPE_STRUCT:   return nnc_resolve_struct(type, st);
+        case TYPE_POINTER:  return nnc_resolve_pointer(type, st);
+        case TYPE_FUNCTION: return nnc_resolve_fn(type, st);
+        default: return false;
     }
-    nnc_deferred_stack_put(table, DEFERRED_TYPE, type);
-    return false;
 }
 
 nnc_static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
@@ -574,13 +655,58 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
     return false;
 }
 
-nnc_static nnc_bool nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* table) {
-    return true;
+nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
+    //todo: add error-recovery
+    for (nnc_u64 i = 0; i < buf_len(params); i++) {
+        nnc_resolve_type(params[i]->type, st);
+    }
 }
 
-nnc_bool nnc_resolve_stmt(nnc_statement* stmt, nnc_st* table) {
-    switch (stmt->kind) {
-        case STMT_LET:  return nnc_resolve_let_stmt(stmt->exact, table);
-        default:        return false;
+nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
+    nnc_resolve_params(fn_stmt->params, st);
+    nnc_resolve_type(fn_stmt->ret, st);
+    nnc_resolve_stmt(fn_stmt->body, st);
+}
+
+nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
+    nnc_resolve_type(let_stmt->type, st);
+    if (let_stmt->init != NULL) {
+        nnc_resolve_expr(let_stmt->init, st);
     }
+}
+
+nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st) {
+    //nnc_resolve_type(type_stmt->type, st);
+    nnc_resolve_aliased_type(type_stmt->as, st);
+}
+
+nnc_static void nnc_resolve_expr_stmt(nnc_expression_statement* expr_stmt, nnc_st* st) {
+    nnc_resolve_expr(expr_stmt->expr, st);
+}
+
+nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt, nnc_st* st) {
+    nnc_u64 len = buf_len(compound_stmt->stmts);
+    for (nnc_u64 i = 0; i < len; i++) {
+        nnc_resolve_stmt(compound_stmt->stmts[i], compound_stmt->scope);
+    }
+}
+
+nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
+    nnc_resolve_stmt(namespace_stmt->body, st);
+}
+
+void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
+    switch (stmt->kind) {
+        case STMT_FN:        nnc_resolve_fn_stmt(stmt->exact, st);        break;
+        case STMT_LET:       nnc_resolve_let_stmt(stmt->exact, st);       break;
+        case STMT_TYPE:      nnc_resolve_type_stmt(stmt->exact, st);      break;
+        case STMT_EXPR:      nnc_resolve_expr_stmt(stmt->exact, st);      break;
+        case STMT_COMPOUND:  nnc_resolve_compound_stmt(stmt->exact, st);  break;
+        case STMT_NAMESPACE: nnc_resolve_namespace_stmt(stmt->exact, st); break;
+        default: break;
+    }
+}
+
+void nnc_resolve(nnc_ast* ast) {
+    nnc_resolve_stmt(ast->root, ast->st);
 }

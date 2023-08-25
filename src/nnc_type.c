@@ -99,8 +99,14 @@ nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_struct_member* member = NULL;
     if (count >= 1) {
         member = type->exact.struct_or_union.members[0];
-        repr = sformat("%s%s:%s ", repr, 
-            member->var->name, nnc_type_tostr(member->type));
+        if (member->type->kind == TYPE_ALIAS) {
+            repr = sformat("%s%s:%s ", repr, 
+                member->var->name, member->type->repr);
+        }
+        else {
+            repr = sformat("%s%s:%s ", repr, 
+                member->var->name, nnc_type_tostr(member->type));
+        }
     }
     if (count > 2) {
         more = count - 2;
@@ -108,8 +114,14 @@ nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     }
     if (count > 1) {
         member = type->exact.struct_or_union.members[count-1];
-        repr = sformat("%s%s:%s ", repr, 
-            member->var->name, nnc_type_tostr(member->type));
+        if (member->type->kind == TYPE_ALIAS) {
+            repr = sformat("%s%s:%s ", repr, 
+                member->var->name, member->type->repr);
+        }
+        else {
+            repr = sformat("%s%s:%s ", repr, 
+                member->var->name, nnc_type_tostr(member->type));
+        }
     }
     return sformat("%s}", repr);
 }
