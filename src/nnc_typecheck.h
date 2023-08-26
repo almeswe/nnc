@@ -19,6 +19,7 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* table)
 nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* table);
 nnc_type* nnc_expr_get_type(const nnc_expression* expr);
 
+nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type* to);
 nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to);
 nnc_bool nnc_can_cast_explicitly(const nnc_type* from, const nnc_type* to);
 
