@@ -45,6 +45,10 @@ nnc_bool nnc_primitive_type(const nnc_type* type) {
     }
 }
 
+nnc_bool nnc_same_type(const nnc_type* t1, const nnc_type* t2) {
+    return false;
+}
+
 nnc_bool nnc_integral_type(const nnc_type* type) {
     switch (type->kind) {
         case TYPE_PRIMITIVE_I8:
@@ -102,7 +106,7 @@ nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to)
         [TYPE_PRIMITIVE_F64] = 9
     };
     if (!nnc_numeric_type(from) || !nnc_numeric_type(to)) {
-        return false;
+        return nnc_same_type(from, to);
     }
     return hierarchy[from->kind] <= hierarchy[to->kind];
 }
@@ -112,6 +116,40 @@ nnc_type* nnc_cast_arith_implicitly(const nnc_type* from, const nnc_type* to) {
         THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
     }
     return (nnc_type*)to;
+}
+
+nnc_bool nnc_can_cast_ptrs_implicitly(const nnc_type* from, const nnc_type* to) {
+    if (nnc_rank(from) != nnc_rank(to)) {
+        return false;
+    }
+    nnc_type* ref_to = (nnc_type*)to;
+    nnc_type* ref_from = (nnc_type*)from;
+    while (ref_to->kind == TYPE_ALIAS) {
+        ref_to = ref_to->base;
+    }
+    while (ref_from->kind == TYPE_ALIAS) {
+        ref_from = ref_from->base;
+    }
+    while (ref_to->kind == TYPE_ARRAY   ||
+           ref_to->kind == TYPE_POINTER ||
+           ref_from->kind == TYPE_POINTER) {
+        ref_to = ref_to->base;
+        ref_from = ref_from->base;
+    }
+    while (ref_to->kind == TYPE_ALIAS) {
+        ref_to = ref_to->base;
+    }
+    while (ref_from->kind == TYPE_ALIAS) {
+        ref_from = ref_from->base;
+    }
+    //todo: block ability to make alias types from pointer or array types.
+    if (ref_to->kind == TYPE_VOID || 
+        ref_from->kind == TYPE_VOID) {
+        return true;
+    }
+    printf("to:   %s\n", nnc_type_tostr(ref_to));
+    printf("from: %s\n", nnc_type_tostr(ref_from));
+    return nnc_can_cast_arith_implicitly(ref_from, ref_to);
 }
 
 nnc_bool nnc_same_fn_types(const nnc_type* t1, const nnc_type* t2);
@@ -124,10 +162,7 @@ nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type
         return nnc_same_fn_types(to, from);
     }
     if (nnc_ptr_type(to) && nnc_arr_or_ptr_type(from)) {
-        if (nnc_rank(from) != nnc_rank(to)) {
-            return false;
-        }
-        return nnc_can_cast_assignment_implicitly(from->base, to->base);
+        return nnc_can_cast_ptrs_implicitly(from, to);
     }
     return false;
 }
