@@ -70,9 +70,9 @@ void nnc_st_put(nnc_st* table, nnc_symbol* sym) {
 }
 
 void nnc_st_put_type(nnc_st* table, nnc_type* type) {
-    assert(type->kind == TYPE_ALIAS);
+    assert(type->kind == T_ALIAS);
     if (nnc_st_has_type(table, type->repr)) {
-        THROW(NNC_TYPE_ALREADY_DECLARED, sformat("type \'%s\' is already declared.", nnc_type_tostr(type)));
+        THROW(NNC_T_ALREADY_DECLARED, sformat("type \'%s\' is already declared.", nnc_type_tostr(type)));
     }
     map_put_s(table->types, type->repr, type);
 }

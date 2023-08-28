@@ -219,7 +219,7 @@ nnc_static nnc_type* nnc_parse_arr_declarator(nnc_parser* parser, nnc_type* type
 nnc_static nnc_type* nnc_parse_ptr_declarator(nnc_parser* parser, nnc_type* type) {
     nnc_parser_expect(parser, TOK_ASTERISK);
     type = nnc_ptr_type_new(type);
-    if (type->base->kind == TYPE_ARRAY) {
+    if (type->base->kind == T_ARRAY) {
         THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.", nnc_type_tostr(type)), nnc_parser_get_ctx(parser));
     }
     return type;

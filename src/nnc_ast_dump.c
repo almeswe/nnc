@@ -61,7 +61,7 @@ nnc_static void nnc_dump_type(const nnc_type* type) {
     }
     else {
         nnc_type* ref_type = (nnc_type*)type;
-        while (ref_type->kind == TYPE_ALIAS) {
+        while (ref_type->kind == T_ALIAS) {
             ref_type = ref_type->base;
         }
         fprintf(stderr, _c(BBLU, "%s(%lu)"), nnc_type_tostr(type), ref_type->size);

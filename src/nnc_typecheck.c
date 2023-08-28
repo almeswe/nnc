@@ -2,78 +2,113 @@
 
 //todo: contexts ??
 
-nnc_bool nnc_incomplete_type(const nnc_type* type) {
-    return type->kind == TYPE_VOID ||
-        type->kind == TYPE_UNKNOWN ||
-        type->kind == TYPE_INCOMPLETE;
-}
+#define m_nnc_type_is(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
 
-nnc_bool nnc_fn_type(const nnc_type* type) {
-    return type->kind == TYPE_FUNCTION;
-}
-
-nnc_bool nnc_ptr_type(const nnc_type* type) {
-    return type->kind == TYPE_POINTER;
-}
-
-nnc_bool nnc_arr_type(const nnc_type* type) {
-    return type->kind == TYPE_ARRAY;
-}
-
-nnc_bool nnc_namespace_type(const nnc_type* type) {
-    return type->kind == TYPE_NAMESPACE;
-}
-
-nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
-    return type->kind == TYPE_POINTER || type->kind == TYPE_ARRAY;
-}
-
-nnc_bool nnc_struct_or_union_type(const nnc_type* type) {
-    return type->kind == TYPE_STRUCT || type->kind == TYPE_UNION;
-}
-
-nnc_bool nnc_primitive_type(const nnc_type* type) {
-    switch (type->kind) {
-        case TYPE_PRIMITIVE_I8:  case TYPE_PRIMITIVE_U8:
-        case TYPE_PRIMITIVE_I16: case TYPE_PRIMITIVE_U16:
-        case TYPE_PRIMITIVE_I32: case TYPE_PRIMITIVE_U32:
-        case TYPE_PRIMITIVE_I64: case TYPE_PRIMITIVE_U64:
-        case TYPE_PRIMITIVE_F32: case TYPE_PRIMITIVE_F64:
+nnc_bool nnc_type_is(const nnc_type* type, ...) {
+    va_list list = {0};
+    va_start(list, type);
+    for (;;) {
+        nnc_i32 arg = va_arg(list, nnc_i32);
+        if (arg == -1) {
+            break;
+        }
+        nnc_type_kind kind = arg;
+        if (kind == type->kind) {
+            va_end(list);
             return true;
-        default:
-            return false;
+        }
     }
-}
-
-nnc_bool nnc_same_type(const nnc_type* t1, const nnc_type* t2) {
+    va_end(list);
     return false;
 }
 
+nnc_type* nnc_unalias(const nnc_type* type) {
+    nnc_type* base = (nnc_type*)type;
+    while (base->kind == T_ALIAS) {
+        base = base->base;
+    }
+    return base;
+}
+
+nnc_bool nnc_incomplete_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_VOID    || 
+           unaliased->kind == T_UNKNOWN || 
+           unaliased->kind == T_INCOMPLETE;
+}
+
+nnc_bool nnc_fn_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_FUNCTION;
+}
+
+nnc_bool nnc_ptr_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind != T_FUNCTION;
+}
+
+nnc_bool nnc_arr_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_ARRAY;
+}
+
+nnc_bool nnc_namespace_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_NAMESPACE;
+}
+
+nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_POINTER || 
+           unaliased->kind == T_ARRAY;
+}
+
+nnc_bool nnc_struct_or_union_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_STRUCT || 
+           unaliased->kind == T_UNION;
+}
+
+nnc_bool nnc_primitive_type(const nnc_type* type) {
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_PRIMITIVE_I8  || 
+           unaliased->kind == T_PRIMITIVE_U8  ||
+           unaliased->kind == T_PRIMITIVE_I16 || 
+           unaliased->kind == T_PRIMITIVE_U16 ||
+           unaliased->kind == T_PRIMITIVE_I32 || 
+           unaliased->kind == T_PRIMITIVE_U32 ||
+           unaliased->kind == T_PRIMITIVE_I64 || 
+           unaliased->kind == T_PRIMITIVE_U64 ||
+           unaliased->kind == T_PRIMITIVE_F32 || 
+           unaliased->kind == T_PRIMITIVE_F64;
+}
+
+nnc_bool nnc_same_types(const nnc_type* t1, const nnc_type* t2) {
+    return nnc_unalias(t1) == nnc_unalias(t2);
+}
+
 nnc_bool nnc_integral_type(const nnc_type* type) {
-    switch (type->kind) {
-        case TYPE_PRIMITIVE_I8:
-        case TYPE_PRIMITIVE_U8:
-        case TYPE_PRIMITIVE_I16:
-        case TYPE_PRIMITIVE_U16:
-        case TYPE_PRIMITIVE_I32:
-        case TYPE_PRIMITIVE_U32:
-        case TYPE_PRIMITIVE_I64:
-        case TYPE_PRIMITIVE_U64:
-            return true;
-        default:
-            return false;
-    } 
+    const nnc_type* unaliased = nnc_unalias(type);
+    return unaliased->kind == T_PRIMITIVE_I8  || 
+           unaliased->kind == T_PRIMITIVE_U8  ||
+           unaliased->kind == T_PRIMITIVE_I16 || 
+           unaliased->kind == T_PRIMITIVE_U16 ||
+           unaliased->kind == T_PRIMITIVE_I32 || 
+           unaliased->kind == T_PRIMITIVE_U32 ||
+           unaliased->kind == T_PRIMITIVE_I64 || 
+           unaliased->kind == T_PRIMITIVE_U64;
 }
 
 nnc_bool nnc_numeric_type(const nnc_type* type) {
-    return nnc_integral_type(type) ||
-        type->kind == TYPE_PRIMITIVE_F32         ||
-        type->kind == TYPE_PRIMITIVE_F64;
+    const nnc_type* unaliased = nnc_unalias(type);
+    return nnc_integral_type(type)    ||
+        unaliased->kind == T_PRIMITIVE_F32 ||
+        unaliased->kind == T_PRIMITIVE_F64;
 }
 
 const nnc_i32 nnc_rank(const nnc_type* type) {
     nnc_i32 rank = 0;
-    const nnc_type* base = type;
+    const nnc_type* base = nnc_unalias(type);
     while (nnc_arr_or_ptr_type(base)) {
         rank++;
         base = base->base;
@@ -94,19 +129,23 @@ const nnc_type* nnc_base_type(const nnc_type* type) {
 
 nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to) {
     static const nnc_i32 hierarchy[] = {
-        [TYPE_PRIMITIVE_I8]  = 0,
-        [TYPE_PRIMITIVE_U8]  = 1,
-        [TYPE_PRIMITIVE_I16] = 2,
-        [TYPE_PRIMITIVE_U16] = 3,
-        [TYPE_PRIMITIVE_I32] = 4,
-        [TYPE_PRIMITIVE_U32] = 5,
-        [TYPE_PRIMITIVE_I64] = 6,
-        [TYPE_PRIMITIVE_U64] = 7,
-        [TYPE_PRIMITIVE_F32] = 8,
-        [TYPE_PRIMITIVE_F64] = 9
+        [T_PRIMITIVE_I8]  = 0,
+        [T_PRIMITIVE_U8]  = 1,
+        [T_PRIMITIVE_I16] = 2,
+        [T_PRIMITIVE_U16] = 3,
+        [T_PRIMITIVE_I32] = 4,
+        [T_PRIMITIVE_U32] = 5,
+        [T_PRIMITIVE_I64] = 6,
+        [T_PRIMITIVE_U64] = 7,
+        [T_PRIMITIVE_F32] = 8,
+        [T_PRIMITIVE_F64] = 9
     };
     if (!nnc_numeric_type(from) || !nnc_numeric_type(to)) {
-        return nnc_same_type(from, to);
+        if (!nnc_struct_or_union_type(to) ||
+            !nnc_struct_or_union_type(from)) {
+            return false;
+        }
+        return nnc_same_types(to, from);
     }
     return hierarchy[from->kind] <= hierarchy[to->kind];
 }
@@ -122,44 +161,31 @@ nnc_bool nnc_can_cast_ptrs_implicitly(const nnc_type* from, const nnc_type* to) 
     if (nnc_rank(from) != nnc_rank(to)) {
         return false;
     }
-    nnc_type* ref_to = (nnc_type*)to;
-    nnc_type* ref_from = (nnc_type*)from;
-    while (ref_to->kind == TYPE_ALIAS) {
+    const nnc_type* ref_to = to;
+    const nnc_type* ref_from = from;
+    while (m_nnc_type_is(ref_to, 
+           T_ARRAY, T_ALIAS, T_POINTER)) {
         ref_to = ref_to->base;
     }
-    while (ref_from->kind == TYPE_ALIAS) {
+    while (m_nnc_type_is(ref_from, 
+           T_ARRAY, T_ALIAS, T_POINTER)) {
         ref_from = ref_from->base;
     }
-    while (ref_to->kind == TYPE_ARRAY   ||
-           ref_to->kind == TYPE_POINTER ||
-           ref_from->kind == TYPE_POINTER) {
-        ref_to = ref_to->base;
-        ref_from = ref_from->base;
-    }
-    while (ref_to->kind == TYPE_ALIAS) {
-        ref_to = ref_to->base;
-    }
-    while (ref_from->kind == TYPE_ALIAS) {
-        ref_from = ref_from->base;
-    }
-    //todo: block ability to make alias types from pointer or array types.
-    if (ref_to->kind == TYPE_VOID || 
-        ref_from->kind == TYPE_VOID) {
+    if (ref_to->kind == T_VOID || 
+        ref_from->kind == T_VOID) {
         return true;
     }
-    printf("to:   %s\n", nnc_type_tostr(ref_to));
-    printf("from: %s\n", nnc_type_tostr(ref_from));
     return nnc_can_cast_arith_implicitly(ref_from, ref_to);
 }
 
-nnc_bool nnc_same_fn_types(const nnc_type* t1, const nnc_type* t2);
+nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2);
 
 nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type* to) {
     if (nnc_can_cast_arith_implicitly(from, to)) {
         return nnc_cast_arith_implicitly(from, to);
     }
     if (nnc_fn_type(to) && nnc_fn_type(from)) {
-        return nnc_same_fn_types(to, from);
+        return nnc_can_cast_fns_implicitly(to, from);
     }
     if (nnc_ptr_type(to) && nnc_arr_or_ptr_type(from)) {
         return nnc_can_cast_ptrs_implicitly(from, to);
@@ -167,9 +193,9 @@ nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type
     return false;
 }
 
-nnc_bool nnc_same_fn_types(const nnc_type* t1, const nnc_type* t2) {
-    assert(t1->kind == TYPE_FUNCTION);
-    assert(t2->kind == TYPE_FUNCTION);
+nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2) {
+    assert(t1->kind == T_FUNCTION);
+    assert(t2->kind == T_FUNCTION);
     if (t1->exact.fn.paramc != t2->exact.fn.paramc) {
         return false;
     }
@@ -309,7 +335,7 @@ nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* tabl
 
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* table) {
     const nnc_type* type = nnc_expr_get_type(expr);
-    if (type->kind != TYPE_UNKNOWN) {
+    if (type->kind != T_UNKNOWN) {
         return (nnc_type*)type;
     }
     switch (expr->kind) {
