@@ -5,7 +5,7 @@
 nnc_static nnc_u64 nnc_sizeof(const nnc_type* type) {
     assert(!nnc_incomplete_type(type));
     nnc_type* temp = (nnc_type*)type;
-    while (temp->kind == TYPE_ALIAS) {
+    while (temp->kind == T_ALIAS) {
         temp = temp->base;
     }
     return temp->size;
@@ -89,14 +89,14 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
 }
 
 nnc_static nnc_bool nnc_needs_resolve_size(const nnc_type* type) {
-    return type->kind == TYPE_ALIAS  ||
-           type->kind == TYPE_STRUCT ||
-           type->kind == TYPE_UNION  ||
-           type->kind == TYPE_ARRAY;
+    return type->kind == T_ALIAS  ||
+           type->kind == T_STRUCT ||
+           type->kind == T_UNION  ||
+           type->kind == T_ARRAY;
 }
 
 nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
-    if (type->kind != TYPE_INCOMPLETE) {
+    if (type->kind != T_INCOMPLETE) {
         return;
     } 
     nnc_type* st_type = NULL;
@@ -112,7 +112,7 @@ nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
 }
 
 nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_type* to, nnc_st* st) {
-    assert(to->kind == TYPE_STRUCT || to->kind == TYPE_UNION);
+    assert(to->kind == T_STRUCT || to->kind == T_UNION);
     const struct _nnc_struct_or_union_type* exact = &to->exact.struct_or_union;
     // iterate through each memeber of `to` type,  
     // and perform circular dependency check for each member
@@ -124,11 +124,11 @@ nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_
         nnc_complete_type(m->type, st);
         // get pure type in context of an array type
         nnc_type* m_ref = m->type;
-        while (m_ref->kind == TYPE_ARRAY) {
+        while (m_ref->kind == T_ARRAY) {
             m_ref = m_ref->base;
         }
         // if type is alias, we can compare it's name with `inside` criteria.
-        if (m_ref->kind == TYPE_ALIAS) {
+        if (m_ref->kind == T_ALIAS) {
             // if same type detected, circular dependency met 
             if (nnc_sequal(inside, m_ref->repr)) {
                 return true;
@@ -166,11 +166,11 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
         // based on `->base` type, we need to be sure that this `->base` type is not the same 
         // as `alias` type. Otherwise it will cause circular dependency => crash the compiler with stack overflow
         nnc_type* m_ref = m->type;
-        while (m_ref->kind == TYPE_ALIAS ||
-               m_ref->kind == TYPE_ARRAY) {
+        while (m_ref->kind == T_ALIAS ||
+               m_ref->kind == T_ARRAY) {
             m_ref = m_ref->base;
         }
-        // if pure type is `TYPE_STRUCT` or `TYPE_UNION`, 
+        // if pure type is `T_STRUCT` or `T_UNION`, 
         // check it for circular dependency
         if (nnc_struct_or_union_type(m_ref)) {
             if (nnc_struct_has_circular_dep(a_name, m_ref, st)) {
@@ -187,13 +187,13 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
 
 nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st) {
     nnc_type* ref_type = alias;
-    while (ref_type->kind == TYPE_ALIAS) {
+    while (ref_type->kind == T_ALIAS) {
         ref_type = ref_type->base;
     }
     switch (ref_type->kind) {
-        case TYPE_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st); 
-        case TYPE_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st);
-        default: return false;
+        case T_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st); 
+        case T_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st);
+        default: return nnc_resolve_type(alias->base, st);
     }
 }
 
@@ -276,7 +276,7 @@ nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* table) {
     for (nnc_u64 i = 0; i < type->exact.fn.paramc && is_resolved; i++) {
         is_resolved &= nnc_resolve_type(type->exact.fn.params[i], table);
     }
-    if (type->exact.fn.ret->kind == TYPE_VOID) {
+    if (type->exact.fn.ret->kind == T_VOID) {
         return is_resolved;
     }
     return is_resolved && nnc_resolve_type(type->exact.fn.ret, table);
@@ -289,13 +289,13 @@ nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st) {
         return true;
     }
     switch (type->kind) {
-        case TYPE_ENUM:     return nnc_resolve_enum(type, st);
-        case TYPE_ALIAS:    return nnc_resolve_alias(type, st);
-        case TYPE_ARRAY:    return nnc_resolve_array(type, st);
-        case TYPE_UNION:    return nnc_resolve_union(type, st);
-        case TYPE_STRUCT:   return nnc_resolve_struct(type, st);
-        case TYPE_POINTER:  return nnc_resolve_pointer(type, st);
-        case TYPE_FUNCTION: return nnc_resolve_fn(type, st);
+        case T_ENUM:     return nnc_resolve_enum(type, st);
+        case T_ALIAS:    return nnc_resolve_alias(type, st);
+        case T_ARRAY:    return nnc_resolve_array(type, st);
+        case T_UNION:    return nnc_resolve_union(type, st);
+        case T_STRUCT:   return nnc_resolve_struct(type, st);
+        case T_POINTER:  return nnc_resolve_pointer(type, st);
+        case T_FUNCTION: return nnc_resolve_fn(type, st);
         default: return false;
     }
 }
@@ -465,10 +465,7 @@ nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* tabl
 
 nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
     if (unary->expr != NULL) {
-        if (!nnc_resolve_expr(unary->expr, table)) {
-            nnc_deferred_stack_put(table, DEFERRED_UNARY_EXPR, unary);
-            return false;
-        }
+        nnc_resolve_expr(unary->expr, table);
     }
     switch (unary->kind) {
         case UNARY_REF:           nnc_resolve_ref_expr(unary, table);         break;
@@ -486,7 +483,6 @@ nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* 
         case UNARY_POSTFIX_SCOPE: nnc_resolve_scope_expr(unary, table);       break;
         case UNARY_POSTFIX_INDEX: nnc_resolve_index_expr(unary, table);       break;
     }
-    nnc_deferred_stack_pop(unary);
     return true;
 }
 
@@ -672,6 +668,11 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     nnc_resolve_type(let_stmt->type, st);
     if (let_stmt->init != NULL) {
         nnc_resolve_expr(let_stmt->init, st);
+        const nnc_type* init_type = nnc_expr_get_type(let_stmt->init);
+        if (!nnc_can_cast_assignment_implicitly(init_type, let_stmt->type)) {
+            THROW(NNC_SEMANTIC, sformat("cannot initialize variable "
+                "with `%s` type.", nnc_type_tostr(init_type)));    
+        }
     }
 }
 
