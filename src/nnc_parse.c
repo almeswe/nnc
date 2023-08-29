@@ -2,16 +2,16 @@
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     nnc_lex_init(&out_parser->lex, file);
-    out_parser->table = anew(nnc_st);
-    nnc_st_init(out_parser->table);
+    out_parser->st = anew(nnc_st);
+    nnc_st_init(out_parser->st);
     out_parser->lookup.is_first = true;
     nnc_parser_next(out_parser);
 }
 
 void nnc_parser_init_with_fp(nnc_parser* out_parser, FILE* fp) {
     nnc_lex_init_with_fp(&out_parser->lex, fp);
-    out_parser->table = anew(nnc_st);
-    nnc_st_init(out_parser->table);
+    out_parser->st = anew(nnc_st);
+    nnc_st_init(out_parser->st);
     out_parser->lookup.is_first = true;
     nnc_parser_next(out_parser);
 }
@@ -87,16 +87,16 @@ nnc_static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
 nnc_static void nnc_parser_enter_scope(nnc_parser* parser) {
     nnc_st* inner = anew(nnc_st);
     nnc_st_init(inner);
-    inner->root = parser->table;
-    buf_add(parser->table->branches, inner);
-    parser->table = inner;
+    inner->root = parser->st;
+    buf_add(parser->st->branches, inner);
+    parser->st = inner;
 }
 
 nnc_static void nnc_parser_leave_scope(nnc_parser* parser) {
-    if (parser->table->root == NULL) {
-        nnc_abort_no_ctx("nnc_parser_leave_scope: root table is NULL.");
+    if (parser->st->root == NULL) {
+        nnc_abort_no_ctx("nnc_parser_leave_scope: root st is NULL.");
     }
-    parser->table = parser->table->root;
+    parser->st = parser->st->root;
 }
 
 nnc_static nnc_type* nnc_parse_type(nnc_parser* parser);
@@ -174,8 +174,8 @@ nnc_static nnc_type* nnc_parse_enum_type(nnc_parser* parser) {
            !nnc_parser_match(parser, TOK_EOF)) {
         nnc_enumerator* member = nnc_parse_enumerator(parser, type);
         buf_add(type->exact.enumeration.members, member);
-        nnc_st_put(parser->table, member->var);
-        //nnc_st_put_entity(parser->table, ST_ENTITY_ENUMERATOR, member);
+        nnc_st_put(parser->st, member->var);
+        //nnc_st_put_entity(parser->st, ST_ENTITY_ENUMERATOR, member);
         if (!nnc_parser_match(parser, TOK_CBRACE)) {
             nnc_parser_expect(parser, TOK_COMMA);
         }
@@ -461,7 +461,6 @@ nnc_static nnc_expression* nnc_parse_index_expr(nnc_parser* parser, nnc_expressi
 }
 
 nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
-    //todo: make all postfix epxressions unary, not binary
     nnc_expression* postfix = NULL;
     nnc_expression* primary = nnc_parse_primary_expr(parser);
     if (nnc_parser_match(parser, TOK_AS)) {
@@ -804,15 +803,15 @@ nnc_static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
 
 nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_assignment_expr(parser);
-    //nnc_resolve_expr(expr, parser->table);
-    //nnc_expr_infer_type(expr, parser->table);
+    //nnc_resolve_expr(expr, parser->st);
+    //nnc_expr_infer_type(expr, parser->st);
     return expr;
 }
 
 nnc_expression* nnc_parse_expr(nnc_parser* parser) {
     nnc_expression* expr = nnc_parse_comma_expr(parser);
-    //nnc_resolve_expr(expr, parser->table);
-    //nnc_expr_infer_type(expr, parser->table);
+    //nnc_resolve_expr(expr, parser->st);
+    //nnc_expr_infer_type(expr, parser->st);
     return expr;
 }
 
@@ -875,8 +874,8 @@ nnc_static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc
     }
     nnc_parser_expect(parser, TOK_SEMICOLON);
     if (put_in_st) {
-        nnc_st_put(parser->table, let_stmt->var);
-        //nnc_st_put_entity(parser->table, ST_ENTITY_VAR, let_stmt);
+        nnc_st_put(parser->st, let_stmt->var);
+        //nnc_st_put_entity(parser->st, ST_ENTITY_VAR, let_stmt);
     }
     return nnc_stmt_new(STMT_LET, let_stmt);
 }
@@ -951,7 +950,7 @@ nnc_static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
     }
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_SEMICOLON);
-    nnc_st_put_type(parser->table, type_stmt->as);
+    nnc_st_put_type(parser->st, type_stmt->as);
     return nnc_stmt_new(STMT_TYPE, type_stmt);
 }
 
@@ -981,13 +980,17 @@ nnc_static nnc_statement* nnc_parse_topmost_stmt(nnc_parser* parser);
 
 nnc_static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) {
     nnc_parser_enter_scope(parser);
+    //todo: make more elegant way to handle this..
+    nnc_st* temp_st = parser->st->root;
+    parser->st->root = NULL;
     nnc_compound_statement* compound_stmt = anew(nnc_compound_statement);
-    compound_stmt->scope = parser->table;
+    compound_stmt->scope = parser->st;
     nnc_parser_expect(parser, TOK_OBRACE);
     while (!nnc_parser_match(parser, TOK_CBRACE)) {
         buf_add(compound_stmt->stmts, nnc_parse_topmost_stmt(parser));
     }
     nnc_parser_expect(parser, TOK_CBRACE);
+    parser->st->root = temp_st;
     nnc_parser_leave_scope(parser);
     return nnc_stmt_new(STMT_COMPOUND, compound_stmt);
 }
@@ -995,7 +998,7 @@ nnc_static nnc_statement* nnc_parse_namespace_compound_stmt(nnc_parser* parser) 
 nnc_static nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser) {
     nnc_parser_enter_scope(parser);
     nnc_compound_statement* compound_stmt = anew(nnc_compound_statement);
-    compound_stmt->scope = parser->table;
+    compound_stmt->scope = parser->st;
     nnc_parser_expect(parser, TOK_OBRACE);
     while (!nnc_parser_match(parser, TOK_CBRACE)) {
         buf_add(compound_stmt->stmts, nnc_parse_stmt(parser));
@@ -1062,9 +1065,9 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
     fn_stmt->body = nnc_parse_compound_stmt(parser);
     // todo: may be somehow put inner scope to nnc_parse_body?
-    // and then put params into table before the entities from body.
+    // and then put params into st before the entities from body.
 
-    nnc_st_put(parser->table, fn_stmt->var);
+    nnc_st_put(parser->st, fn_stmt->var);
     assert(fn_stmt->body->kind == STMT_COMPOUND);
     // put all function parameters inside inner scope of the function
     nnc_st* inner = NNC_GET_SYMTABLE(fn_stmt);
@@ -1087,8 +1090,7 @@ nnc_static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     namespace_stmt->var->type->repr = namespace_stmt->var->name;
     namespace_stmt->var->type->exact.name.space = namespace_stmt;
     namespace_stmt->body = nnc_parse_namespace_compound_stmt(parser);
-    //todo: namespace scope is not isolated!
-    nnc_st_put(parser->table, namespace_stmt->var);
+    nnc_st_put(parser->st, namespace_stmt->var);
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
 
@@ -1122,7 +1124,7 @@ nnc_ast* nnc_parse(const char* file) {
     nnc_parser_init(&parser, file);
     nnc_ast* ast = nnc_ast_new(file);
     ast->root = nnc_parse_topmost_stmt(&parser);
-    ast->st = parser.table;
+    ast->st = parser.st;
     nnc_parser_fini(&parser);
     return ast;
 }

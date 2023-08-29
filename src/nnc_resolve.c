@@ -4,11 +4,7 @@
 
 nnc_static nnc_u64 nnc_sizeof(const nnc_type* type) {
     assert(!nnc_incomplete_type(type));
-    nnc_type* temp = (nnc_type*)type;
-    while (temp->kind == T_ALIAS) {
-        temp = temp->base;
-    }
-    return temp->size;
+    return nnc_unalias(type)->size;
 }
 
 nnc_static nnc_bool nnc_wrapable_expr(const nnc_expression* expr) {
@@ -145,12 +141,9 @@ nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_
     return false;
 }
 
-nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* table);
-nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st);
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st);
 
-nnc_static nnc_bool nnc_resolve_aliased_union(const nnc_type* alias, nnc_type* ref_type, nnc_st* st) {
-    return nnc_resolve_aliased_struct(alias, ref_type, st);
-}
+#define nnc_resolve_aliased_union(...) nnc_resolve_aliased_struct(__VA_ARGS__)
 
 nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st) {
     const nnc_str a_name = alias->repr;
@@ -186,10 +179,7 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
 }
 
 nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st) {
-    nnc_type* ref_type = alias;
-    while (ref_type->kind == T_ALIAS) {
-        ref_type = ref_type->base;
-    }
+    nnc_type* ref_type = nnc_unalias(alias);
     switch (ref_type->kind) {
         case T_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st); 
         case T_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st);
@@ -197,7 +187,8 @@ nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st) {
     }
 }
 
-nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* st) {
+    nnc_resolve_expr(enumerator->init, st);
     if (!nnc_wrapable_expr(enumerator->init)) {
         THROW(NNC_WRONG_ENUMERATOR_INITIALIZER, "enumerator initializer must be constant expression.");
     }
@@ -205,22 +196,22 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* t
     if (!nnc_integral_type(init_type)) {
         THROW(NNC_SEMANTIC, "enumerator initializer must be of intergral type.");
     }
-    enumerator->init_const.d = nnc_evald(enumerator->init, table);
+    enumerator->init_const.d = nnc_evald(enumerator->init, st);
     nnc_deferred_stack_pop(enumerator);
     return true;
 }
 
-nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st) {
     nnc_bool resolved = true;
     for (nnc_u64 i = 0; i < type->exact.enumeration.memberc; i++) {
         nnc_enumerator* enumerator = type->exact.enumeration.members[i];
-        resolved &= nnc_resolve_enumerator(enumerator, table);
+        resolved &= nnc_resolve_enumerator(enumerator, st);
     }
     return resolved;
 }
 
-nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* table) {
-    return nnc_resolve_aliased_type(type, table);
+nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* st) {
+    return nnc_resolve_aliased_type(type, st);
 }
 
 nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* st) {
@@ -267,19 +258,19 @@ nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st) {
     return true;
 }
 
-nnc_static nnc_bool nnc_resolve_pointer(nnc_type* type, nnc_st* table) {
-    return nnc_resolve_type(type->base, table);
+nnc_static nnc_bool nnc_resolve_pointer(nnc_type* type, nnc_st* st) {
+    return nnc_resolve_type(type->base, st);
 }
 
-nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* st) {
     nnc_bool is_resolved = true;
     for (nnc_u64 i = 0; i < type->exact.fn.paramc && is_resolved; i++) {
-        is_resolved &= nnc_resolve_type(type->exact.fn.params[i], table);
+        is_resolved &= nnc_resolve_type(type->exact.fn.params[i], st);
     }
     if (type->exact.fn.ret->kind == T_VOID) {
         return is_resolved;
     }
-    return is_resolved && nnc_resolve_type(type->exact.fn.ret, table);
+    return is_resolved && nnc_resolve_type(type->exact.fn.ret, st);
 }
 
 nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st) {
@@ -332,10 +323,10 @@ nnc_static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
     return true; 
 }
 
-nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
-    nnc_symbol* sym = nnc_st_get(table, ident->name);
+nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
+    nnc_symbol* sym = nnc_st_get(st, ident->name);
     if (sym == NULL) {
-        nnc_deferred_stack_put(table, DEFERRED_IDENT, ident);
+        nnc_deferred_stack_put(st, DEFERRED_IDENT, ident);
         return false;
     }
     ident->ctx = sym->ctx;
@@ -348,7 +339,7 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* table) {
     return true;
 }
 
-nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* st) {
     if (!nnc_locatable_expr(unary->expr)) {
         THROW(NNC_CANNOT_RESOLVE_REF_EXPR, "cannot reference non locatable expression.");
     }
@@ -356,7 +347,7 @@ nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* table)
     unary->type = nnc_ptr_type_new(inner);
 }
 
-nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_integral_type(inner) && !nnc_arr_or_ptr_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_NOT_EXPR, "cannot use logical not for this expression.");
@@ -364,12 +355,12 @@ nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* table)
     unary->type = &i8_type;
 }
 
-nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* st) {
     //todo: check for explicit cast
     unary->type = unary->exact.cast.to;
 }
 
-nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_numeric_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_PLUS_EXPR, "expression must have numeric type.");
@@ -377,7 +368,7 @@ nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* table
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_numeric_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_MINUS_EXPR, "expression must have numeric type.");
@@ -385,22 +376,22 @@ nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* tabl
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_arr_or_ptr_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_DEREF_EXPR, sformat("cannot dereference (non array or pointer) \'%s\' type.", nnc_type_tostr(inner)));
     }
 }
 
-nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = &u64_type;
 }
 
-nnc_static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = &u64_type;
 }
 
-nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_integral_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_BW_NOT_EXPR, "expression must have integral type.");
@@ -408,12 +399,12 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
-nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* table) {
-    nnc_resolve_type(unary->exact.cast.to, table);
+nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
+    nnc_resolve_type(unary->exact.cast.to, st);
     unary->type = unary->exact.cast.to;
 }
 
-nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_struct_or_union_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("cannot access member of (non union or struct) \'%s\' type.", nnc_type_tostr(inner)));
@@ -430,7 +421,7 @@ nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* table)
     THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("\'%s\' is not member of \'%s\'.", member->name, nnc_type_tostr(inner)));
 }
 
-nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_fn_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_CALL_EXPR, sformat("cannot call (non function) \'%s\' type.", nnc_type_tostr(inner)));
@@ -438,7 +429,7 @@ nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* table
     unary->type = inner->exact.fn.ret;
 }
 
-nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner_type = nnc_expr_get_type(unary->expr);
     if (!nnc_namespace_type(inner_type)) {
         THROW(NNC_CANNOT_RESOLVE_SCOPE_EXPR, sformat("cannot reference (non namespace) \'%s\' type.", nnc_type_tostr(inner_type)));
@@ -455,7 +446,7 @@ nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* tabl
     unary->type = member->type;
 }
 
-nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* inner = nnc_expr_get_type(unary->expr);
     if (!nnc_arr_or_ptr_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_INDEX_EXPR, sformat("cannot index (non pointer or array) \'%s\' type.", nnc_type_tostr(inner)));
@@ -463,30 +454,30 @@ nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* tabl
     unary->type = inner->base;
 }
 
-nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* st) {
     if (unary->expr != NULL) {
-        nnc_resolve_expr(unary->expr, table);
+        nnc_resolve_expr(unary->expr, st);
     }
     switch (unary->kind) {
-        case UNARY_REF:           nnc_resolve_ref_expr(unary, table);         break;
-        case UNARY_NOT:           nnc_resolve_not_expr(unary, table);         break;
-        case UNARY_CAST:          nnc_resolve_cast_expr(unary, table);        break;
-        case UNARY_PLUS:          nnc_resolve_plus_expr(unary, table);        break;
-        case UNARY_MINUS:         nnc_resolve_minus_expr(unary, table);       break;
-        case UNARY_DEREF:         nnc_resolve_deref_expr(unary, table);       break;
-        case UNARY_SIZEOF:        nnc_resolve_sizeof_expr(unary, table);      break;
-        case UNARY_LENGTHOF:      nnc_resolve_lengthof_expr(unary, table);    break;
-        case UNARY_BITWISE_NOT:   nnc_resolve_bitwise_not_expr(unary, table); break;
-        case UNARY_POSTFIX_AS:    nnc_resolve_as_expr(unary, table);          break;
-        case UNARY_POSTFIX_DOT:   nnc_resolve_dot_expr(unary, table);         break;
-        case UNARY_POSTFIX_CALL:  nnc_resolve_call_expr(unary, table);        break;
-        case UNARY_POSTFIX_SCOPE: nnc_resolve_scope_expr(unary, table);       break;
-        case UNARY_POSTFIX_INDEX: nnc_resolve_index_expr(unary, table);       break;
+        case UNARY_REF:           nnc_resolve_ref_expr(unary, st);         break;
+        case UNARY_NOT:           nnc_resolve_not_expr(unary, st);         break;
+        case UNARY_CAST:          nnc_resolve_cast_expr(unary, st);        break;
+        case UNARY_PLUS:          nnc_resolve_plus_expr(unary, st);        break;
+        case UNARY_MINUS:         nnc_resolve_minus_expr(unary, st);       break;
+        case UNARY_DEREF:         nnc_resolve_deref_expr(unary, st);       break;
+        case UNARY_SIZEOF:        nnc_resolve_sizeof_expr(unary, st);      break;
+        case UNARY_LENGTHOF:      nnc_resolve_lengthof_expr(unary, st);    break;
+        case UNARY_BITWISE_NOT:   nnc_resolve_bitwise_not_expr(unary, st); break;
+        case UNARY_POSTFIX_AS:    nnc_resolve_as_expr(unary, st);          break;
+        case UNARY_POSTFIX_DOT:   nnc_resolve_dot_expr(unary, st);         break;
+        case UNARY_POSTFIX_CALL:  nnc_resolve_call_expr(unary, st);        break;
+        case UNARY_POSTFIX_SCOPE: nnc_resolve_scope_expr(unary, st);       break;
+        case UNARY_POSTFIX_INDEX: nnc_resolve_index_expr(unary, st);       break;
     }
     return true;
 }
 
-nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* st) {
     //todo: pointer arithmetic?
     nnc_type* ltype = nnc_expr_get_type(binary->lexpr);
     nnc_type* rtype = nnc_expr_get_type(binary->rexpr);
@@ -507,10 +498,10 @@ nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* tabl
     if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_CANNOT_RESOLVE_ADD_EXPR, "both expressions must have numeric types.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* st) {
     nnc_type* ltype = nnc_expr_get_type(binary->lexpr);
     nnc_type* rtype = nnc_expr_get_type(binary->rexpr);
     if (binary->kind == BINARY_MOD) {
@@ -521,19 +512,19 @@ nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* tabl
     if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_CANNOT_RESOLVE_MUL_EXPR, "both expressions must have numeric types.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* st) {
     nnc_type* ltype = nnc_expr_get_type(binary->lexpr);
     nnc_type* rtype = nnc_expr_get_type(binary->rexpr);
     if (!nnc_integral_type(ltype) || !nnc_integral_type(rtype)) {
         THROW(NNC_CANNOT_RESOLVE_SHIFT_EXPR, "both expressions must have integral types.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* st) {
     //todo: pointer arithmetic?
     nnc_type* ltype = nnc_expr_get_type(binary->lexpr);
     nnc_type* rtype = nnc_expr_get_type(binary->rexpr);
@@ -550,68 +541,68 @@ nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* tabl
     else if (!nnc_numeric_type(ltype) && !nnc_numeric_type(rtype)) {
         THROW(NNC_CANNOT_RESOLVE_REL_EXPR, "both expressions must have numeric types.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* st) {
     nnc_type* ltype = nnc_expr_get_type(binary->lexpr);
     nnc_type* rtype = nnc_expr_get_type(binary->rexpr);
     if (!nnc_integral_type(ltype) || !nnc_integral_type(rtype)) {
         THROW(NNC_CANNOT_RESOLVE_BITWISE_EXPR, "both expressions must have integral types.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* table) {
+nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* st) {
     if (!nnc_locatable_expr(binary->lexpr)) {
         THROW(NNC_CANNOT_ASSIGN_EXPR, "left expression must be locatable.");
     }
-    nnc_binary_expr_infer_type(binary, table);
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* table) {
-    nnc_binary_expr_infer_type(binary, table);
+nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* st) {
+    nnc_binary_expr_infer_type(binary, st);
 }
 
-nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* table) {
-    if (!nnc_resolve_expr(binary->lexpr, table) || 
-        !nnc_resolve_expr(binary->rexpr, table)) {
-        nnc_deferred_stack_put(table, DEFERRED_BINARY_EXPR, binary);
+nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* st) {
+    if (!nnc_resolve_expr(binary->lexpr, st) || 
+        !nnc_resolve_expr(binary->rexpr, st)) {
+        nnc_deferred_stack_put(st, DEFERRED_BINARY_EXPR, binary);
         return false;
     }
     switch (binary->kind) {
-        case BINARY_OR:     nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_LT:     nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_GT:     nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_EQ:     nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_ADD:    nnc_resolve_add_expr(binary, table);     break;
-        case BINARY_SUB:    nnc_resolve_add_expr(binary, table);     break;
-        case BINARY_MUL:    nnc_resolve_mul_expr(binary, table);     break;
-        case BINARY_DIV:    nnc_resolve_mul_expr(binary, table);     break;
-        case BINARY_MOD:    nnc_resolve_mul_expr(binary, table);     break;
-        case BINARY_SHR:    nnc_resolve_shift_expr(binary, table);   break;
-        case BINARY_SHL:    nnc_resolve_shift_expr(binary, table);   break;
-        case BINARY_NEQ:    nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_AND:    nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_LTE:    nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_GTE:    nnc_resolve_rel_expr(binary, table);     break;
-        case BINARY_COMMA:  nnc_resolve_comma_expr(binary, table);   break;
-        case BINARY_BW_OR:  nnc_resolve_bitwise_expr(binary, table); break;
-        case BINARY_BW_AND: nnc_resolve_bitwise_expr(binary, table); break;
-        case BINARY_BW_XOR: nnc_resolve_bitwise_expr(binary, table); break;
-        case BINARY_ASSIGN: nnc_resolve_assign_expr(binary, table);  break;
+        case BINARY_OR:     nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_LT:     nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_GT:     nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_EQ:     nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_ADD:    nnc_resolve_add_expr(binary, st);     break;
+        case BINARY_SUB:    nnc_resolve_add_expr(binary, st);     break;
+        case BINARY_MUL:    nnc_resolve_mul_expr(binary, st);     break;
+        case BINARY_DIV:    nnc_resolve_mul_expr(binary, st);     break;
+        case BINARY_MOD:    nnc_resolve_mul_expr(binary, st);     break;
+        case BINARY_SHR:    nnc_resolve_shift_expr(binary, st);   break;
+        case BINARY_SHL:    nnc_resolve_shift_expr(binary, st);   break;
+        case BINARY_NEQ:    nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_AND:    nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_LTE:    nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_GTE:    nnc_resolve_rel_expr(binary, st);     break;
+        case BINARY_COMMA:  nnc_resolve_comma_expr(binary, st);   break;
+        case BINARY_BW_OR:  nnc_resolve_bitwise_expr(binary, st); break;
+        case BINARY_BW_AND: nnc_resolve_bitwise_expr(binary, st); break;
+        case BINARY_BW_XOR: nnc_resolve_bitwise_expr(binary, st); break;
+        case BINARY_ASSIGN: nnc_resolve_assign_expr(binary, st);  break;
     } 
     nnc_deferred_stack_pop(binary);
     return true;
 }
 
-nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nnc_st* table) {
+nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nnc_st* st) {
     nnc_expression* exprs[] = {
         ternary->cexpr, ternary->lexpr, ternary->rexpr
     };
     for (nnc_i32 i = 0; i < 3; i++) {
-        if (!nnc_resolve_expr(exprs[i], table)) {
-            nnc_deferred_stack_put(table, DEFERRED_TERNARY_EXPR, ternary);
+        if (!nnc_resolve_expr(exprs[i], st)) {
+            nnc_deferred_stack_put(st, DEFERRED_TERNARY_EXPR, ternary);
             return false;
         }
     }
@@ -619,7 +610,7 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
     if (!nnc_integral_type(ctype)) {
         THROW(NNC_CANNOT_RESOLVE_TERNARY_EXPR, "type of condition must be of integral type.");
     }
-    nnc_ternary_expr_infer_type(ternary, table);
+    nnc_ternary_expr_infer_type(ternary, st);
     return true;
 }
 
@@ -636,16 +627,16 @@ nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
     return false;
 }
 
-nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table) {
+nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
     switch (expr->kind) {
         case EXPR_INT_LITERAL:  return nnc_resolve_int_literal(expr->exact);
         case EXPR_DBL_LITERAL:  return nnc_resolve_dbl_literal(expr->exact);
         case EXPR_CHR_LITERAL:  return nnc_resolve_chr_literal(expr->exact);
         case EXPR_STR_LITERAL:  return nnc_resolve_str_literal(expr->exact);
-        case EXPR_IDENT:        return nnc_resolve_ident(expr->exact, table);
-        case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, table);
-        case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, table);
-        case EXPR_TERNARY:      return nnc_resolve_ternary_expr(expr->exact, table);
+        case EXPR_IDENT:        return nnc_resolve_ident(expr->exact, st);
+        case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, st);
+        case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, st);
+        case EXPR_TERNARY:      return nnc_resolve_ternary_expr(expr->exact, st);
         default: nnc_abort_no_ctx("nnc_resolve_expr: kind unknown.");
     }
     return false;

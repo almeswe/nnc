@@ -34,12 +34,12 @@ typedef struct _nnc_st {
 
 void nnc_st_init(nnc_st* out_table);
 
-void nnc_st_put(nnc_st* table, nnc_symbol* sym);
-void nnc_st_put_type(nnc_st* table, nnc_type* type);
-nnc_bool nnc_st_has(const nnc_st* table, const char* key);
-nnc_bool nnc_st_has_type(const nnc_st* table, const char* key);
-nnc_symbol* nnc_st_get(const nnc_st* table, const char* key);
-nnc_type* nnc_st_get_type(const nnc_st* table, const char* key); 
-nnc_symbol* nnc_st_get_below(const nnc_st* table, const char* key);
+void nnc_st_put(nnc_st* st, nnc_symbol* sym);
+void nnc_st_put_type(nnc_st* st, nnc_type* type);
+nnc_bool nnc_st_has(const nnc_st* st, const char* key);
+nnc_bool nnc_st_has_type(const nnc_st* st, const char* key);
+nnc_symbol* nnc_st_get(const nnc_st* st, const char* key);
+nnc_type* nnc_st_get_type(const nnc_st* st, const char* key); 
+nnc_symbol* nnc_st_get_below(const nnc_st* st, const char* key);
 
 #endif

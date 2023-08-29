@@ -15,7 +15,7 @@ typedef struct _nnc_parser {
         nnc_tok tok;
         nnc_bool is_first;
     } lookup;
-    nnc_st* table;
+    nnc_st* st;
 } nnc_parser;
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file);

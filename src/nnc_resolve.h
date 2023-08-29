@@ -61,9 +61,9 @@ void nnc_deferred_stack_meta_put(nnc_heap_ptr entity, nnc_deferred_meta* meta);
 nnc_deferred_meta* nnc_deferred_meta_get(nnc_heap_ptr entity);
 
 nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity);
-nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* table);
+nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st);
 
-void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* table);
+void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st);
 void nnc_resolve(nnc_ast* ast);
 
 #endif
