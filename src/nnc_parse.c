@@ -837,7 +837,7 @@ nnc_static nnc_cond_n_body* nnc_parse_cond_n_body(nnc_parser* parser) {
 
 nnc_static nnc_statement* nnc_parse_if_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_IF);
-    nnc_if_stmt* if_stmt = anew(nnc_if_stmt);
+    nnc_if_statement* if_stmt = anew(nnc_if_statement);
     if_stmt->if_br = nnc_parse_cond_n_body(parser);
     while (nnc_parser_match(parser, TOK_ELIF)) {
         nnc_parser_next(parser);

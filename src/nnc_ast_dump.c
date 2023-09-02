@@ -269,7 +269,7 @@ nnc_static void nnc_dump_expr(nnc_dump_data data) {
 } 
 
 nnc_static void nnc_dump_if_stmt(nnc_dump_data data) {
-    const nnc_if_stmt* if_stmt = data.exact;
+    const nnc_if_statement* if_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "if-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "if-cond=");

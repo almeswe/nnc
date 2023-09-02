@@ -67,11 +67,11 @@ typedef nnc_cond_n_body nnc_if_branch;
 typedef nnc_cond_n_body nnc_elif_branch;
 typedef nnc_statement   nnc_else_branch;
 
-typedef struct _nnc_if_stmt {
+typedef struct _nnc_if_statement {
 	nnc_if_branch* if_br;
 	nnc_elif_branch** elif_brs;
 	nnc_else_branch* else_br;
-} nnc_if_stmt;
+} nnc_if_statement;
 
 typedef nnc_cond_n_body nnc_while_statement;
 typedef nnc_cond_n_body nnc_do_while_statement;
