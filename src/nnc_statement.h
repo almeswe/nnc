@@ -73,15 +73,15 @@ typedef struct _nnc_if_stmt {
 	nnc_else_branch* else_br;
 } nnc_if_stmt;
 
-typedef nnc_cond_n_body nnc_while_stmt;
-typedef nnc_cond_n_body nnc_do_while_stmt;
+typedef nnc_cond_n_body nnc_while_statement;
+typedef nnc_cond_n_body nnc_do_while_statement;
 
-typedef struct _nnc_for_stmt {
+typedef struct _nnc_for_statement {
 	nnc_statement* init;
 	nnc_statement* cond;
 	nnc_statement* step;
 	nnc_statement* body;
-} nnc_for_stmt;
+} nnc_for_statement;
 
 typedef struct _nnc_jump_statement {
 	nnc_statement* body;

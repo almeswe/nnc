@@ -326,7 +326,6 @@ nnc_static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
 nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
     nnc_symbol* sym = nnc_st_get(st, ident->name);
     if (sym == NULL) {
-        nnc_deferred_stack_put(st, DEFERRED_IDENT, ident);
         return false;
     }
     ident->ctx = sym->ctx;
@@ -335,7 +334,6 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
         ident->type = &i64_type;
         ident->refs = sym->refs;
     }
-    nnc_deferred_stack_pop(ident);
     return true;
 }
 
@@ -567,7 +565,6 @@ nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* st
 nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* st) {
     if (!nnc_resolve_expr(binary->lexpr, st) || 
         !nnc_resolve_expr(binary->rexpr, st)) {
-        nnc_deferred_stack_put(st, DEFERRED_BINARY_EXPR, binary);
         return false;
     }
     switch (binary->kind) {
@@ -592,7 +589,6 @@ nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_s
         case BINARY_BW_XOR: nnc_resolve_bitwise_expr(binary, st); break;
         case BINARY_ASSIGN: nnc_resolve_assign_expr(binary, st);  break;
     } 
-    nnc_deferred_stack_pop(binary);
     return true;
 }
 
@@ -602,7 +598,6 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
     };
     for (nnc_i32 i = 0; i < 3; i++) {
         if (!nnc_resolve_expr(exprs[i], st)) {
-            nnc_deferred_stack_put(st, DEFERRED_TERNARY_EXPR, ternary);
             return false;
         }
     }
@@ -612,19 +607,6 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
     }
     nnc_ternary_expr_infer_type(ternary, st);
     return true;
-}
-
-nnc_bool nnc_resolve_entity(nnc_deferred_entity* entity) {
-    switch (entity->kind) {
-        case DEFERRED_EXPR:         return nnc_resolve_expr(entity->exact, entity->context);
-        case DEFERRED_TYPE:         return nnc_resolve_type(entity->exact, entity->context);
-        case DEFERRED_IDENT:        return nnc_resolve_ident(entity->exact, entity->context);
-        case DEFERRED_UNARY_EXPR:   return nnc_resolve_unary_expr(entity->exact, entity->context);
-        case DEFERRED_BINARY_EXPR:  return nnc_resolve_binary_expr(entity->exact, entity->context); 
-        case DEFERRED_TERNARY_EXPR: return nnc_resolve_ternary_expr(entity->exact, entity->context);
-        default: nnc_abort_no_ctx("nnc_resolve_entity: kind unknown.");
-    }
-    return false;
 }
 
 nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
@@ -649,10 +631,41 @@ nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
     }
 }
 
+nnc_static void nnc_resolve_condition_expr(nnc_expression* expr, nnc_st* st) {
+    nnc_resolve_expr(expr, st);
+    const nnc_type* cond_type = nnc_expr_get_type(expr); 
+    if (!nnc_integral_type(cond_type)) {
+        THROW(NNC_SEMANTIC, "condition must have integral type.");
+    }
+}
+
+nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st) {
+    nnc_resolve_stmt(do_stmt->body, st);
+    nnc_resolve_condition_expr(do_stmt->cond, st);
+}
+
 nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type(fn_stmt->ret, st);
     nnc_resolve_stmt(fn_stmt->body, st);
+}
+
+nnc_static void nnc_resolve_for_stmt(nnc_for_statement* for_stmt, nnc_st* st) {
+    if (for_stmt->init->kind == STMT_LET &&
+        for_stmt->body->kind != STMT_COMPOUND) {
+        THROW(NNC_SEMANTIC, "cannot declare variable in this context.");
+    }
+    nnc_resolve_stmt(for_stmt->init, st);
+    nnc_st* current = st;
+    if (for_stmt->init->kind == STMT_LET) {
+        current = NNC_GET_SYMTABLE(for_stmt);
+    }
+    if (for_stmt->cond->kind == STMT_EXPR) {
+        nnc_expression_statement* expr_stmt = for_stmt->cond->exact; 
+        nnc_resolve_condition_expr(expr_stmt->expr, current);
+    }
+    nnc_resolve_stmt(for_stmt->step, current);
+    nnc_resolve_stmt(for_stmt->body, st);
 }
 
 nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
@@ -668,12 +681,16 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
 }
 
 nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st) {
-    //nnc_resolve_type(type_stmt->type, st);
     nnc_resolve_aliased_type(type_stmt->as, st);
 }
 
 nnc_static void nnc_resolve_expr_stmt(nnc_expression_statement* expr_stmt, nnc_st* st) {
     nnc_resolve_expr(expr_stmt->expr, st);
+}
+
+nnc_static void nnc_resolve_while_stmt(nnc_while_statement* while_stmt, nnc_st* st) {
+    nnc_resolve_condition_expr(while_stmt->cond, st);
+    nnc_resolve_stmt(while_stmt->body, st);
 }
 
 nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt, nnc_st* st) {
@@ -689,10 +706,13 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
 
 void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     switch (stmt->kind) {
+        case STMT_DO:        nnc_resolve_do_stmt(stmt->exact, st);        break;
         case STMT_FN:        nnc_resolve_fn_stmt(stmt->exact, st);        break;
+        case STMT_FOR:       nnc_resolve_for_stmt(stmt->exact, st);       break;
         case STMT_LET:       nnc_resolve_let_stmt(stmt->exact, st);       break;
         case STMT_TYPE:      nnc_resolve_type_stmt(stmt->exact, st);      break;
         case STMT_EXPR:      nnc_resolve_expr_stmt(stmt->exact, st);      break;
+        case STMT_WHILE:     nnc_resolve_while_stmt(stmt->exact, st);     break;
         case STMT_COMPOUND:  nnc_resolve_compound_stmt(stmt->exact, st);  break;
         case STMT_NAMESPACE: nnc_resolve_namespace_stmt(stmt->exact, st); break;
         default: break;
