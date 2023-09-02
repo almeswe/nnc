@@ -650,6 +650,18 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     nnc_resolve_stmt(fn_stmt->body, st);
 }
 
+nnc_static void nnc_resolve_if_stmt(nnc_if_statement* if_stmt, nnc_st* st) {
+    nnc_resolve_condition_expr(if_stmt->if_br->cond, st);
+    nnc_resolve_stmt(if_stmt->if_br->body, st);
+    for (nnc_u64 i = 0; i < buf_len(if_stmt->elif_brs); i++) {
+        nnc_resolve_condition_expr(if_stmt->elif_brs[i]->cond, st);
+        nnc_resolve_stmt(if_stmt->elif_brs[i]->body, st);
+    }
+    if (if_stmt->else_br != NULL) {
+        nnc_resolve_stmt(if_stmt->else_br, st);
+    }
+}
+
 nnc_static void nnc_resolve_for_stmt(nnc_for_statement* for_stmt, nnc_st* st) {
     if (for_stmt->init->kind == STMT_LET &&
         for_stmt->body->kind != STMT_COMPOUND) {
@@ -708,6 +720,7 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     switch (stmt->kind) {
         case STMT_DO:        nnc_resolve_do_stmt(stmt->exact, st);        break;
         case STMT_FN:        nnc_resolve_fn_stmt(stmt->exact, st);        break;
+        case STMT_IF:        nnc_resolve_if_stmt(stmt->exact, st);        break;
         case STMT_FOR:       nnc_resolve_for_stmt(stmt->exact, st);       break;
         case STMT_LET:       nnc_resolve_let_stmt(stmt->exact, st);       break;
         case STMT_TYPE:      nnc_resolve_type_stmt(stmt->exact, st);      break;
