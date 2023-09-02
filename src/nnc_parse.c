@@ -852,7 +852,7 @@ nnc_static nnc_statement* nnc_parse_if_stmt(nnc_parser* parser) {
 
 nnc_static nnc_statement* nnc_parse_do_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_DO);
-    nnc_do_while_stmt* do_stmt = anew(nnc_do_while_stmt);
+    nnc_do_while_statement* do_stmt = anew(nnc_do_while_statement);
     do_stmt->body = nnc_parse_body(parser);
     nnc_parser_expect(parser, TOK_WHILE);
     do_stmt->cond = nnc_parse_parens(parser);
@@ -875,7 +875,6 @@ nnc_static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc
     nnc_parser_expect(parser, TOK_SEMICOLON);
     if (put_in_st) {
         nnc_st_put(parser->st, let_stmt->var);
-        //nnc_st_put_entity(parser->st, ST_ENTITY_VAR, let_stmt);
     }
     return nnc_stmt_new(STMT_LET, let_stmt);
 }
@@ -886,7 +885,7 @@ nnc_static nnc_statement* nnc_parse_let_stmt(nnc_parser* parser) {
 
 nnc_static nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_FOR);
-    nnc_for_stmt* for_stmt = anew(nnc_for_stmt);
+    nnc_for_statement* for_stmt = anew(nnc_for_statement);
     nnc_parser_expect(parser, TOK_OPAREN);
     if (nnc_parser_match(parser, TOK_LET)) {
         for_stmt->init = nnc_parse_let_stmt_with_opt_st(parser, false);
@@ -905,10 +904,10 @@ nnc_static nnc_statement* nnc_parse_for_stmt(nnc_parser* parser) {
     }
     nnc_parser_expect(parser, TOK_CPAREN);
     for_stmt->body = nnc_parse_body(parser);
-    if (for_stmt->init->kind == STMT_LET) {
+    if (for_stmt->init->kind == STMT_LET &&
+        for_stmt->body->kind == STMT_COMPOUND) {
         nnc_st* inner = NNC_GET_SYMTABLE(for_stmt);
         nnc_st_put(inner, ((nnc_let_statement*)(for_stmt->init->exact))->var);
-        //nnc_st_put_entity(inner, ST_ENTITY_VAR, for_stmt->init->exact);
     }
     return nnc_stmt_new(STMT_FOR, for_stmt);
 }
@@ -956,7 +955,7 @@ nnc_static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
 
 nnc_static nnc_statement* nnc_parse_while_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_WHILE);
-    nnc_while_stmt* while_stmt = anew(nnc_while_stmt);
+    nnc_while_statement* while_stmt = anew(nnc_while_statement);
     while_stmt->cond = nnc_parse_parens(parser);
     while_stmt->body = nnc_parse_body(parser);
     return nnc_stmt_new(STMT_WHILE, while_stmt);

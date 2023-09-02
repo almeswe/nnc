@@ -297,7 +297,7 @@ nnc_static void nnc_dump_if_stmt(nnc_dump_data data) {
 }
 
 nnc_static void nnc_dump_do_stmt(nnc_dump_data data) {
-    const nnc_do_while_stmt* do_stmt = data.exact;
+    const nnc_do_while_statement* do_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "do-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "body=");
@@ -308,7 +308,7 @@ nnc_static void nnc_dump_do_stmt(nnc_dump_data data) {
 }
 
 nnc_static void nnc_dump_for_stmt(nnc_dump_data data) {
-    const nnc_for_stmt* for_stmt = data.exact;
+    const nnc_for_statement* for_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "for-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "init=");
@@ -355,7 +355,7 @@ nnc_static void nnc_dump_type_stmt(nnc_dump_data data) {
 }
 
 nnc_static void nnc_dump_while_stmt(nnc_dump_data data) {
-    const nnc_while_stmt* while_stmt = data.exact;
+    const nnc_while_statement* while_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "while-stmt\n"));
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "cond=");

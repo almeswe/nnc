@@ -2,7 +2,8 @@
 
 //todo: contexts ??
 
-#define m_nnc_type_is(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
+#define T_IS(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
+#define T_UNALIAS(type) nnc_type* ref_##type = nnc_unalias(type)
 
 nnc_bool nnc_type_is(const nnc_type* type, ...) {
     va_list list = {0};
@@ -31,56 +32,56 @@ nnc_type* nnc_unalias(const nnc_type* type) {
 }
 
 nnc_bool nnc_incomplete_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_VOID    || 
-           unaliased->kind == T_UNKNOWN || 
-           unaliased->kind == T_INCOMPLETE;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_VOID    || 
+           ref_type->kind == T_UNKNOWN || 
+           ref_type->kind == T_INCOMPLETE;
 }
 
 nnc_bool nnc_fn_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_FUNCTION;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_FUNCTION;
 }
 
 nnc_bool nnc_ptr_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind != T_FUNCTION;
+    const T_UNALIAS(type);
+    return ref_type->kind != T_FUNCTION;
 }
 
 nnc_bool nnc_arr_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_ARRAY;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_ARRAY;
 }
 
 nnc_bool nnc_namespace_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_NAMESPACE;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_NAMESPACE;
 }
 
 nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_POINTER || 
-           unaliased->kind == T_ARRAY;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_POINTER || 
+           ref_type->kind == T_ARRAY;
 }
 
 nnc_bool nnc_struct_or_union_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_STRUCT || 
-           unaliased->kind == T_UNION;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_STRUCT || 
+           ref_type->kind == T_UNION;
 }
 
 nnc_bool nnc_primitive_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_PRIMITIVE_I8  || 
-           unaliased->kind == T_PRIMITIVE_U8  ||
-           unaliased->kind == T_PRIMITIVE_I16 || 
-           unaliased->kind == T_PRIMITIVE_U16 ||
-           unaliased->kind == T_PRIMITIVE_I32 || 
-           unaliased->kind == T_PRIMITIVE_U32 ||
-           unaliased->kind == T_PRIMITIVE_I64 || 
-           unaliased->kind == T_PRIMITIVE_U64 ||
-           unaliased->kind == T_PRIMITIVE_F32 || 
-           unaliased->kind == T_PRIMITIVE_F64;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_PRIMITIVE_I8  || 
+           ref_type->kind == T_PRIMITIVE_U8  ||
+           ref_type->kind == T_PRIMITIVE_I16 || 
+           ref_type->kind == T_PRIMITIVE_U16 ||
+           ref_type->kind == T_PRIMITIVE_I32 || 
+           ref_type->kind == T_PRIMITIVE_U32 ||
+           ref_type->kind == T_PRIMITIVE_I64 || 
+           ref_type->kind == T_PRIMITIVE_U64 ||
+           ref_type->kind == T_PRIMITIVE_F32 || 
+           ref_type->kind == T_PRIMITIVE_F64;
 }
 
 nnc_bool nnc_same_types(const nnc_type* t1, const nnc_type* t2) {
@@ -88,31 +89,31 @@ nnc_bool nnc_same_types(const nnc_type* t1, const nnc_type* t2) {
 }
 
 nnc_bool nnc_integral_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return unaliased->kind == T_PRIMITIVE_I8  || 
-           unaliased->kind == T_PRIMITIVE_U8  ||
-           unaliased->kind == T_PRIMITIVE_I16 || 
-           unaliased->kind == T_PRIMITIVE_U16 ||
-           unaliased->kind == T_PRIMITIVE_I32 || 
-           unaliased->kind == T_PRIMITIVE_U32 ||
-           unaliased->kind == T_PRIMITIVE_I64 || 
-           unaliased->kind == T_PRIMITIVE_U64;
+    const T_UNALIAS(type);
+    return ref_type->kind == T_PRIMITIVE_I8  || 
+           ref_type->kind == T_PRIMITIVE_U8  ||
+           ref_type->kind == T_PRIMITIVE_I16 || 
+           ref_type->kind == T_PRIMITIVE_U16 ||
+           ref_type->kind == T_PRIMITIVE_I32 || 
+           ref_type->kind == T_PRIMITIVE_U32 ||
+           ref_type->kind == T_PRIMITIVE_I64 || 
+           ref_type->kind == T_PRIMITIVE_U64;
 }
 
 nnc_bool nnc_numeric_type(const nnc_type* type) {
-    const nnc_type* unaliased = nnc_unalias(type);
-    return nnc_integral_type(type)         ||
-        unaliased->kind == T_ENUM          ||
-        unaliased->kind == T_PRIMITIVE_F32 ||
-        unaliased->kind == T_PRIMITIVE_F64;
+    const T_UNALIAS(type);
+    return nnc_integral_type(ref_type)    ||
+        ref_type->kind == T_ENUM          ||
+        ref_type->kind == T_PRIMITIVE_F32 ||
+        ref_type->kind == T_PRIMITIVE_F64;
 }
 
 const nnc_i32 nnc_rank(const nnc_type* type) {
     nnc_i32 rank = 0;
-    const nnc_type* base = nnc_unalias(type);
-    while (nnc_arr_or_ptr_type(base)) {
+    const T_UNALIAS(type);
+    while (nnc_arr_or_ptr_type(ref_type)) {
         rank++;
-        base = base->base;
+        ref_type = ref_type->base;
     }
     return rank;
 }
@@ -129,8 +130,7 @@ const nnc_type* nnc_base_type(const nnc_type* type) {
 }
 
 nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to) {
-    nnc_type* ref_to = nnc_unalias(to);
-    nnc_type* ref_from = nnc_unalias(from);
+    T_UNALIAS(to); T_UNALIAS(from);
     static const nnc_i32 hierarchy[] = {
         [T_PRIMITIVE_I8]  = 0,
         [T_PRIMITIVE_U8]  = 1,
@@ -144,7 +144,8 @@ nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to)
         [T_PRIMITIVE_F32] = 8,
         [T_PRIMITIVE_F64] = 9
     };
-    if (!nnc_numeric_type(ref_to) || !nnc_numeric_type(ref_from)) {
+    if (!nnc_numeric_type(ref_to) || 
+        !nnc_numeric_type(ref_from)) {
         if (!nnc_struct_or_union_type(ref_to) ||
             !nnc_struct_or_union_type(ref_from)) {
             return false;
@@ -167,12 +168,10 @@ nnc_bool nnc_can_cast_ptrs_implicitly(const nnc_type* from, const nnc_type* to) 
     }
     const nnc_type* ref_to = to;
     const nnc_type* ref_from = from;
-    while (m_nnc_type_is(ref_to, 
-           T_ARRAY, T_ALIAS, T_POINTER)) {
+    while (T_IS(ref_to, T_ARRAY, T_ALIAS, T_POINTER)) {
         ref_to = ref_to->base;
     }
-    while (m_nnc_type_is(ref_from, 
-           T_ARRAY, T_ALIAS, T_POINTER)) {
+    while (T_IS(ref_from, T_ARRAY, T_ALIAS, T_POINTER)) {
         ref_from = ref_from->base;
     }
     if (ref_to->kind == T_VOID || 
@@ -198,21 +197,20 @@ nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type
 }
 
 nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2) {
-    nnc_type* t1_ref = nnc_unalias(t1);
-    nnc_type* t2_ref = nnc_unalias(t2);
-    assert(t1_ref->kind == T_FUNCTION);
-    assert(t2_ref->kind == T_FUNCTION);
-    if (t1_ref->exact.fn.paramc != t2_ref->exact.fn.paramc) {
+    T_UNALIAS(t1); T_UNALIAS(t2);
+    assert(ref_t1->kind == T_FUNCTION);
+    assert(ref_t2->kind == T_FUNCTION);
+    if (ref_t1->exact.fn.paramc != ref_t2->exact.fn.paramc) {
         return false;
     }
-    nnc_type** t1_params = t1_ref->exact.fn.params;
-    nnc_type** t2_params = t2_ref->exact.fn.params;
-    for (nnc_u64 i = 0; i < t1_ref->exact.fn.paramc; i++) {
+    nnc_type** t1_params = ref_t1->exact.fn.params;
+    nnc_type** t2_params = ref_t2->exact.fn.params;
+    for (nnc_u64 i = 0; i < ref_t1->exact.fn.paramc; i++) {
         if (!nnc_can_cast_assignment_implicitly(t2_params[i], t1_params[i])) {
             return false;
         }
     }
-    return nnc_can_cast_assignment_implicitly(t2_ref->exact.fn.ret, t1_ref->exact.fn.ret);
+    return nnc_can_cast_assignment_implicitly(ref_t2->exact.fn.ret, ref_t1->exact.fn.ret);
 }
 
 nnc_type* nnc_infer_implicitly(const nnc_type* t1, const nnc_type* t2) {
