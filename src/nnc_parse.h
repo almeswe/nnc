@@ -16,6 +16,9 @@ typedef struct _nnc_parser {
         nnc_bool is_first;
     } lookup;
     nnc_st* st;
+    struct _nnc_parser_tempref {
+        nnc_fn_statement* fn;
+    } ref;
 } nnc_parser;
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file);

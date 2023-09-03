@@ -645,6 +645,10 @@ nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st)
 }
 
 nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
+    if (st->ctx != ST_CTX_GLOBAL &&
+        st->ctx != ST_CTX_NAMESPACE) {
+        THROW(NNC_SEMANTIC, "cannot declare function in this scope.");
+    }
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type(fn_stmt->ret, st);
     nnc_resolve_stmt(fn_stmt->body, st);
@@ -693,6 +697,10 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
 }
 
 nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st) {
+    if (st->ctx != ST_CTX_GLOBAL &&
+        st->ctx != ST_CTX_NAMESPACE) {
+        THROW(NNC_SEMANTIC, "cannot declare type in this scope.");
+    }
     nnc_resolve_aliased_type(type_stmt->as, st);
 }
 
@@ -705,6 +713,34 @@ nnc_static void nnc_resolve_while_stmt(nnc_while_statement* while_stmt, nnc_st* 
     nnc_resolve_stmt(while_stmt->body, st);
 }
 
+nnc_static void nnc_resolve_break_stmt(nnc_break_statement* break_stmt, nnc_st* st) {
+    if (!(st->ctx & ST_CTX_LOOP)) {
+        THROW(NNC_SEMANTIC, "cannot use `break` outside loop.");
+    }
+}
+
+nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* st) {
+    if (!(st->ctx & ST_CTX_FN)) {
+        THROW(NNC_SEMANTIC, "cannot use `return` outside function.");
+    }
+    nnc_resolve_stmt(ret_stmt->body, st);
+    if (ret_stmt->body->kind == STMT_EXPR) {
+        const nnc_expression_statement* expr_stmt = ret_stmt->body->exact;
+        const nnc_type* ret_type = nnc_expr_get_type(expr_stmt->expr);
+        if (!nnc_can_cast_assignment_implicitly(ret_type, st->ref.fn->ret)) {
+            THROW(NNC_SEMANTIC, sformat("cannot return value of type `%s` when "
+                "function has `%s` return type.", nnc_type_tostr(ret_type), nnc_type_tostr(st->ref.fn->ret)));    
+        }
+    }
+    else {
+        // check if function return type is void or not
+        // because we returning nothing here.
+        if (st->ref.fn->ret->kind != T_VOID) {
+            THROW(NNC_SEMANTIC, "cannot return nothing from non-void function.");
+        }
+    }
+}
+
 nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt, nnc_st* st) {
     nnc_u64 len = buf_len(compound_stmt->stmts);
     for (nnc_u64 i = 0; i < len; i++) {
@@ -712,9 +748,38 @@ nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt,
     }
 }
 
+nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt, nnc_st* st) {
+    if (!(st->ctx & ST_CTX_LOOP)) {
+        THROW(NNC_SEMANTIC, "cannot use `continue` outside loop.");
+    }
+}
+
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
+
     nnc_resolve_stmt(namespace_stmt->body, st);
 }
+
+/*void nnc_resolve_top_stmt(nnc_statement* stmt, nnc_st* st) {
+    static nnc_str stmt_strs[] = {
+        [STMT_DO]             = "do-loop",
+        [STMT_FN]             = "function",
+        [STMT_IF]             = "if-else",
+        [STMT_FOR]            = "for-loop",
+        [STMT_LET]            = "let statement",
+        [STMT_TYPE]           = "type statement",
+        [STMT_EXPR]           = "expression statement",
+        [STMT_WHILE]          = "while-loop",
+        [STMT_BREAK]          = "break",
+        [STMT_RETURN]         = "return",
+        [STMT_COMPOUND]       = "compound statement",
+        [STMT_CONTINUE]       = "continue",
+        [STMT_NAMESPACE]      = "namespace"
+    };
+    if (st->ctx != ST_CTX_GLOBAL &&
+        st->ctx != ST_CTX_NAMESPACE) {
+        THROW(NNC_SEMANTIC, sformat("cannot declare %s in this scope.", stmt_strs[stmt->kind]));
+    }
+}*/
 
 void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     switch (stmt->kind) {
@@ -726,7 +791,10 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
         case STMT_TYPE:      nnc_resolve_type_stmt(stmt->exact, st);      break;
         case STMT_EXPR:      nnc_resolve_expr_stmt(stmt->exact, st);      break;
         case STMT_WHILE:     nnc_resolve_while_stmt(stmt->exact, st);     break;
+        case STMT_BREAK:     nnc_resolve_break_stmt(stmt->exact, st);     break;
+        case STMT_RETURN:    nnc_resolve_return_stmt(stmt->exact, st);    break;
         case STMT_COMPOUND:  nnc_resolve_compound_stmt(stmt->exact, st);  break;
+        case STMT_CONTINUE:  nnc_resolve_continue_stmt(stmt->exact, st);  break;
         case STMT_NAMESPACE: nnc_resolve_namespace_stmt(stmt->exact, st); break;
         default: break;
     }

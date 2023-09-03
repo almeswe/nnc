@@ -1,14 +1,26 @@
 #include "nnc_symtable.h"
 
+nnc_st* nnc_st_new(nnc_st_ctx ctx) {
+    nnc_st* st = anew(nnc_st);
+    st->ctx = ctx;
+    nnc_st_init(st);
+    return st;
+}
+
 void nnc_st_init(nnc_st* out_table) {
+    out_table->ctx = ST_CTX_DEFAULT;
     out_table->syms = map_init_with(8);
     out_table->types = map_init_with(8);
+    out_table->ref = (struct _nnc_st_ref){0};
 }
 
 nnc_bool nnc_st_has(const nnc_st* st, const char* key) {
     nnc_bool has_in_map = false;
     for (; st != NULL && !has_in_map; st = st->root) {
         has_in_map |= map_has_s(st->syms, key);
+        if (st->ctx & ST_CTX_NAMESPACE) {
+            break;
+        }
     }
     return has_in_map;
 }

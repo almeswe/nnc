@@ -3,6 +3,11 @@
 
 #include "nnc_expression.h"
 
+#define NNC_GET_SYMTABLE(stmt) \
+	(stmt->body->kind == STMT_COMPOUND) ? \
+		(((nnc_compound_statement*)stmt->body->exact)->scope) \
+		: NULL;
+
 typedef enum _nnc_statement_kind {
 	STMT_FN,
     STMT_IF,
@@ -33,20 +38,16 @@ typedef struct _nnc_let_statement {
     nnc_ident* var;
     nnc_type* type;
     nnc_expression* init;
-	nnc_bool is_topmost;
 } nnc_let_statement;
 
 typedef struct _nnc_type_statement {
 	nnc_type* type;
 	nnc_type* as;
-	nnc_bool is_topmost;
 } nnc_type_statement;
 
 typedef struct _nnc_expression_statement {
     nnc_expression* expr;
 } nnc_expression_statement;
-
-#define NNC_GET_SYMTABLE(stmt) ((nnc_compound_statement*)stmt->body->exact)->scope;
 
 typedef struct _nnc_compound_statement {
 	nnc_statement** stmts;
