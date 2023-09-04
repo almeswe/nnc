@@ -88,3 +88,16 @@ void nnc_st_put_type(nnc_st* st, nnc_type* type) {
     }
     map_put_s(st->types, type->repr, type);
 }
+
+nnc_bool nnc_st_has_ctx(const nnc_st* st, nnc_st** t_st, nnc_st_ctx ctx) {
+    nnc_bool has_ctx = false;
+    for (; st != NULL && !has_ctx; st = st->root) {
+        if (st->ctx == ctx) {
+            if (t_st != NULL) {
+                *t_st = (nnc_st*)st;
+            }
+            has_ctx = true;
+        }
+    } 
+    return has_ctx;
+}

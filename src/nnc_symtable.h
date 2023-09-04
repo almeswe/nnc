@@ -42,5 +42,6 @@ nnc_bool nnc_st_has_type(const nnc_st* st, const char* key);
 nnc_symbol* nnc_st_get(const nnc_st* st, const char* key);
 nnc_type* nnc_st_get_type(const nnc_st* st, const char* key); 
 nnc_symbol* nnc_st_get_below(const nnc_st* st, const char* key);
+nnc_bool nnc_st_has_ctx(const nnc_st* st, nnc_st** t_st, nnc_st_ctx ctx);
 
 #endif
