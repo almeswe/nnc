@@ -66,9 +66,11 @@ nnc_static nnc_bool nnc_locatable_expr(const nnc_expression* expr) {
         case EXPR_UNARY: {
             const nnc_unary_expression* unary = expr->exact; 
             switch (unary->kind) {
+                case UNARY_CAST:          return nnc_locatable_expr(unary->expr);  
                 case UNARY_POSTFIX_DOT:   return true;
                 case UNARY_POSTFIX_INDEX: return true;
                 case UNARY_POSTFIX_SCOPE: return nnc_locatable_expr(unary->exact.scope.member);
+                case UNARY_POSTFIX_AS:    return nnc_locatable_expr(unary->expr);
                 default: return false;
             }
         }
@@ -354,7 +356,12 @@ nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* st) {
 }
 
 nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* st) {
-    //todo: check for explicit cast
+    nnc_resolve_type(unary->exact.cast.to, st);
+    const nnc_type* type = nnc_expr_get_type(unary->expr);
+    if (!nnc_can_exp_cast(type, unary->exact.cast.to)) {
+        THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
+            nnc_type_tostr(type), nnc_type_tostr(unary->exact.cast.to)));
+    }
     unary->type = unary->exact.cast.to;
 }
 
@@ -379,6 +386,7 @@ nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* st) 
     if (!nnc_arr_or_ptr_type(inner)) {
         THROW(NNC_CANNOT_RESOLVE_DEREF_EXPR, sformat("cannot dereference (non array or pointer) \'%s\' type.", nnc_type_tostr(inner)));
     }
+    unary->type = inner->base;
 }
 
 nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* st) {
@@ -399,6 +407,14 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
 
 nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_resolve_type(unary->exact.cast.to, st);
+    const nnc_type* type = nnc_expr_get_type(unary->expr);
+    if (!nnc_can_exp_cast(type, unary->exact.cast.to)) {
+        THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
+            nnc_type_tostr(type), nnc_type_tostr(unary->exact.cast.to)));
+    }
+    else {
+        //todo: check for const expression + cast to expansion type
+    }
     unary->type = unary->exact.cast.to;
 }
 
@@ -698,7 +714,7 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     if (let_stmt->init != NULL) {
         nnc_resolve_expr(let_stmt->init, st);
         const nnc_type* init_type = nnc_expr_get_type(let_stmt->init);
-        if (!nnc_can_cast_assignment_implicitly(init_type, let_stmt->type)) {
+        if (!nnc_can_imp_cast_assign(init_type, let_stmt->type)) {
             THROW(NNC_SEMANTIC, sformat("cannot initialize variable "
                 "with `%s` type.", nnc_type_tostr(init_type)));    
         }
@@ -744,7 +760,7 @@ nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* 
     if (ret_stmt->body->kind == STMT_EXPR) {
         const nnc_expression_statement* expr_stmt = ret_stmt->body->exact;
         const nnc_type* ret_type = nnc_expr_get_type(expr_stmt->expr);
-        if (!nnc_can_cast_assignment_implicitly(ret_type, t_st->ref.fn->ret)) {
+        if (!nnc_can_imp_cast_assign(ret_type, t_st->ref.fn->ret)) {
             THROW(NNC_SEMANTIC, sformat("cannot return value of type `%s` when "
                 "function has `%s` return type.", nnc_type_tostr(ret_type), nnc_type_tostr(t_st->ref.fn->ret)));    
         }
@@ -759,7 +775,6 @@ nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* 
 }
 
 nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt, nnc_st* st) {
-    //todo: this statement can be called from any context (fix this)
     nnc_u64 len = buf_len(compound_stmt->stmts);
     for (nnc_u64 i = 0; i < len; i++) {
         nnc_resolve_stmt(compound_stmt->stmts[i], compound_stmt->scope);
