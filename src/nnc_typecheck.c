@@ -129,7 +129,7 @@ const nnc_type* nnc_base_type(const nnc_type* type) {
     return base;
 }
 
-nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to) {
+nnc_bool nnc_can_imp_cast_arith(const nnc_type* from, const nnc_type* to) {
     T_UNALIAS(to); T_UNALIAS(from);
     static const nnc_i32 hierarchy[] = {
         [T_PRIMITIVE_I8]  = 0,
@@ -155,14 +155,14 @@ nnc_bool nnc_can_cast_arith_implicitly(const nnc_type* from, const nnc_type* to)
     return hierarchy[ref_from->kind] <= hierarchy[ref_to->kind];
 }
 
-nnc_type* nnc_cast_arith_implicitly(const nnc_type* from, const nnc_type* to) {
-    if (!nnc_can_cast_arith_implicitly(from, to)) {
+nnc_type* nnc_cast_imp_arith(const nnc_type* from, const nnc_type* to) {
+    if (!nnc_can_imp_cast_arith(from, to)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
     }
     return (nnc_type*)to;
 }
 
-nnc_bool nnc_can_cast_ptrs_implicitly(const nnc_type* from, const nnc_type* to) {
+nnc_bool nnc_can_imp_cast_ptrs(const nnc_type* from, const nnc_type* to) {
     if (nnc_rank(from) != nnc_rank(to)) {
         return false;
     }
@@ -178,25 +178,26 @@ nnc_bool nnc_can_cast_ptrs_implicitly(const nnc_type* from, const nnc_type* to) 
         ref_from->kind == T_VOID) {
         return true;
     }
-    return nnc_can_cast_arith_implicitly(ref_from, ref_to);
+    return nnc_can_imp_cast_arith(ref_from, ref_to);
 }
 
-nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2);
+nnc_bool nnc_can_imp_cast_fns(const nnc_type* t1, const nnc_type* t2);
 
-nnc_bool nnc_can_cast_assignment_implicitly(const nnc_type* from, const nnc_type* to) {
-    if (nnc_can_cast_arith_implicitly(from, to)) {
-        return nnc_cast_arith_implicitly(from, to);
+nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to) {
+    T_UNALIAS(to); T_UNALIAS(from);
+    if (nnc_can_imp_cast_arith(ref_from, ref_to)) {
+        return nnc_cast_imp_arith(ref_from, ref_to);
     }
-    if (nnc_fn_type(to) && nnc_fn_type(from)) {
-        return nnc_can_cast_fns_implicitly(to, from);
+    if (nnc_fn_type(ref_to) && nnc_fn_type(ref_from)) {
+        return nnc_can_imp_cast_fns(ref_to, ref_from);
     }
-    if (nnc_ptr_type(to) && nnc_arr_or_ptr_type(from)) {
-        return nnc_can_cast_ptrs_implicitly(from, to);
+    if (nnc_ptr_type(ref_to) && nnc_arr_or_ptr_type(ref_from)) {
+        return nnc_can_imp_cast_ptrs(ref_from, ref_to);
     }
     return false;
 }
 
-nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2) {
+nnc_bool nnc_can_imp_cast_fns(const nnc_type* t1, const nnc_type* t2) {
     T_UNALIAS(t1); T_UNALIAS(t2);
     assert(ref_t1->kind == T_FUNCTION);
     assert(ref_t2->kind == T_FUNCTION);
@@ -206,44 +207,56 @@ nnc_bool nnc_can_cast_fns_implicitly(const nnc_type* t1, const nnc_type* t2) {
     nnc_type** t1_params = ref_t1->exact.fn.params;
     nnc_type** t2_params = ref_t2->exact.fn.params;
     for (nnc_u64 i = 0; i < ref_t1->exact.fn.paramc; i++) {
-        if (!nnc_can_cast_assignment_implicitly(t2_params[i], t1_params[i])) {
+        if (!nnc_can_imp_cast_assign(t2_params[i], t1_params[i])) {
             return false;
         }
     }
-    return nnc_can_cast_assignment_implicitly(ref_t2->exact.fn.ret, ref_t1->exact.fn.ret);
+    return nnc_can_imp_cast_assign(ref_t2->exact.fn.ret, ref_t1->exact.fn.ret);
 }
 
-nnc_type* nnc_infer_implicitly(const nnc_type* t1, const nnc_type* t2) {
-    if (nnc_can_cast_arith_implicitly(t1, t2)) {
-        return nnc_cast_arith_implicitly(t1, t2);
+nnc_type* nnc_infer_imp(const nnc_type* t1, const nnc_type* t2) {
+    if (nnc_can_imp_cast_arith(t1, t2)) {
+        return nnc_cast_imp_arith(t1, t2);
     }
-    if (nnc_can_cast_arith_implicitly(t2, t1)) {
-        return nnc_cast_arith_implicitly(t2, t1);
+    if (nnc_can_imp_cast_arith(t2, t1)) {
+        return nnc_cast_imp_arith(t2, t1);
     }
-    THROW(NNC_SEMANTIC, sformat("implicit cast between \'%s\' and \'%s\' is not possible.", nnc_type_tostr(t1), nnc_type_tostr(t2)));
+    THROW(NNC_SEMANTIC, sformat("implicit cast between \'%s\' and \'%s\' is not possible.", 
+        nnc_type_tostr(t1), nnc_type_tostr(t2)));
     return NULL;
 }
 
-nnc_type* nnc_infer_relate_implicitly(const nnc_type* from, const nnc_type* to) {
-    if (!nnc_infer_implicitly(from, to)) {
-        THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
+nnc_type* nnc_infer_imp_rel(const nnc_type* from, const nnc_type* to) {
+    if (!nnc_infer_imp(from, to)) {
+        THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", 
+            nnc_type_tostr(from), nnc_type_tostr(to)));
     }
     return &i8_type;
 }
 
-nnc_type* nnc_infer_assignment_implicitly(const nnc_type* from, const nnc_type* to) {
-    if (!nnc_can_cast_assignment_implicitly(from, to)) {
-        THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
+nnc_type* nnc_infer_imp_assign(const nnc_type* from, const nnc_type* to) {
+    if (!nnc_can_imp_cast_assign(from, to)) {
+        THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", 
+            nnc_type_tostr(from), nnc_type_tostr(to)));
     }
     return (nnc_type*)to;
 }
 
-nnc_bool nnc_can_cast_explicitly(const nnc_type* from, const nnc_type* to) {
+nnc_bool nnc_can_exp_cast(const nnc_type* from, const nnc_type* to) {
+    T_UNALIAS(to); T_UNALIAS(from);
+    if (ref_to->kind == T_ARRAY ||
+        ref_to->kind == T_VOID) {
+        return false;
+    }
+    if (nnc_struct_or_union_type(ref_to) ||
+        nnc_struct_or_union_type(ref_from)) {
+        return nnc_same_types(ref_to, ref_from);
+    }
     return true;
 }
 
-nnc_type* nnc_cast_explicitly(const nnc_type* from, const nnc_type* to) {
-    if (nnc_can_cast_explicitly(from, to)) {
+nnc_type* nnc_exp_cast(const nnc_type* from, const nnc_type* to) {
+    if (nnc_can_exp_cast(from, to)) {
         return (nnc_type*)to;
     }
     THROW(NNC_SEMANTIC, sformat("cannot cast \'%s\' to \'%s\'.", nnc_type_tostr(from), nnc_type_tostr(to)));
@@ -294,7 +307,7 @@ nnc_static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_s
     switch (expr->kind) {
         case UNARY_CAST:
         case UNARY_POSTFIX_AS:
-            return expr->type = nnc_cast_explicitly(type, expr->exact.cast.to);
+            return expr->type = nnc_exp_cast(type, expr->exact.cast.to);
         default:
             return &unknown_type;
     }
@@ -307,21 +320,21 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
         case BINARY_COMMA:
             return expr->type = rtype;
         case BINARY_ASSIGN:
-            return expr->type = nnc_infer_assignment_implicitly(rtype, ltype);
+            return expr->type = nnc_infer_imp_assign(rtype, ltype);
         case BINARY_ADD: case BINARY_SUB:
         case BINARY_MUL: case BINARY_DIV:
         case BINARY_SHL: case BINARY_SHR:
-            return expr->type = nnc_infer_implicitly(ltype, rtype);
+            return expr->type = nnc_infer_imp(ltype, rtype);
         case BINARY_BW_OR:
         case BINARY_BW_AND: case BINARY_BW_XOR:
-            return expr->type = nnc_infer_implicitly(ltype, rtype);
+            return expr->type = nnc_infer_imp(ltype, rtype);
         case BINARY_OR:  case BINARY_AND:
         case BINARY_EQ:  case BINARY_NEQ:
         case BINARY_GT:  case BINARY_LT:
         case BINARY_GTE: case BINARY_LTE:
             // return value is not used here
             // just need to be sure that types are the same
-            nnc_infer_implicitly(ltype, rtype);
+            nnc_infer_imp(ltype, rtype);
             return expr->type = &i8_type;
         default:
             return &unknown_type;
@@ -331,10 +344,10 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
 nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* st) {
     nnc_type* ltype = nnc_expr_infer_type(expr->lexpr, st);
     nnc_type* rtype = nnc_expr_infer_type(expr->rexpr, st);
-    if (nnc_can_cast_assignment_implicitly(rtype, ltype)) {
-        return expr->type = nnc_infer_assignment_implicitly(rtype, ltype);
+    if (nnc_can_imp_cast_assign(rtype, ltype)) {
+        return expr->type = nnc_infer_imp_assign(rtype, ltype);
     }
-    return expr->type = nnc_infer_assignment_implicitly(ltype, rtype);
+    return expr->type = nnc_infer_imp_assign(ltype, rtype);
 }
 
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* st) {

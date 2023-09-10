@@ -33,7 +33,6 @@ typedef struct _nnc_st {
     } ref;
 } nnc_st;
 
-nnc_st* nnc_st_new();
 void nnc_st_init(nnc_st* out_table);
 void nnc_st_put(nnc_st* st, nnc_symbol* sym);
 void nnc_st_put_type(nnc_st* st, nnc_type* type);

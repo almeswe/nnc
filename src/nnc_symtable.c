@@ -1,12 +1,5 @@
 #include "nnc_symtable.h"
 
-nnc_st* nnc_st_new(nnc_st_ctx ctx) {
-    nnc_st* st = anew(nnc_st);
-    st->ctx = ctx;
-    nnc_st_init(st);
-    return st;
-}
-
 void nnc_st_init(nnc_st* out_table) {
     out_table->ctx = ST_CTX_DEFAULT;
     out_table->syms = map_init_with(8);

@@ -71,7 +71,7 @@ nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     return nnc_parser_peek(parser);
 }
 
-nnc_static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
+nnc_static nnc_bool nnc_parser_match_type(nnc_parser* parser, nnc_tok_kind kind) {
     switch (kind) {
         case TOK_VOID:
         case TOK_I8:  case TOK_I16:
@@ -80,9 +80,13 @@ nnc_static nnc_bool nnc_parser_match_type(nnc_tok_kind kind) {
         case TOK_U32: case TOK_U64:
         case TOK_F32: case TOK_F64:
             return true;
-        default:
-            return false;
+        default: break;
     }
+    if (kind == TOK_IDENT) {
+        const char* lexeme = parser->lookup.tok.lexeme;
+        return nnc_st_get_type(parser->st, lexeme) != NULL;
+    }
+    return false;
 }
 
 nnc_static void nnc_parser_enter_scope(nnc_parser* parser) {
@@ -251,9 +255,9 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_U16:    type = &u16_type;  break;
         case TOK_I32:    type = &i32_type;  break;
         case TOK_U32:    type = &u32_type;  break;
-        case TOK_F32:    type = &f32_type;  break;
         case TOK_I64:    type = &i64_type;  break;
         case TOK_U64:    type = &u64_type;  break;
+        case TOK_F32:    type = &f32_type;  break;
         case TOK_F64:    type = &f64_type;  break;
         case TOK_VOID:   type = &void_type; break;
         case TOK_FN:     type = nnc_parse_fn_type(parser);   break;
@@ -264,7 +268,9 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
         default:
             THROW(NNC_SYNTAX, "type expected.", nnc_parser_get_ctx(parser));
     }
-    if (nnc_parser_match_type(kind)) {
+    // todo: fix this condition expression
+    if (kind != TOK_IDENT &&
+        nnc_parser_match_type(parser, kind)) {
         nnc_parser_next(parser);
     }
     return nnc_parse_type_declarators(parser, type);
@@ -490,7 +496,7 @@ nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
 nnc_static nnc_expression* nnc_parse_unary_expr(nnc_parser* parser) {
     if (nnc_parser_match(parser, TOK_OPAREN)) {
         nnc_tok_kind lookup = nnc_parser_peek_lookup(parser);
-        if (nnc_parser_match_type(lookup)) {
+        if (nnc_parser_match_type(parser, lookup)) {
             return nnc_parse_cast_expr(parser);
         }
     }
@@ -805,17 +811,11 @@ nnc_static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
 }
 
 nnc_expression* nnc_parse_expr_reduced(nnc_parser* parser) {
-    nnc_expression* expr = nnc_parse_assignment_expr(parser);
-    //nnc_resolve_expr(expr, parser->st);
-    //nnc_expr_infer_type(expr, parser->st);
-    return expr;
+    return nnc_parse_assignment_expr(parser);
 }
 
 nnc_expression* nnc_parse_expr(nnc_parser* parser) {
-    nnc_expression* expr = nnc_parse_comma_expr(parser);
-    //nnc_resolve_expr(expr, parser->st);
-    //nnc_expr_infer_type(expr, parser->st);
-    return expr;
+    return nnc_parse_comma_expr(parser);
 }
 
 nnc_static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser);
@@ -971,9 +971,6 @@ nnc_static nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser, nnc_st_ctx
     nnc_compound_statement* compound_stmt = anew(nnc_compound_statement);
     compound_stmt->scope = parser->st;
     compound_stmt->scope->ctx = ctx;
-    if (ctx == ST_CTX_FN) {
-        compound_stmt->scope->ref.fn = parser->ref.fn;
-    }
     nnc_parser_expect(parser, TOK_OBRACE);
     while (!nnc_parser_match(parser, TOK_CBRACE)) {
         buf_add(compound_stmt->stmts, nnc_parse_stmt(parser));
@@ -1017,12 +1014,12 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_COLON);
     fn_stmt->ret = nnc_parse_type(parser);
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
-    parser->ref.fn = fn_stmt;
     fn_stmt->body = nnc_parse_compound_stmt(parser, ST_CTX_FN);
     nnc_st_put(parser->st, fn_stmt->var);
     assert(fn_stmt->body->kind == STMT_COMPOUND);
     // put all function parameters inside inner scope of the function
     nnc_st* inner = NNC_GET_SYMTABLE(fn_stmt);
+    inner->ref.fn = fn_stmt;
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
         nnc_st_put(inner, fn_stmt->params[i]->var);
     }
@@ -1059,7 +1056,6 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
         case TOK_WHILE:     return nnc_parse_while_stmt(parser);
         case TOK_BREAK:     return nnc_parse_break_stmt(parser);
         case TOK_RETURN:    return nnc_parse_return_stmt(parser);
-        case TOK_OBRACE:    return nnc_parse_compound_stmt(parser, parser->st->ctx);
         case TOK_CONTINUE:  return nnc_parse_continue_stmt(parser);
         case TOK_NAMESPACE: return nnc_parse_namespace_stmt(parser);
         default:

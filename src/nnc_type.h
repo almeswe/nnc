@@ -67,10 +67,9 @@ typedef enum _nnc_type_kind {
 } nnc_type_kind;
 
 typedef struct _nnc_type {
-    nnc_str repr;
     nnc_u64 size;
-    nnc_bool visited;
     nnc_type_kind kind;
+    nnc_str repr;
     union {
     struct _nnc_fn_type {
         nnc_type*  ret;
