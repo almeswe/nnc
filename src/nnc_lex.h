@@ -23,6 +23,8 @@
 #define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
 #define NNC_LEX_COMMIT(k)       NNC_LEX_SET(k); break
 
+#define NNC_LEX_SKIP_LINE()     nnc_lex_skip_line(lex)
+
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND,  TOK_AND,        TOK_ASSIGN,
     TOK_ASTERISK,   TOK_ATPERSAND,  TOK_CBRACE,
