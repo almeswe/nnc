@@ -174,15 +174,23 @@ nnc_static void nnc_lex_tok_clear(nnc_lex* lex) {
 }
 
 /**
- * @brief Performs error-recovery, by skipping whole line of characters.
+ * @brief Skips line in source file.
  * @param lex Pointer to `nnc_lex` instance.
  */
-nnc_static void nnc_lex_make_recovery(nnc_lex* lex) {
+nnc_static void nnc_lex_skip_line(nnc_lex* lex) {
     while (nnc_lex_grab(lex), lex->cc != EOF) {
         if (lex->cc == '\n') {
             break;
         }
     }
+}
+
+/**
+ * @brief Performs error-recovery, by skipping whole line of characters.
+ * @param lex Pointer to `nnc_lex` instance.
+ */
+nnc_static void nnc_lex_make_recovery(nnc_lex* lex) {
+    nnc_lex_skip_line(lex);
 }
 
 /**
@@ -578,7 +586,6 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case '?':   NNC_LEX_COMMIT(TOK_QUESTION);
             case ';':   NNC_LEX_COMMIT(TOK_SEMICOLON);
             case '#':   NNC_LEX_COMMIT(TOK_SIGN);
-            case '/':   NNC_LEX_COMMIT(TOK_SLASH);
             case '~':   NNC_LEX_COMMIT(TOK_TILDE);
             case '<':   NNC_LEX_ADJUST('=') ? NNC_LEX_SET_TERN(TOK_LTE)     : 
                         NNC_LEX_ADJUST('<') ? NNC_LEX_SET_TERN(TOK_LSHIFT)  : NNC_LEX_SET_TERNB(TOK_LT);
@@ -617,6 +624,16 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case 'y': case 'Y': case 'z': case 'Z':
                 NNC_LEX_COMMIT(nnc_lex_grab_ident(lex));
                 break;
+            case '/': {
+                if (NNC_LEX_ADJUST('/')) {
+                    NNC_LEX_SKIP_LINE();
+                    return nnc_lex_next(lex);
+                }
+                else {
+                    NNC_LEX_COMMIT(TOK_SLASH);
+                }
+                break;
+            }
         }
         ETRY;
         return lex->ctok.kind;
