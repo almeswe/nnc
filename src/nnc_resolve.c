@@ -498,6 +498,13 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
     return true;
 }
 
+/**
+ * @brief Resolves unary reference expression (&<expr>).
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_REF_EXPR` in case when referenced expression is not locatable.
+ *  So basically address cannot be retrieved.
+ */
 nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* st) {
     if (!nnc_can_locate_expr(unary->expr)) {
         THROW(NNC_CANNOT_RESOLVE_REF_EXPR, "cannot reference non locatable expression.");
@@ -506,6 +513,13 @@ nnc_static void nnc_resolve_ref_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = nnc_ptr_type_new(t_expr);
 }
 
+/**
+ * @brief Resolves unary not expression (!<expr>).
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_NOT_EXPR` in case when referenced expression is not locatable.
+ *  So basically address cannot be retrieved.
+ */
 nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_integral_type(t_expr) && !nnc_arr_or_ptr_type(t_expr)) {
@@ -514,6 +528,12 @@ nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = &i8_type;
 }
 
+/**
+ * @brief Resolves unary cast expression ((<type>)<expr>).
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when cannot explicitly cast type of expression to specified type.
+ */
 nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_resolve_type(unary->exact.cast.to, st);
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
@@ -524,6 +544,12 @@ nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = unary->exact.cast.to;
 }
 
+/**
+ * @brief Resolves unary plus expression (+<expr>). 
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_PLUS_EXPR` in case when applied to non numeric expression. 
+ */
 nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_numeric_type(t_expr)) {
@@ -532,6 +558,12 @@ nnc_static void nnc_resolve_plus_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
+/**
+ * @brief Resolves unary minus expression (-<expr>). 
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_MINUS_EXPR` in case when applied to non numeric expression. 
+ */
 nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_numeric_type(t_expr)) {
@@ -540,6 +572,12 @@ nnc_static void nnc_resolve_minus_expr(nnc_unary_expression* unary, nnc_st* st) 
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
+/**
+ * @brief Resolves unary deference expression (*<expr>). 
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_DEREF_EXPR` in case when applied to non array or pointer. 
+ */
 nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_arr_or_ptr_type(t_expr)) {
@@ -549,16 +587,32 @@ nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* st) 
     unary->type = t_expr->base;
 }
 
+/**
+ * @brief Resolves unary sizeof expression (sizeof(<type>)). 
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_resolve_type(unary->exact.size.of, st);
     assert(unary->expr == NULL);
     unary->type = &u64_type;
 }
 
+/**
+ * @brief Resolves unary lengthof expression (lengthof <expr>). 
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_lengthof_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = &u64_type;
 }
 
+/**
+ * @brief Resolves unary bitwise not expression (~<expr>).
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_BW_NOT_EXPR` in case when applied to integral expression.
+ */
 nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_integral_type(t_expr)) {
@@ -567,6 +621,15 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
     unary->type = nnc_expr_get_type(unary->expr);
 }
 
+/**
+ * @brief Resolves unary as expression (<expr> as <type>).
+ * It differs from default `cast` with independent type declaration order.
+ * So if you declare type after `as` expression is used, it will be ok.
+ * `cast` expression in this case will not work. (syntax error)
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @return `NNC_SEMANTIC` in case when cannot explicitly cast expression type to `as` type. 
+ */
 nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_resolve_type(unary->exact.cast.to, st);
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
@@ -580,34 +643,73 @@ nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
     unary->type = unary->exact.cast.to;
 }
 
+/**
+ * @brief Resolves unary dot expression (<expr>.<ident>).
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_DOT_EXPR` in case when expression is not struct or union.
+ *        `NNC_CANNOT_RESOLVE_DOT_EXPR` in case when accessed member is not listed in struct or union.
+ */
 nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_struct_or_union_type(t_expr)) {
         THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("cannot access member of (non union or struct) "
             "`%s` type.", nnc_type_tostr(t_expr)));
     }
-    nnc_ident* member = unary->exact.dot.member->exact;
+    nnc_ident* m = unary->exact.dot.member->exact;
     for (nnc_u64 i = 0; i < t_expr->exact.struct_or_union.memberc; i++) {
-        nnc_struct_member* struct_member = t_expr->exact.struct_or_union.members[i];
-        if (nnc_sequal(struct_member->var->name, member->name)) {
-            unary->type = struct_member->type;
-            member->type = unary->type;
+        nnc_struct_member* s_m = t_expr->exact.struct_or_union.members[i];
+        if (nnc_sequal(s_m->var->name, m->name)) {
+            unary->type = s_m->type;
+            m->type = unary->type;
             return;
         }
     }
     THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("`%s` is not member of " 
-        "`%s`.", member->name, nnc_type_tostr(t_expr)));
+        "`%s`.", m->name, nnc_type_tostr(t_expr)));
 }
 
+/**
+ * @brief Resolves call expression. (<expr>({<expr>}+))
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_CALL_EXPR` in case when applied to non function expression.
+ *        `NNC_CANNOT_RESOLVE_CALL_EXPR` in case when amount of needed arguments is not the same as specified.
+ *        `NNC_CANNOT_RESOLVE_CALL_EXPR` in case when type of some argument is not the same with type from function declaration.
+ */
 nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_fn_type(t_expr)) {
         THROW(NNC_CANNOT_RESOLVE_CALL_EXPR, sformat("cannot call (non function) "
             "`%s` type.", nnc_type_tostr(t_expr)));
     }
+    const struct _nnc_fn_type* f_type = &t_expr->exact.fn;
+    const struct _nnc_unary_postfix_call* c_expr = &unary->exact.call;
+    // check amount of arguments needed, and amount specified.
+    if (f_type->paramc != c_expr->argc) {
+        THROW(NNC_CANNOT_RESOLVE_CALL_EXPR, sformat("function has %lu argument(s), "
+            "but %lu was(were) given.", f_type->paramc, c_expr->argc));
+    }
+    // then resolve all arguments, and check their types
+    for (nnc_u64 i = 0; i < c_expr->argc; i++) {
+        nnc_resolve_expr(c_expr->args[i], st);
+        const nnc_type* t_param = f_type->params[i];
+        const nnc_type* t_arg = nnc_expr_get_type(c_expr->args[i]);  
+        if (!nnc_can_imp_cast_assign(t_arg, t_param)) {
+            THROW(NNC_CANNOT_RESOLVE_CALL_EXPR, sformat("cannot use argument of type `%s`, "
+                "when function has `%s`.", nnc_type_tostr(t_arg), nnc_type_tostr(t_param)));
+        }
+    }
     unary->type = t_expr->exact.fn.ret;
 }
 
+/**
+ * @brief Resolves scope expression. (<expr>::<ident>)
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_SCOPE_EXPR` in case when applied to non namespace expression.
+ *        `NNC_CANNOT_RESOLVE_SCOPE_EXPR` in case when member is not listed in namespace.
+ */
 nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_namespace_type(t_expr)) {
@@ -627,6 +729,13 @@ nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* st) 
     unary->type = member->type;
 }
 
+/**
+ * @brief Resolves index expression. (<expr>[<expr>])
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_INDEX_EXPR` in case when trying to index non array or pointer expression.
+ *        `NNC_CANNOT_RESOLVE_INDEX_EXPR` in case when index expression is not integral.
+ */
 nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_resolve_expr(unary->exact.index.expr, st);
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
@@ -642,6 +751,11 @@ nnc_static void nnc_resolve_index_expr(nnc_unary_expression* unary, nnc_st* st) 
     unary->type = t_expr->base;
 }
 
+/**
+ * @brief Resolves unary expression.
+ * @param unary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* st) {
     if (unary->expr != NULL) {
         nnc_resolve_expr(unary->expr, st);
@@ -665,6 +779,14 @@ nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* 
     return true;
 }
 
+/**
+ * @brief Resolves binary addition expression. (<expr>[`+` | `-`]<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_ADD_EXPR` in case when left expression is pointer or array, but right expression is not integral.
+ *        `NNC_CANNOT_RESOLVE_ADD_EXPR` in case when right expression is pointer or array, but left expression is not integral.
+ *        `NNC_CANNOT_RESOLVE_ADD_EXPR` in case when both expressions have non numeric types.
+ */
 nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* st) {
     //todo: pointer arithmetic?
     nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
@@ -689,6 +811,12 @@ nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* st) 
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary multiplication expression. (<expr>[`*` | `/` | `%`]<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_SHIFT_EXPR` in case when both expression have non integral or numeric types.
+ */
 nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* st) {
     nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
     nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
@@ -703,15 +831,30 @@ nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* st) 
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary shift expression. (<expr>[`<<` | `>>`]<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_SHIFT_EXPR` in case when one or both expressions are not integral.
+ */
 nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* st) {
-    nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
-    nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
+    const nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
+    const nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
     if (!nnc_integral_type(t_lexpr) || !nnc_integral_type(t_rexpr)) {
         THROW(NNC_CANNOT_RESOLVE_SHIFT_EXPR, "both expressions must have integral types.");
     }
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary relation expression. (<expr>[`||` | `>`  | `<`  | `==` | `!=`]<expr>)
+ *                                                    [`&&` | `>=` | `<=` |            ]
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_REL_EXPR` in case when left expression is pointer or array, but right expression is not integral.
+ *        `NNC_CANNOT_RESOLVE_REL_EXPR` in case when right expression is pointer or array, but left expression is not integral.
+ *        `NNC_CANNOT_RESOLVE_REL_EXPR` in case when both expressions have non numeric types.
+ */
 nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* st) {
     //todo: pointer arithmetic?
     nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
@@ -732,9 +875,15 @@ nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* st) 
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary bitwise expression. (<expr>[`|` | `&` | `^`]<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_BITWISE_EXPR` in case when at least one expression has non integral type. 
+ */
 nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* st) {
-    nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
-    nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
+    const nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
+    const nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
     if (!nnc_integral_type(t_lexpr) || !nnc_integral_type(t_rexpr)) {
         THROW(NNC_CANNOT_RESOLVE_BITWISE_EXPR, "both expressions must have integral types.");
     }
@@ -984,5 +1133,10 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
 }
 
 void nnc_resolve(nnc_ast* ast) {
+    TRY {
         nnc_resolve_stmt(ast->root, ast->st);
+    }
+    CATCHALL {
+        nnc_abort(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), NULL);
+    }
 }
