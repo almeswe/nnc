@@ -1,6 +1,11 @@
 #include "nnc_typecheck.h"
 
-//todo: contexts ??
+//todo: add contexts to add nodes of ast
+//todo: add ability to address type from another namespace
+//todo: add error-recovery for all front-end
+//todo: add import statement
+//todo: add initializer expression
+//todo: tests
 
 #define T_IS(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
 #define T_UNALIAS(type) nnc_type* ref_##type = nnc_unalias(type)
@@ -371,16 +376,17 @@ nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* st) {
 }
 
 nnc_type* nnc_expr_get_type(const nnc_expression* expr) {
+    nnc_type* t_expr = NULL;
     switch (expr->kind) {
-        case EXPR_CHR_LITERAL: return ((nnc_chr_literal*)expr->exact)->type;
-        case EXPR_STR_LITERAL: return ((nnc_str_literal*)expr->exact)->type;
-        case EXPR_DBL_LITERAL: return ((nnc_dbl_literal*)expr->exact)->type;
-        case EXPR_INT_LITERAL: return ((nnc_int_literal*)expr->exact)->type;
-        case EXPR_IDENT:       return ((nnc_ident*)expr->exact)->type;
-        case EXPR_UNARY:       return ((nnc_unary_expression*)expr->exact)->type;
-        case EXPR_BINARY:      return ((nnc_binary_expression*)expr->exact)->type;
-        case EXPR_TERNARY:     return ((nnc_ternary_expression*)expr->exact)->type;
+        case EXPR_CHR_LITERAL: t_expr = ((nnc_chr_literal*)expr->exact)->type;        break;
+        case EXPR_STR_LITERAL: t_expr = ((nnc_str_literal*)expr->exact)->type;        break;
+        case EXPR_DBL_LITERAL: t_expr = ((nnc_dbl_literal*)expr->exact)->type;        break;
+        case EXPR_INT_LITERAL: t_expr = ((nnc_int_literal*)expr->exact)->type;        break;
+        case EXPR_IDENT:       t_expr = ((nnc_ident*)expr->exact)->type;              break;
+        case EXPR_UNARY:       t_expr = ((nnc_unary_expression*)expr->exact)->type;   break;
+        case EXPR_BINARY:      t_expr = ((nnc_binary_expression*)expr->exact)->type;  break;
+        case EXPR_TERNARY:     t_expr = ((nnc_ternary_expression*)expr->exact)->type; break;
         default: nnc_abort_no_ctx("nnc_expr_get_type: unknown kind.\n");
     }
-    return &unknown_type;
+    return t_expr == NULL ? &unknown_type : nnc_unalias(t_expr); 
 }

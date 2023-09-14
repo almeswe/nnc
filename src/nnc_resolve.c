@@ -109,7 +109,8 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
  * @throw `NNC_SEMANTIC` in case when `type` is not listed in `st`. 
  */
 nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
-    if (type->kind != T_INCOMPLETE) {
+    if (type->kind != T_INCOMPLETE &&
+        type->kind != T_ALIAS) {
         return;
     } 
     nnc_type* st_type = NULL;
@@ -495,6 +496,9 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
         ident->type = &i64_type;
         ident->refs = sym->refs;
     }
+    if (ident->ctx == IDENT_FUNCTION) {
+        //nnc_resolve_type(ident->type, st);
+    }
     return true;
 }
 
@@ -700,7 +704,9 @@ nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
                 "when function has `%s`.", nnc_type_tostr(t_arg), nnc_type_tostr(t_param)));
         }
     }
-    unary->type = t_expr->exact.fn.ret;
+    assert(f_type->ret != NULL);
+    nnc_resolve_type(f_type->ret, st);
+    unary->type = f_type->ret;
 }
 
 /**
@@ -890,6 +896,12 @@ nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* 
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary assignment expression. (<expr>`=`<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_ASSIGN_EXPR` in case when cannot locate left expression.
+ */
 nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* st) {
     if (!nnc_can_locate_expr(binary->lexpr)) {
         THROW(NNC_CANNOT_ASSIGN_EXPR, "left expression must be locatable.");
@@ -897,10 +909,20 @@ nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* s
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary comma expression. (<expr>`,`<expr>)
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* st) {
     nnc_binary_expr_infer_type(binary, st);
 }
 
+/**
+ * @brief Resolves binary expression.
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* st) {
     if (!nnc_resolve_expr(binary->lexpr, st) || 
         !nnc_resolve_expr(binary->rexpr, st)) {
@@ -931,6 +953,12 @@ nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_s
     return true;
 }
 
+/**
+ * @brief Resolves ternary expression. (<expr>`?`<expr>`:`<expr>)
+ * @param ternary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_RESOLVE_TERNARY_EXPR` in case when condition expression is not integral.
+ */
 nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nnc_st* st) {
     nnc_resolve_expr(ternary->cexpr, st);
     nnc_resolve_expr(ternary->lexpr, st);
@@ -943,6 +971,11 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
     return true;
 }
 
+/**
+ * @brief Resolves expression.
+ * @param expr Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
     switch (expr->kind) {
         case EXPR_INT_LITERAL:  return nnc_resolve_int_literal(expr->exact);
@@ -958,13 +991,29 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
     return false;
 }
 
+/**
+ * @brief Resolves list of function params.
+ * @param params Array of function params to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
     //todo: add error-recovery
     for (nnc_u64 i = 0; i < buf_len(params); i++) {
-        nnc_resolve_type(params[i]->type, st);
+        TRY {
+            nnc_resolve_type(params[i]->type, st);
+            ETRY;
+        }
+        CATCHALL {
+            nnc_error(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), NULL);
+        }
     }
 }
 
+/**
+ * @brief Resolves condition expression.
+ * @param expr Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_condition_expr(nnc_expression* expr, nnc_st* st) {
     nnc_resolve_expr(expr, st);
     const nnc_type* t_expr = nnc_expr_get_type(expr); 
@@ -973,6 +1022,12 @@ nnc_static void nnc_resolve_condition_expr(nnc_expression* expr, nnc_st* st) {
     }
 }
 
+/**
+ * @brief Resolves do-while statement.
+ * @param do_stmt Statement to be resolved. 
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when statement is declared outside function context.
+ */
 nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_FN)) {
         THROW(NNC_SEMANTIC, "cannot declare `do` in this context.");
@@ -981,6 +1036,12 @@ nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st)
     nnc_resolve_condition_expr(do_stmt->cond, st);
 }
 
+/**
+ * @brief Resolves function statemnt.
+ * @param fn_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when statement not declared in namespace or global scope. 
+ */
 nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
@@ -991,6 +1052,12 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     nnc_resolve_stmt(fn_stmt->body, st);
 }
 
+/**
+ * @brief Resolves if-else statement.
+ * @param if_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when statement declared outside function.
+ */
 nnc_static void nnc_resolve_if_stmt(nnc_if_statement* if_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_FN)) {
         THROW(NNC_SEMANTIC, "cannot declare `if-else` in this context.");
@@ -1006,6 +1073,14 @@ nnc_static void nnc_resolve_if_stmt(nnc_if_statement* if_stmt, nnc_st* st) {
     }
 }
 
+/**
+ * @brief Resolves for statement.
+ * @param for_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when statement declared outside function.
+ *        `NNC_SEMANTIC` in case when declaring variable in init expression without any body.
+ *        (it means that variable will not be used, so this is pointless)
+ */
 nnc_static void nnc_resolve_for_stmt(nnc_for_statement* for_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_FN)) {
         THROW(NNC_SEMANTIC, "cannot declare `for` in this context.");
@@ -1027,6 +1102,12 @@ nnc_static void nnc_resolve_for_stmt(nnc_for_statement* for_stmt, nnc_st* st) {
     nnc_resolve_stmt(for_stmt->body, st);
 }
 
+/**
+ * @brief Resolves let statement.
+ * @param let_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when initializer expression is not the same as type of declarable variable.
+ */
 nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     nnc_resolve_type(let_stmt->type, st);
     if (let_stmt->init != NULL) {
@@ -1039,6 +1120,12 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     }
 }
 
+/**
+ * @brief Resolves type statement.
+ * @param type_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared not in global scope.
+ */
 nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st) {
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
@@ -1047,6 +1134,12 @@ nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st)
     nnc_resolve_aliased_type(type_stmt->as, st);
 }
 
+/**
+ * @brief Resolves expression statement.
+ * @param expr_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared outside of function.
+ */
 nnc_static void nnc_resolve_expr_stmt(nnc_expression_statement* expr_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_FN)) {
         THROW(NNC_SEMANTIC, "cannot use expression in this context.");
@@ -1054,6 +1147,12 @@ nnc_static void nnc_resolve_expr_stmt(nnc_expression_statement* expr_stmt, nnc_s
     nnc_resolve_expr(expr_stmt->expr, st);
 }
 
+/**
+ * @brief Resolves while statement.
+ * @param while_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared outside of function.
+ */
 nnc_static void nnc_resolve_while_stmt(nnc_while_statement* while_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_FN)) {
         THROW(NNC_SEMANTIC, "cannot declare `while` in this context.");
@@ -1062,12 +1161,26 @@ nnc_static void nnc_resolve_while_stmt(nnc_while_statement* while_stmt, nnc_st* 
     nnc_resolve_stmt(while_stmt->body, st);
 }
 
+/**
+ * @brief Resolves break statement.
+ * @param break_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared outside of loop.
+ */
 nnc_static void nnc_resolve_break_stmt(nnc_break_statement* break_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_LOOP)) {
         THROW(NNC_SEMANTIC, "cannot use `break` outside loop.");
     }
 }
 
+/**
+ * @brief Resolves return statement.
+ * @param ret_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared outside of function.
+ *        `NNC_SEMANTIC` in case when return type differs with expression type.
+ *        `NNC_SEMANTIC` in case when returning nothing from non void function.
+ */
 nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* st) {
     nnc_st* t_st = NULL;
     if (!nnc_st_has_ctx(st, &t_st, ST_CTX_FN)) {
@@ -1092,6 +1205,11 @@ nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* 
     }
 }
 
+/**
+ * @brief Resolves compound statement.
+ * @param compound_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt, nnc_st* st) {
     nnc_u64 len = buf_len(compound_stmt->stmts);
     for (nnc_u64 i = 0; i < len; i++) {
@@ -1099,12 +1217,24 @@ nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt,
     }
 }
 
+/**
+ * @brief Resolves continue statement.
+ * @param continue_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when declared outside loop. 
+ */
 nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_LOOP)) {
         THROW(NNC_SEMANTIC, "cannot use `continue` outside loop.");
     }
 }
 
+/**
+ * @brief Resolves namespace statement.
+ * @param namespace_stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_SEMANTIC` in case when not declared in global scope. 
+ */
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
@@ -1113,6 +1243,11 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
     nnc_resolve_stmt(namespace_stmt->body, st);
 }
 
+/**
+ * @brief Resolves statement.
+ * @param stmt Statement to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ */
 void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     switch (stmt->kind) {
         case STMT_DO:        nnc_resolve_do_stmt(stmt->exact, st);        break;
@@ -1132,9 +1267,14 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     }
 }
 
+/**
+ * @brief Resolves abstract syntax tree of the program (semantic analysis).
+ * @param ast AST to be resolved.
+ */
 void nnc_resolve(nnc_ast* ast) {
     TRY {
         nnc_resolve_stmt(ast->root, ast->st);
+        ETRY;
     }
     CATCHALL {
         nnc_abort(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), NULL);
