@@ -1,9 +1,9 @@
 #include "nnc_ast_eval.h"
 
 nnc_static nnc_i64 nnc_evald_ident(const nnc_ident* ident, const nnc_st* st) {
-    assert(ident->ctx == IDENT_ENUMERATOR);
+    assert(ident->ictx == IDENT_ENUMERATOR);
     nnc_symbol* sym = nnc_st_get(st, ident->name);
-    assert(sym != NULL && sym->ctx == IDENT_ENUMERATOR);
+    assert(sym != NULL && sym->ictx == IDENT_ENUMERATOR);
     return sym->refs.enumerator->init_const.d;
 }
 

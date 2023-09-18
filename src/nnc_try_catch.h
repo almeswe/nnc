@@ -18,7 +18,7 @@
 #define CATCHED                 glob_exception_stack.thrown
 #define FINALLY
 
-#define nnc_show_catched(ctx) nnc_error(sformat("%s: %s", CATCHED.repr, CATCHED.what), ctx);
+#define NNC_SHOW_CATCHED(ctx) nnc_error(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), ctx);
 
 typedef enum _nnc_exception_kind {
     NNC_CONTEXT_SAVED   = 0x00,
@@ -36,7 +36,6 @@ typedef enum _nnc_exception_kind {
     NNC_LEX_BAD_SUFFIX,
     NNC_SYNTAX,
     NNC_SEMANTIC,
-    NNC_TABLE_MISS,
     NNC_NAME_ALREADY_DECLARED,
     NNC_TYPE_ALREADY_DECLARED,
     NNC_CANNOT_RESOLVE_TYPE,
@@ -60,6 +59,7 @@ typedef enum _nnc_exception_kind {
     NNC_CANNOT_RESOLVE_BITWISE_EXPR,
     NNC_CANNOT_ASSIGN_EXPR,
     NNC_CANNOT_RESOLVE_TERNARY_EXPR,
+    NNC_WRONG_ENUMERATOR_INITIALIZER
 } nnc_exception_kind;
 
 typedef struct _nnc_exception {

@@ -26,7 +26,7 @@ nnc_static nnc_bool nnc_can_fold_expr(const nnc_expression* expr) {
         case EXPR_DBL_LITERAL: return true;
         case EXPR_IDENT: {
             const nnc_ident* ident = expr->exact;
-            switch (ident->ctx) {
+            switch (ident->ictx) {
                 case IDENT_ENUMERATOR: return true;
                 default: return false;
             }
@@ -72,7 +72,7 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
         case EXPR_DBL_LITERAL: return false;
         case EXPR_IDENT: {
             const nnc_ident* ident = expr->exact;
-            switch (ident->ctx) {
+            switch (ident->ictx) {
                 case IDENT_DEFAULT:        return true;
                 case IDENT_FUNCTION:       return true;
                 case IDENT_FUNCTION_PARAM: return true;
@@ -490,14 +490,11 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
     if (sym == NULL) {
         THROW(NNC_SEMANTIC, sformat("undeclared identifier `%s` met.", ident->name), NULL);
     }
-    ident->ctx = sym->ctx;
+    ident->ictx = sym->ictx;
     ident->type = sym->type;
-    if (ident->ctx == IDENT_ENUMERATOR) {
+    if (ident->ictx == IDENT_ENUMERATOR) {
         ident->type = &i64_type;
         ident->refs = sym->refs;
-    }
-    if (ident->ctx == IDENT_FUNCTION) {
-        //nnc_resolve_type(ident->type, st);
     }
     return true;
 }
@@ -730,7 +727,7 @@ nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* st) 
         THROW(NNC_CANNOT_RESOLVE_SCOPE_EXPR, sformat("`%s` is not listed in "
             "`%s`.", member->name, nnc_type_tostr(t_expr)));
     }
-    member->ctx = sym->ctx;
+    member->ictx = sym->ictx;
     member->type = sym->type;
     unary->type = member->type;
 }
@@ -1001,10 +998,11 @@ nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
     for (nnc_u64 i = 0; i < buf_len(params); i++) {
         TRY {
             nnc_resolve_type(params[i]->type, st);
+            params[i]->var->type = params[i]->type;
             ETRY;
         }
         CATCHALL {
-            nnc_error(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), NULL);
+            NNC_SHOW_CATCHED(NULL);
         }
     }
 }
@@ -1045,7 +1043,7 @@ nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st)
 nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
-        THROW(NNC_SEMANTIC, "cannot declare `fn` in this context.");
+        THROW(NNC_SEMANTIC, "cannot declare `fn` in this context.", &fn_stmt->var->ctx);
     }
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type(fn_stmt->ret, st);
@@ -1169,7 +1167,7 @@ nnc_static void nnc_resolve_while_stmt(nnc_while_statement* while_stmt, nnc_st* 
  */
 nnc_static void nnc_resolve_break_stmt(nnc_break_statement* break_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_LOOP)) {
-        THROW(NNC_SEMANTIC, "cannot use `break` outside loop.");
+        THROW(NNC_SEMANTIC, "cannot use `break` outside loop.", &break_stmt->ctx);
     }
 }
 
@@ -1192,15 +1190,15 @@ nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* 
         const nnc_expression_statement* expr_stmt = ret_stmt->body->exact;
         const nnc_type* t_ret = nnc_expr_get_type(expr_stmt->expr);
         if (!nnc_can_imp_cast_assign(t_ret, t_st->ref.fn->ret)) {
-            THROW(NNC_SEMANTIC, sformat("cannot return value of type `%s` when "
-                "function has `%s` return type.", nnc_type_tostr(t_ret), nnc_type_tostr(t_st->ref.fn->ret)));    
+            THROW(NNC_SEMANTIC, sformat("cannot return value of type `%s` when function has `%s` return type.",
+                nnc_type_tostr(t_ret), nnc_type_tostr(t_st->ref.fn->ret)), &ret_stmt->ctx);    
         }
     }
     else {
         // check if function return type is void or not
         // because we returning nothing here.
         if (t_st->ref.fn->ret->kind != T_VOID) {
-            THROW(NNC_SEMANTIC, "cannot return nothing from non-void function.");
+            THROW(NNC_SEMANTIC, "cannot return nothing from non-void function.", &ret_stmt->ctx);
         }
     }
 }
@@ -1225,7 +1223,7 @@ nnc_static void nnc_resolve_compound_stmt(nnc_compound_statement* compound_stmt,
  */
 nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt, nnc_st* st) {
     if (!nnc_st_has_ctx(st, NULL, ST_CTX_LOOP)) {
-        THROW(NNC_SEMANTIC, "cannot use `continue` outside loop.");
+        THROW(NNC_SEMANTIC, "cannot use `continue` outside loop.", &continue_stmt->ctx);
     }
 }
 
@@ -1238,7 +1236,7 @@ nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt,
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
-        THROW(NNC_SEMANTIC, "cannot declare `namespace` in this context.");
+        THROW(NNC_SEMANTIC, "cannot declare `namespace` in this context.", &namespace_stmt->var->ctx);
     }
     nnc_resolve_stmt(namespace_stmt->body, st);
 }
@@ -1277,6 +1275,6 @@ void nnc_resolve(nnc_ast* ast) {
         ETRY;
     }
     CATCHALL {
-        nnc_abort(sformat("%s: %s\n", CATCHED.repr, CATCHED.what), NULL);
+        NNC_SHOW_CATCHED(CATCHED.data);
     }
 }

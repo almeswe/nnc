@@ -1,6 +1,7 @@
 #ifndef _NNC_TYPE_H
 #define _NNC_TYPE_H
 
+#include "nnc_ctx.h"
 #include "nnc_arena.h"
 #include "nnc_format.h"
 
@@ -18,10 +19,11 @@ typedef enum _nnc_ident_ctx {
 } nnc_ident_ctx;
 
 typedef struct _nnc_ident {
+    nnc_ctx ctx;
     nnc_u64 size;
     nnc_str name;
     nnc_type* type;
-    nnc_ident_ctx ctx;
+    nnc_ident_ctx ictx;
     union _nnc_ident_refs {
         nnc_enumerator* enumerator;
     } refs;

@@ -16,6 +16,7 @@ typedef enum _nnc_dbl_suffix {
 } nnc_dbl_suffix;
 
 typedef struct _nnc_dbl_literal {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_f64 exact;
     nnc_dbl_suffix suffix;
@@ -27,6 +28,7 @@ typedef enum _nnc_int_suffix {
 } nnc_int_suffix;
 
 typedef struct _nnc_int_literal {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_byte base;
     nnc_bool is_signed;
@@ -38,11 +40,13 @@ typedef struct _nnc_int_literal {
 } nnc_int_literal;
 
 typedef struct _nnc_chr_literal {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_byte exact;
 } nnc_chr_literal;
 
 typedef struct _nnc_str_literal {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_u64 length;
     nnc_byte* exact;
