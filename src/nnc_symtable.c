@@ -62,13 +62,13 @@ void nnc_st_put(nnc_st* st, nnc_symbol* sym) {
     };
     if (nnc_st_has(st, sym->name)) {
         nnc_symbol* in_table_sym = nnc_st_get(st, sym->name);
-        if (sym->ctx == in_table_sym->ctx) {
+        if (sym->ictx == in_table_sym->ictx) {
             THROW(NNC_NAME_ALREADY_DECLARED, sformat("%s \'%s\' is already declared.",
-                ctxs[in_table_sym->ctx], in_table_sym->name));
+                ctxs[in_table_sym->ictx], in_table_sym->name));
         }
         else {
             THROW(NNC_NAME_ALREADY_DECLARED, sformat("cannot declare %s, %s with name \'%s\' is already declared.", 
-                ctxs[sym->ctx], ctxs[in_table_sym->ctx], in_table_sym->name));
+                ctxs[sym->ictx], ctxs[in_table_sym->ictx], in_table_sym->name));
         }
     }
     map_put_s(st->syms, sym->name, sym);

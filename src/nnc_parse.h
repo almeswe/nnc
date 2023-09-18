@@ -10,9 +10,11 @@ typedef struct _nnc_parser {
     nnc_lex lex;
     struct _nnc_parser_current {
         nnc_tok tok;
+        nnc_ctx ctx;
     } current;
     struct _nnc_parser_lookup {
         nnc_tok tok;
+        nnc_ctx ctx;
         nnc_bool is_first;
     } lookup;
     nnc_st* st;

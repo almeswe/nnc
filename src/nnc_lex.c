@@ -183,6 +183,8 @@ nnc_static void nnc_lex_skip_line(nnc_lex* lex) {
             break;
         }
     }
+    lex->cctx.hint_ln++;
+    lex->cctx.hint_ch = 0;
 }
 
 /**
@@ -639,7 +641,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         return lex->ctok.kind;
     }
     CATCHALL {
-        nnc_show_catched(&lex->cctx);
+        NNC_SHOW_CATCHED(&lex->cctx);
         nnc_lex_make_recovery(lex);
         return nnc_lex_next(lex);
     }
@@ -668,6 +670,7 @@ void nnc_lex_init(nnc_lex* out_lex, const char* fpath) {
     }
     out_lex->cc = '\0';
     out_lex->fpath = fpath;
+    out_lex->cctx.hint_ln = 1;
     out_lex->cctx.fabs = fpath;
     nnc_lex_init_with_fp(out_lex, fp);
 }

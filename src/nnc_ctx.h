@@ -9,9 +9,9 @@
 #endif
 
 typedef struct _nnc_ctx {
-    nnc_u32 hint_ln;
+    nnc_u16 hint_ln;
     nnc_u32 hint_ch;
-    nnc_u64 hint_sz;
+    nnc_u16 hint_sz;
     const char* fabs;
 } nnc_ctx;
 

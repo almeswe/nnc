@@ -54,11 +54,6 @@ typedef struct _nnc_compound_statement {
 	struct _nnc_st* scope;
 } nnc_compound_statement;
 
-typedef struct _nnc_scoped_body {
-	nnc_statement* stmt;
-	struct _nnc_st* scope;
-} nnc_scoped_body;
-
 typedef struct _nnc_cond_n_body {
 	nnc_expression* cond;
 	nnc_statement* body;
@@ -85,6 +80,7 @@ typedef struct _nnc_for_statement {
 } nnc_for_statement;
 
 typedef struct _nnc_jump_statement {
+	nnc_ctx ctx;
 	nnc_statement* body;
 } nnc_jump_statement;
 

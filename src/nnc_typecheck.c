@@ -305,7 +305,7 @@ nnc_static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
 }
 
 nnc_static nnc_type* nnc_ident_infer_type(nnc_ident* ident, nnc_st* st) {
-    if (ident->ctx == IDENT_NAMESPACE) {
+    if (ident->ictx == IDENT_NAMESPACE) {
         return &unknown_type;
     }
     return ident->type;
@@ -328,6 +328,7 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
             return expr->type = t_rexpr;
         case BINARY_ASSIGN:
             return expr->type = nnc_infer_imp_assign(t_rexpr, t_lexpr);
+        case BINARY_MOD:
         case BINARY_ADD: case BINARY_SUB:
         case BINARY_MUL: case BINARY_DIV:
         case BINARY_SHL: case BINARY_SHR:
