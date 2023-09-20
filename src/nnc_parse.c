@@ -118,8 +118,8 @@ nnc_static nnc_var_type* nnc_parse_var_type(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_var_type* var_type = anew(nnc_var_type);
     if (nnc_parser_match(parser, TOK_IDENT)) {
-        var_type->var = nnc_ident_new(tok->lexeme, 
-            nnc_parser_get_ctx(parser));
+        var_type->var = nnc_ident_new(tok->lexeme);
+        var_type->var->ctx = *nnc_parser_get_ctx(parser);
     }
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_COLON);
@@ -142,8 +142,8 @@ nnc_static nnc_enumerator* nnc_parse_enumerator(nnc_parser* parser, nnc_type* in
     enumerator->in_enum = in_enum;
     if (nnc_parser_match(parser, TOK_IDENT)) {
         const nnc_tok* tok = nnc_parser_get(parser);
-        enumerator->var = nnc_ident_new(tok->lexeme,
-            nnc_parser_get_ctx(parser));
+        enumerator->var = nnc_ident_new(tok->lexeme);
+        enumerator->var->ctx = *nnc_parser_get_ctx(parser);
         enumerator->var->ictx = IDENT_ENUMERATOR;
         enumerator->var->refs.enumerator = enumerator;
     }
@@ -176,8 +176,8 @@ nnc_static nnc_type* nnc_parse_fn_type(nnc_parser* parser) {
 
 nnc_static nnc_type* nnc_parse_user_type(nnc_parser* parser) {
     nnc_tok* tok = nnc_parser_get(parser);
-    nnc_ident* ident = nnc_ident_new(tok->lexeme,
-        nnc_parser_get_ctx(parser));
+    nnc_ident* ident = nnc_ident_new(tok->lexeme);
+    ident->ctx = *nnc_parser_get_ctx(parser);
     nnc_parser_expect(parser, TOK_IDENT);
     return nnc_type_new(ident->name);
 }
@@ -273,8 +273,7 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_ENUM:   type = nnc_parse_enum_type(parser); break;
         case TOK_UNION:  type = nnc_parse_struct_or_union_type(parser); break;
         case TOK_STRUCT: type = nnc_parse_struct_or_union_type(parser); break;
-        default:
-            THROW(NNC_SYNTAX, "type expected.", nnc_parser_get_ctx(parser));
+        default: THROW(NNC_SYNTAX, "type expected.", nnc_parser_get_ctx(parser));
     }
     // todo: fix this condition expression
     if (kind != TOK_IDENT &&
@@ -286,36 +285,45 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
 
 nnc_static nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_heap_ptr exact = nnc_dbl_new(tok->lexeme);
+    nnc_dbl_literal* exact = nnc_dbl_new(tok->lexeme);
+    exact->ctx = *nnc_parser_get_ctx(parser);
+    exact->ctx.hint_ch -= tok->size;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_DBL_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_int(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_heap_ptr exact = nnc_int_new(tok->lexeme);
+    nnc_int_literal* exact = nnc_int_new(tok->lexeme);
+    exact->ctx = *nnc_parser_get_ctx(parser);
+    exact->ctx.hint_ch -= tok->size;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_INT_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_chr(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_heap_ptr exact = nnc_chr_new(tok->lexeme);
+    nnc_chr_literal* exact = nnc_chr_new(tok->lexeme);
+    exact->ctx = *nnc_parser_get_ctx(parser);
+    exact->ctx.hint_ch -= exact->shift;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_CHR_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_str(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_heap_ptr exact = nnc_str_new(tok->lexeme);
+    nnc_str_literal* exact = nnc_str_new(tok->lexeme);
+    exact->ctx = *nnc_parser_get_ctx(parser);
+    exact->ctx.hint_ch -= exact->shift;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_STR_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_ident(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_heap_ptr exact = nnc_ident_new(tok->lexeme,
-        nnc_parser_get_ctx(parser));
+    nnc_ident* exact = nnc_ident_new(tok->lexeme);
+    exact->ctx = *nnc_parser_get_ctx(parser);
+    exact->ctx.hint_ch -= tok->size;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_IDENT, exact);
 }
@@ -329,7 +337,7 @@ nnc_static nnc_expression* nnc_parse_number(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_OPAREN);
     nnc_expression* expr = nnc_parse_expr(parser);
     nnc_parser_expect(parser, TOK_CPAREN);
     return expr;
@@ -343,8 +351,7 @@ nnc_static nnc_expression* nnc_parse_primary_expr(nnc_parser* parser) {
         case TOK_IDENT:  return nnc_parse_ident(parser);
         case TOK_NUMBER: return nnc_parse_number(parser);
         case TOK_OPAREN: return nnc_parse_parens(parser);
-        default:
-            THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_primary_expr: %s.", nnc_tok_str(tok->kind)));
+        default: THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_primary_expr: %s.", nnc_tok_str(tok->kind)));
     }
     return NULL;
 }
@@ -354,6 +361,7 @@ nnc_static nnc_expression* nnc_parse_unary_expr(nnc_parser* parser);
 nnc_static nnc_expression* nnc_parse_cast_expr(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_OPAREN);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_CAST);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->exact.cast.to = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_CPAREN);
     expr->expr = nnc_parse_unary_expr(parser);
@@ -361,50 +369,57 @@ nnc_static nnc_expression* nnc_parse_cast_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_plus_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_PLUS);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_PLUS);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 nnc_static nnc_expression* nnc_parse_minus_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_MINUS);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_MINUS);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 nnc_static nnc_expression* nnc_parse_bitwise_not_expr(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_TILDE);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_BITWISE_NOT);
-    nnc_parser_next(parser);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr); 
 }
 
-nnc_static nnc_expression* nnc_parse_dereference_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+nnc_static nnc_expression* nnc_parse_deref_expr(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_ASTERISK);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_DEREF);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr); 
 }
 
-nnc_static nnc_expression* nnc_parse_reference_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+nnc_static nnc_expression* nnc_parse_ref_expr(nnc_parser* parser) {
+    nnc_parser_expect(parser, TOK_AMPERSAND);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_REF);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr); 
 }
 
 nnc_static nnc_expression* nnc_parse_not_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_EXCMARK);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_NOT);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_unary_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr); 
 }
 
 nnc_static nnc_expression* nnc_parse_sizeof_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_SIZEOF);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_SIZEOF);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     nnc_parser_expect(parser, TOK_OPAREN);
     expr->exact.size.of = nnc_parse_type(parser);
     nnc_parser_expect(parser, TOK_CPAREN);
@@ -412,8 +427,9 @@ nnc_static nnc_expression* nnc_parse_sizeof_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_lengthof_expr(nnc_parser* parser) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_LENGTHOF);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_LENGTHOF);
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->expr = nnc_parse_expr(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
@@ -422,6 +438,7 @@ nnc_static nnc_expression* nnc_parse_as_expr(nnc_parser* parser, nnc_expression*
     nnc_parser_expect(parser, TOK_AS);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_AS);
     expr->expr = prefix;
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->exact.cast.to = nnc_parse_type(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
@@ -429,23 +446,25 @@ nnc_static nnc_expression* nnc_parse_as_expr(nnc_parser* parser, nnc_expression*
 nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser);
 
 nnc_static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* prefix) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_DOT);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
         THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_DOT);
     expr->expr = prefix;
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->exact.dot.member = nnc_parse_ident(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
 nnc_static nnc_expression* nnc_parse_scope_expr(nnc_parser* parser, nnc_expression* prefix) {
-    nnc_parser_next(parser);
+    nnc_parser_expect(parser, TOK_DCOLON);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
         THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
     }
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_SCOPE);
     expr->expr = prefix;
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->exact.scope.member = nnc_parse_ident(parser);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
@@ -454,6 +473,7 @@ nnc_static nnc_expression* nnc_parse_call_expr(nnc_parser* parser, nnc_expressio
     nnc_parser_expect(parser, TOK_OPAREN);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_CALL);
     expr->expr = prefix;
+    expr->ctx = *nnc_parser_get_ctx(parser);
     while (!nnc_parser_match(parser, TOK_CPAREN) &&
            !nnc_parser_match(parser, TOK_EOF)) {
         buf_add(expr->exact.call.args, nnc_parse_expr_reduced(parser));
@@ -472,6 +492,7 @@ nnc_static nnc_expression* nnc_parse_index_expr(nnc_parser* parser, nnc_expressi
     nnc_parser_expect(parser, TOK_OBRACKET);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_INDEX);
     expr->expr = prefix;
+    expr->ctx = *nnc_parser_get_ctx(parser);
     expr->exact.index.expr = nnc_parse_expr(parser);
     nnc_parser_expect(parser, TOK_CBRACKET);
     return nnc_expr_new(EXPR_UNARY, expr);
@@ -494,8 +515,7 @@ nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
             case TOK_DCOLON:    postfix = nnc_parse_scope_expr(parser, prefix);  break;
             case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
             case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
-            default:
-                nnc_abort_no_ctx("nnc_parse_postfix_expr: bug detected.\n");
+            default: nnc_abort_no_ctx("nnc_parse_postfix_expr: unknown kind.\n");
         }
     }
     return postfix ? postfix : primary;
@@ -516,13 +536,14 @@ nnc_static nnc_expression* nnc_parse_unary_expr(nnc_parser* parser) {
         case TOK_SIZEOF:    return nnc_parse_sizeof_expr(parser);
         case TOK_EXCMARK:   return nnc_parse_not_expr(parser);
         case TOK_LENGTHOF:  return nnc_parse_lengthof_expr(parser);
-        case TOK_ASTERISK:  return nnc_parse_dereference_expr(parser);
-        case TOK_AMPERSAND: return nnc_parse_reference_expr(parser);
+        case TOK_ASTERISK:  return nnc_parse_deref_expr(parser);
+        case TOK_AMPERSAND: return nnc_parse_ref_expr(parser);
         default:            return nnc_parse_postfix_expr(parser);
     }
 }
 
 nnc_static nnc_expression* nnc_parse_arith_multiplication_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_unary_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
@@ -535,11 +556,11 @@ nnc_static nnc_expression* nnc_parse_arith_multiplication_expr(nnc_parser* parse
             case TOK_SLASH:    kind = BINARY_DIV; break;
             case TOK_PERCENT:  kind = BINARY_MOD; break;
             case TOK_ASTERISK: kind = BINARY_MUL; break;
-            default:
-                nnc_abort_no_ctx("nnc_parse_arith_multiplication_expr: bug detected.\n");
+            default: nnc_abort_no_ctx("nnc_parse_arith_multiplication_expr: unknown kind.\n");
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_unary_expr(parser);
         if (expr != NULL) {
@@ -554,6 +575,7 @@ nnc_static nnc_expression* nnc_parse_arith_multiplication_expr(nnc_parser* parse
 }
 
 nnc_static nnc_expression* nnc_parse_arith_addition_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_arith_multiplication_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
@@ -565,6 +587,7 @@ nnc_static nnc_expression* nnc_parse_arith_addition_expr(nnc_parser* parser) {
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_arith_multiplication_expr(parser);
         if (expr != NULL) {
@@ -579,6 +602,7 @@ nnc_static nnc_expression* nnc_parse_arith_addition_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_arith_shift_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_arith_addition_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
@@ -590,6 +614,7 @@ nnc_static nnc_expression* nnc_parse_arith_shift_expr(nnc_parser* parser) {
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_arith_addition_expr(parser);
         if (expr != NULL) {
@@ -604,6 +629,7 @@ nnc_static nnc_expression* nnc_parse_arith_shift_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_relation_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_arith_shift_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
@@ -618,11 +644,11 @@ nnc_static nnc_expression* nnc_parse_relation_expr(nnc_parser* parser) {
             case TOK_GT:  kind = BINARY_GT;  break;
             case TOK_LTE: kind = BINARY_LTE; break;
             case TOK_GTE: kind = BINARY_GTE; break;
-            default:
-                nnc_abort_no_ctx("nnc_parse_relation_expr: bug detected.\n");
+            default: nnc_abort_no_ctx("nnc_parse_relation_expr: unknown kind.\n");
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_arith_shift_expr(parser);
         if (expr != NULL) {
@@ -637,6 +663,7 @@ nnc_static nnc_expression* nnc_parse_relation_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_equality_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_relation_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
@@ -648,6 +675,7 @@ nnc_static nnc_expression* nnc_parse_equality_expr(nnc_parser* parser) {
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_relation_expr(parser);
         if (expr != NULL) {
@@ -662,12 +690,14 @@ nnc_static nnc_expression* nnc_parse_equality_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_bitwise_and_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_equality_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_AMPERSAND)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_BW_AND);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_equality_expr(parser);
         if (expr != NULL) {
@@ -682,12 +712,14 @@ nnc_static nnc_expression* nnc_parse_bitwise_and_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_bitwise_xor_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_bitwise_and_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_CIRCUMFLEX)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_BW_XOR);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_bitwise_and_expr(parser);
         if (expr != NULL) {
@@ -702,12 +734,14 @@ nnc_static nnc_expression* nnc_parse_bitwise_xor_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_bitwise_or_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_bitwise_xor_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_VLINE)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_BW_OR);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_bitwise_xor_expr(parser);
         if (expr != NULL) {
@@ -722,12 +756,14 @@ nnc_static nnc_expression* nnc_parse_bitwise_or_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_and_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_bitwise_or_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_AND)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_AND);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_bitwise_or_expr(parser);
         if (expr != NULL) {
@@ -742,12 +778,14 @@ nnc_static nnc_expression* nnc_parse_and_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_or_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_and_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_OR)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_OR);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_and_expr(parser);
         if (expr != NULL) {
@@ -762,15 +800,17 @@ nnc_static nnc_expression* nnc_parse_or_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_ternary_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_or_expr(parser);
     nnc_ternary_expression* expr = NULL;
     if (nnc_parser_match(parser, TOK_QUESTION)) {
         nnc_parser_next(parser);
         expr = nnc_ternary_expr_new();
+        expr->ctx = ctx;
         expr->lexpr = nnc_parse_expr(parser);
         nnc_parser_expect(parser, TOK_COLON);
         expr->rexpr = nnc_parse_expr(parser);
-        expr->cexpr = nether_expr;   
+        expr->cexpr = nether_expr;
     }
     if (expr != NULL) {
         return nnc_expr_new(EXPR_TERNARY, expr);
@@ -779,12 +819,14 @@ nnc_static nnc_expression* nnc_parse_ternary_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_assignment_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_ternary_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_ASSIGN)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_ASSIGN);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_ternary_expr(parser);
         if (expr != NULL) {
@@ -799,12 +841,14 @@ nnc_static nnc_expression* nnc_parse_assignment_expr(nnc_parser* parser) {
 }
 
 nnc_static nnc_expression* nnc_parse_comma_expr(nnc_parser* parser) {
+    nnc_ctx ctx = *nnc_parser_get_ctx(parser);
     nnc_expression* nether_expr = nnc_parse_assignment_expr(parser);
     nnc_binary_expression* temp = NULL;
     nnc_binary_expression* expr = NULL;
     while (nnc_parser_match(parser, TOK_COMMA)) {
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(BINARY_COMMA);
+        temp->ctx = ctx;
         temp->lexpr = nether_expr;
         temp->rexpr = nnc_parse_assignment_expr(parser);
         if (expr != NULL) {
@@ -862,8 +906,8 @@ nnc_static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc
     nnc_parser_expect(parser, TOK_LET);
     nnc_let_statement* let_stmt = anew(nnc_let_statement);
     const nnc_tok* tok = nnc_parser_get(parser);
-    let_stmt->var = nnc_ident_new(tok->lexeme,
-        nnc_parser_get_ctx(parser));
+    let_stmt->var = nnc_ident_new(tok->lexeme);
+    let_stmt->var->ctx = *nnc_parser_get_ctx(parser);
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_COLON);
     let_stmt->type = nnc_parse_type(parser);
@@ -1004,8 +1048,8 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_fn_statement* fn_stmt = anew(nnc_fn_statement);
     if (nnc_parser_match(parser, TOK_IDENT)) {
-        fn_stmt->var = nnc_ident_new(tok->lexeme,
-            nnc_parser_get_ctx(parser));
+        fn_stmt->var = nnc_ident_new(tok->lexeme);
+        fn_stmt->var->ctx = *nnc_parser_get_ctx(parser);
     }
     nnc_parser_expect(parser, TOK_IDENT);
     fn_stmt->var->ictx = IDENT_FUNCTION; 
@@ -1044,8 +1088,8 @@ nnc_static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     nnc_namespace_statement* namespace_stmt = anew(nnc_namespace_statement);
     const nnc_tok* tok = nnc_parser_get(parser);
     if (nnc_parser_match(parser, TOK_IDENT)) {
-        namespace_stmt->var = nnc_ident_new(tok->lexeme,
-            nnc_parser_get_ctx(parser));
+        namespace_stmt->var = nnc_ident_new(tok->lexeme);
+        namespace_stmt->var->ctx = *nnc_parser_get_ctx(parser);
     }
     nnc_parser_expect(parser, TOK_IDENT);
     namespace_stmt->var->ictx = IDENT_NAMESPACE;
@@ -1072,8 +1116,7 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
         case TOK_RETURN:    return nnc_parse_return_stmt(parser);
         case TOK_CONTINUE:  return nnc_parse_continue_stmt(parser);
         case TOK_NAMESPACE: return nnc_parse_namespace_stmt(parser);
-        default:
-            return nnc_parse_expr_stmt(parser);
+        default:            return nnc_parse_expr_stmt(parser);
     }
 }
 
@@ -1081,6 +1124,8 @@ nnc_ast* nnc_parse(const char* file) {
     nnc_parser parser = { 0 };
     nnc_parser_init(&parser, file);
     nnc_ast* ast = nnc_ast_new(file);
+    //while (nnc_parser_next(&parser) != TOK_EOF);
+    //exit(EXIT_FAILURE);
     ast->root = nnc_parse_stmt(&parser);
     ast->st = parser.st;
     nnc_parser_fini(&parser);

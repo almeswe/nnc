@@ -1,12 +1,34 @@
 #include "nnc_literal.h"
 
 /**
+ * @brief Determines if character is escape or not.
+ * @param c Character to be checked.
+ * @return `true` if this is escape character, otherwise `false`.
+ */
+nnc_static nnc_bool nnc_is_esc_chr(char c) {
+    switch (c) {
+        case '\0': return true;
+        case '\a': return true;
+        case '\b': return true;
+        case '\f': return true;
+        case '\t': return true;
+        case '\v': return true;
+        case '\r': return true;
+        case '\n': return true;
+        case '\\': return true;
+        case '\'': return true;
+        case '\"': return true;
+    }
+    return false;
+}
+
+/**
  * @brief Parses string representation of float number, and 
  *  determines what suffix was specified within this number.
  * @param repr String representation of float number.
  * @return `nnc_dbl_suffix` value, or SUFFIX_NONE.
  */
-nnc_dbl_suffix nnc_get_dbl_suffix(const char* repr) {
+nnc_static nnc_dbl_suffix nnc_get_dbl_suffix(const char* repr) {
     nnc_byte suffix[3] = { 0 };
     nnc_bool met_f = false;
     nnc_u64 size = strlen(repr);
@@ -52,7 +74,7 @@ nnc_dbl_suffix nnc_get_dbl_suffix(const char* repr) {
  * @return Exact the same literal as it was specified in argument.
  * @throw NNC_OVERFLOW in case of overflow.
  */
-nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
+nnc_static nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
     static const nnc_bounds bounds[] = {
         [SUFFIX_F32]  = { .min.f = 0.0, .max.f = FLT_MAX  },
         [SUFFIX_F64]  = { .min.f = 0.0, .max.f = DBL_MAX  },
@@ -60,8 +82,8 @@ nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
     nnc_bounds current = bounds[literal->suffix];
     if (current.min.f > literal->exact ||
         current.max.f < literal->exact) {
-        THROW(NNC_OVERFLOW, sformat("this value out of bounds "
-            "of it's type \'%f\'.\n", literal->exact));
+        THROW(NNC_OVERFLOW, sformat("value \'%f\' out of bounds "
+            "of it's suffix.", literal->exact), &literal->ctx);
     }
     return literal;
 }
@@ -162,7 +184,7 @@ nnc_int_suffix nnc_get_int_suffix(const char* repr) {
  * @return Exact the same literal as it was specified in argument.
  * @throw NNC_OVERFLOW in case of overflow.
  */
-nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
+nnc_static nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
     static const nnc_bounds bounds[] = {
         [SUFFIX_I8]  = { .min.d = INT8_MIN,  .max.d = INT8_MAX  },
         [SUFFIX_I16] = { .min.d = INT16_MIN, .max.d = INT16_MAX },
@@ -177,15 +199,15 @@ nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
     if (literal->is_signed) {
         if (current.min.d > literal->exact.d ||
             current.max.d < literal->exact.d) {
-            THROW(NNC_OVERFLOW, sformat("this value out of bounds "
-                "of it's type \'%ld\'.\n", literal->exact.d));
+            THROW(NNC_OVERFLOW, sformat("value \'%ld\' out of bounds "
+                "of it's suffix.", literal->exact.d), &literal->ctx);
         }
     }
     else {
         if (current.min.u > literal->exact.u ||
             current.max.u < literal->exact.u) {
-            THROW(NNC_OVERFLOW, sformat("this value out of bounds "
-                "of it's type \'%lu\'.\n", literal->exact.u));
+            THROW(NNC_OVERFLOW, sformat("value \'%lu\' out of bounds "
+                "of it's suffix.", literal->exact.u), &literal->ctx);
         }
     }
     return literal;
@@ -247,8 +269,8 @@ nnc_int_literal* nnc_int_new(const char* repr) {
         ptr->exact.u = strtoull(repr_buf, NULL, ptr->base);
     }
     if (errno == ERANGE) {
-        THROW(NNC_OVERFLOW, sformat("this value out of bounds "
-            "of it's type \'%s\'.\n", repr_buf));
+        THROW(NNC_OVERFLOW, sformat("value \'%s\' out of bounds "
+            "of it's suffix.", repr_buf), &ptr->ctx);
     }
     if (errno != 0) {
         nnc_abort_no_ctx(sformat("nnc_int_new [errno: %d]: cannot"
@@ -267,9 +289,10 @@ nnc_chr_literal* nnc_chr_new(const char* repr) {
     nnc_chr_literal* ptr = anew(nnc_chr_literal);
     ptr->type = &unknown_type;
     if (strlen(repr) != 1) {
-        THROW(NNC_LEX_BAD_CHR, "nnc_chr_new: bug detected. strlen(repr) != 1\n");
+        nnc_abort_no_ctx("nnc_chr_new: bug detected. strlen(repr) != 1\n");
     }
     ptr->exact = (nnc_byte)repr[0];
+    ptr->shift = (nnc_u16)nnc_is_esc_chr(repr[0]);
     return ptr;
 }
 
@@ -281,8 +304,17 @@ nnc_chr_literal* nnc_chr_new(const char* repr) {
 nnc_str_literal* nnc_str_new(const char* repr) {
     nnc_str_literal* ptr = anew(nnc_str_literal);
     ptr->type = &unknown_type;
-    ptr->length = strlen(repr);
-    ptr->exact = cnew(nnc_byte, ptr->length + 1);
+    ptr->bytes = strlen(repr);
+    // calculate length of string literal in text file
+    // this is needed when substracting from current context 
+    // (to determine correct starting position)
+    ptr->shift = ptr->bytes + 2; // + 2 for both quotes
+    for (nnc_u64 i = 0; i < ptr->bytes; i++) {
+        // if character is escape character then
+        // it is represented with 2 symbols in text file. 
+        ptr->shift += nnc_is_esc_chr(repr[i]);
+    }
+    ptr->exact = cnew(nnc_byte, ptr->bytes + 1);
     strcpy(ptr->exact, repr);
     return ptr;
 }

@@ -154,7 +154,7 @@ nnc_static void nnc_lex_skip(nnc_lex* lex) {
                 break;
             case '\n':
                 lex->cctx.hint_ln++;
-                lex->cctx.hint_ch = 0;
+                lex->cctx.hint_ch = 1;
                 break;
             default:
                 return;
@@ -184,7 +184,7 @@ nnc_static void nnc_lex_skip_line(nnc_lex* lex) {
         }
     }
     lex->cctx.hint_ln++;
-    lex->cctx.hint_ch = 0;
+    lex->cctx.hint_ch = 1;
 }
 
 /**

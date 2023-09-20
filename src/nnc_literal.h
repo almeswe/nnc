@@ -42,13 +42,15 @@ typedef struct _nnc_int_literal {
 typedef struct _nnc_chr_literal {
     nnc_ctx ctx;
     nnc_type* type;
+    nnc_u16 shift;
     nnc_byte exact;
 } nnc_chr_literal;
 
 typedef struct _nnc_str_literal {
     nnc_ctx ctx;
     nnc_type* type;
-    nnc_u64 length;
+    nnc_u64 bytes;
+    nnc_u16 shift;
     nnc_byte* exact;
 } nnc_str_literal;
 

@@ -1,14 +1,11 @@
 #include "nnc_ast.h"
 
-nnc_ident* nnc_ident_new(const nnc_byte* from, const nnc_ctx* ctx) {
+nnc_ident* nnc_ident_new(const nnc_byte* from) {
     nnc_ident* ptr = anew(nnc_ident);
     ptr->type = &unknown_type;
     ptr->size = strlen(from);
     ptr->name = cnew(nnc_byte, ptr->size + 1);
     ptr->ictx = IDENT_DEFAULT;
-    if (ctx != NULL) {
-        ptr->ctx = *ctx;
-    }
     strcpy(ptr->name, from);
     return ptr;
 }
