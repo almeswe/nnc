@@ -39,6 +39,7 @@ typedef enum _nnc_unary_expression_kind {
 } nnc_unary_expression_kind;
 
 typedef struct _nnc_unary_expression {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_expression* expr;
     nnc_unary_expression_kind kind;
@@ -89,6 +90,7 @@ typedef enum _nnc_binary_expression_kind {
 } nnc_binary_expression_kind;
 
 typedef struct _nnc_binary_expression {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_expression* lexpr;
     nnc_expression* rexpr;
@@ -96,14 +98,27 @@ typedef struct _nnc_binary_expression {
 } nnc_binary_expression;
 
 typedef struct _nnc_ternary_expression {
+    nnc_ctx ctx;
     nnc_type* type;
     nnc_expression* cexpr;
     nnc_expression* rexpr;
     nnc_expression* lexpr;
 } nnc_ternary_expression;
 
+typedef struct _nnc_init_expression {
+    nnc_expression** exprs;
+    enum _nnc_init_expression_kind {
+        INIT_KIND_UNTYPED,
+        INIT_KIND_ZERO,
+        INIT_KIND_UNION,
+        INIT_KIND_ARRAY,
+        INIT_KIND_STRUCT
+    } kind;
+    nnc_heap_ptr inits;
+} nnc_init_expression;
+
 nnc_ident* nnc_ident_new(const nnc_byte* from);
-void nnc_set_ident_ctx(nnc_ident* ident, nnc_ident_ctx ctx);
+nnc_ctx* nnc_expr_get_ctx(const nnc_expression* expr);
 
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind);
 nnc_binary_expression* nnc_binary_expr_new(nnc_binary_expression_kind kind);

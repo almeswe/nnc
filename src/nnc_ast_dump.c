@@ -55,6 +55,19 @@ nnc_static void nnc_dump_indent(nnc_i64 indent) {
     }
 }
 
+nnc_static void nnc_dump_ctx(const nnc_ctx* ctx) {
+    if (ctx->fabs && strlen(ctx->fabs) < MAX_PATH) {
+        char path[MAX_PATH] = { 0 };
+        strcpy(path, ctx->fabs);
+        fprintf(stderr, "%s:%u:%u", ctx->fabs, 
+            ctx->hint_ln, ctx->hint_ch);
+    }
+    else {
+        fprintf(stderr, "%u:%u", 
+            ctx->hint_ln, ctx->hint_ch); 
+    }
+}
+
 nnc_static void nnc_dump_type(const nnc_type* type) {
     if (type == NULL) {
         fprintf(stderr, _c(RED, "%s"), "?");
@@ -80,13 +93,15 @@ nnc_static void nnc_dump_chr(nnc_dump_data data) {
     fprintf(stderr, "code=%d,", (nnc_i32)literal->exact);
     fprintf(stderr, "type=");
     nnc_dump_type(literal->type);
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&literal->ctx);
     fprintf(stderr, ">\n");
 }
 
 nnc_static void nnc_dump_str(nnc_dump_data data) {
     const nnc_str_literal* literal = data.exact;
     fprintf(stderr, _c(BYEL, "str") " <val=");
-    for (nnc_u64 i = 0; i < literal->length; i++) {
+    for (nnc_u64 i = 0; i < literal->bytes; i++) {
         nnc_byte code = literal->exact[i];
         if (!nnc_is_escape(code)) {
             fprintf(stderr, "%c", code);
@@ -95,9 +110,11 @@ nnc_static void nnc_dump_str(nnc_dump_data data) {
             fprintf(stderr, "\\%c", nnc_escape(code));
         }
     }
-    fprintf(stderr, ",len=%lu,", literal->length);
+    fprintf(stderr, ",len=%lu,", literal->bytes);
     fprintf(stderr, "type=");
     nnc_dump_type(literal->type);
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&literal->ctx);
     fprintf(stderr, ">\n");
 }
 
@@ -108,6 +125,8 @@ nnc_static void nnc_dump_ident(nnc_dump_data data) {
     fprintf(stderr, "len=%lu", ident->size);
     fprintf(stderr, ",type=");
     nnc_dump_type(ident->type);
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&ident->ctx);
     fprintf(stderr, ">\n");
 }
 
@@ -125,6 +144,8 @@ nnc_static void nnc_dump_int(nnc_dump_data data) {
     fprintf(stderr, "suff=%d,", literal->suffix);
     fprintf(stderr, "type=");
     nnc_dump_type(literal->type);
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&literal->ctx);
     fprintf(stderr, ">\n");
 }
 
@@ -135,6 +156,8 @@ nnc_static void nnc_dump_dbl(nnc_dump_data data) {
     fprintf(stderr, "<suff=%d,", literal->suffix);
     fprintf(stderr, "type=");
     nnc_dump_type(literal->type);
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&literal->ctx);
     fprintf(stderr, ">\n");
 }
 
@@ -165,13 +188,14 @@ nnc_static void nnc_dump_unary(nnc_dump_data data) {
         fprintf(stderr, "<cast-type="); nnc_dump_type(type);
         fprintf(stderr, ",type=");
         nnc_dump_type(unary->type);
-        fprintf(stderr, ">\n");
     }
     else {
         fprintf(stderr, "<type=");
         nnc_dump_type(unary->type);
-        fprintf(stderr, ">\n");
     }
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&unary->ctx);
+    fprintf(stderr, ">\n");
     if (unary->expr != NULL) {
         nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
         nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->expr));
@@ -227,7 +251,8 @@ nnc_static void nnc_dump_binary(nnc_dump_data data) {
     fprintf(stderr, _c(BGRN, "binary-expr `%s` "), binary_str[binary->kind]);
     fprintf(stderr, "<type=");
     nnc_dump_type(binary->type);
-    fprintf(stderr, ">\n");
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&binary->ctx); fprintf(stderr, ">\n");
     nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
     nnc_dump_expr(DUMP_DATA(data.indent + 1, binary->lexpr));
     nnc_dump_indent(data.indent + 1); fprintf(stderr, TREE_BR);
@@ -239,7 +264,8 @@ nnc_static void nnc_dump_ternary(nnc_dump_data data) {
     fprintf(stderr, _c(BGRN, "ternary-expr "));
     fprintf(stderr, "<type=");
     nnc_dump_type(ternary->type);
-    fprintf(stderr, ">\n");
+    fprintf(stderr, ", ctx=");
+    nnc_dump_ctx(&ternary->ctx); fprintf(stderr, ">\n");
     nnc_dump_indent(data.indent + 1); 
     fprintf(stderr, TREE_BR "condn=");
     nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->cexpr));
