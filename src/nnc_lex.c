@@ -216,7 +216,10 @@ nnc_static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
         case '\'':  return '\'';
         case '\"':  return '\"';
     }
-    THROW(NNC_LEX_BAD_ESC, "expected valid escape sequence character.\n");
+    // unget last character for correct
+    // context calculation
+    nnc_lex_undo(lex);
+    THROW(NNC_LEX_BAD_ESC, "expected valid escape sequence character.", &lex->cctx);
     // unreachable code part, just to avoid compiler warning
     return '\0';
 }
@@ -241,7 +244,10 @@ nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
         nnc_lex_grab(lex);
     }
     if (NNC_LEX_NOT_MATCH('\'')) {
-        THROW(NNC_LEX_BAD_CHR, "expected single quote [\'].\n");
+        // unget last character for correct
+        // context calculation
+        nnc_lex_undo(lex);
+        THROW(NNC_LEX_BAD_CHR, "expected single quote `\'`.", &lex->cctx);
     }
     return TOK_CHR;
 }
@@ -268,7 +274,10 @@ nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
         }
     }
     if (NNC_LEX_NOT_MATCH('\"')) {
-        THROW(NNC_LEX_BAD_STR, "expected double quote [\"].\n");
+        // unget last character for correct
+        // context calculation
+        nnc_lex_undo(lex);
+        THROW(NNC_LEX_BAD_STR, "expected double quote `\"`.", &lex->cctx);
     }
     return TOK_STR;
 }
@@ -284,7 +293,8 @@ nnc_static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
     nnc_lex_grab(lex);
     nnc_byte sign = lex->cc;
     if (sign != '+' && sign != '-') {
-        THROW(NNC_LEX_BAD_EXP, "expected exponent sign (+ or -).\n");
+        nnc_lex_undo(lex);
+        THROW(NNC_LEX_BAD_EXP, "expected exponent sign (+ or -).", &lex->cctx);
     }
     NNC_TOK_PUT_C(sign);
     while (nnc_lex_grab(lex) != EOF) {
@@ -337,7 +347,8 @@ nnc_static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
                     break;
                 default:
                     bad_suffix:
-                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (i/I/u/U)(8|16|32|64)\n");
+                    nnc_lex_undo(lex);
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (i|I|u|U)(8|16|32|64).", &lex->cctx);
                     break;
             }
             break;
@@ -376,7 +387,8 @@ nnc_static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
                     break;
                 default:
                     bad_suffix:
-                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (f/F)(32/64)\n"); 
+                    nnc_lex_undo(lex);
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (f|F)(32|64).", &lex->cctx); 
                     break;
             }
             break;
@@ -408,7 +420,8 @@ nnc_static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
         NNC_TOK_PUT_CC();
     }
     if (size_after_dot == 0) {
-        THROW(NNC_LEX_BAD_FLOAT, "empty after dot part.\n");
+        nnc_lex_undo(lex);
+        THROW(NNC_LEX_BAD_FLOAT, "empty after dot part.", &lex->cctx);
     }
     return TOK_NUMBER;
 }
