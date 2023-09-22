@@ -11,6 +11,7 @@ typedef struct _nnc_parser {
     struct _nnc_parser_current {
         nnc_tok tok;
         nnc_ctx ctx;
+        nnc_ctx ctx_copy;
     } current;
     struct _nnc_parser_lookup {
         nnc_tok tok;
