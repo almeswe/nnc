@@ -4,7 +4,7 @@
 #include <errno.h> 
 #include "nnc_ctx.h"
 
-typedef nnc_bool nnc_error_canarie; 
+typedef nnc_i32 nnc_error_canarie; 
 
 typedef struct _nnc_file_cache {
     const char* path;

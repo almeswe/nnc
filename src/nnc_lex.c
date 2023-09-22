@@ -202,7 +202,7 @@ nnc_static void nnc_lex_make_recovery(nnc_lex* lex) {
  * @return Escape character represented by two separate characters.
  *  May throw NNC_LEX_BAD_ESC.
  */
-nnc_static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
+nnc_static char nnc_lex_grab_esc(nnc_lex* lex) {
     switch (lex->cc) {
         case '0':   return '\0';
         case 'a':   return '\a';
@@ -219,7 +219,7 @@ nnc_static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
     // unget last character for correct
     // context calculation
     nnc_lex_undo(lex);
-    THROW(NNC_LEX_BAD_ESC, "expected valid escape sequence character.", &lex->cctx);
+    THROW(NNC_LEX_BAD_ESC, "bad escape character met.", &lex->cctx);
     // unreachable code part, just to avoid compiler warning
     return '\0';
 }
@@ -231,15 +231,17 @@ nnc_static char nnc_lex_grab_esc_seq(nnc_lex* lex) {
  */
 nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
     char initial = nnc_lex_grab(lex); 
     if (initial != EOF) {
         if (NNC_LEX_NOT_MATCH('\\')) {
             NNC_TOK_PUT_C(initial);
         }
         else {
+            NNC_TOK_PUT_CC();
             nnc_lex_grab(lex);
-            char esc = nnc_lex_grab_esc_seq(lex);
-            NNC_TOK_PUT_C(esc);
+            nnc_lex_grab_esc(lex);
+            NNC_TOK_PUT_CC();
         }
         nnc_lex_grab(lex);
     }
@@ -249,6 +251,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
         nnc_lex_undo(lex);
         THROW(NNC_LEX_BAD_CHR, "expected single quote `\'`.", &lex->cctx);
     }
+    NNC_TOK_PUT_CC();
     return TOK_CHR;
 }
 
@@ -259,6 +262,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
  */
 nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
     nnc_lex_tok_clear(lex);
+    NNC_TOK_PUT_CC();
     while (nnc_lex_grab(lex) != EOF) {
         if (NNC_LEX_MATCH('\n') || 
             NNC_LEX_MATCH('\"')) {
@@ -268,9 +272,10 @@ nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
             NNC_TOK_PUT_CC();
         }
         else {
+            NNC_TOK_PUT_CC();
             nnc_lex_grab(lex);
-            char esc = nnc_lex_grab_esc_seq(lex);
-            NNC_TOK_PUT_C(esc);
+            nnc_lex_grab_esc(lex);
+            NNC_TOK_PUT_CC();
         }
     }
     if (NNC_LEX_NOT_MATCH('\"')) {
@@ -279,6 +284,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
         nnc_lex_undo(lex);
         THROW(NNC_LEX_BAD_STR, "expected double quote `\"`.", &lex->cctx);
     }
+    NNC_TOK_PUT_CC();
     return TOK_STR;
 }
 
@@ -620,7 +626,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case '3': case '4':
             case '5': case '6':
             case '7': case '8':
-            case '9': case '0': 
+            case '9': case '0':
                 NNC_LEX_COMMIT(nnc_lex_grab_number(lex));
                 break;
             case '_':

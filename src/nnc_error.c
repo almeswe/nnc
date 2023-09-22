@@ -33,7 +33,7 @@ void nnc_error(const char* what, const nnc_ctx* ctx) {
         fprintf(stderr, "\033[1m\033[36m" "%s " "\033[0m", nnc_ctx_tostr(ctx));
     }
     fprintf(stderr, "%s", what);
-    glob_error_canarie = true;
+    glob_error_canarie++;
 }
 
 void nnc_abort(const char* what, const nnc_ctx* ctx) {
@@ -52,9 +52,9 @@ void nnc_abort_no_ctx(const char* what) {
 }
 
 void nnc_reset_canarie() {
-    glob_error_canarie = false;
+    glob_error_canarie = 0;
 }
 
 nnc_bool nnc_error_occured() {
-    return glob_error_canarie;
+    return glob_error_canarie != 0;
 }

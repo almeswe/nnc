@@ -1,25 +1,26 @@
 #include "nnc_literal.h"
 
 /**
- * @brief Determines if character is escape or not.
- * @param c Character to be checked.
- * @return `true` if this is escape character, otherwise `false`.
+ * @brief Converts specified character from ASCII table to escape character.
+ * @param c Character to be converted.
+ * @return Converted character.
  */
-nnc_static nnc_bool nnc_is_esc_chr(char c) {
+nnc_static nnc_byte nnc_get_esc_chr(nnc_byte c) {
     switch (c) {
-        case '\0': return true;
-        case '\a': return true;
-        case '\b': return true;
-        case '\f': return true;
-        case '\t': return true;
-        case '\v': return true;
-        case '\r': return true;
-        case '\n': return true;
-        case '\\': return true;
-        case '\'': return true;
-        case '\"': return true;
+        case '0':   return '\0';
+        case 'a':   return '\a';
+        case 'b':   return '\b';
+        case 'f':   return '\f';
+        case 't':   return '\t';
+        case 'v':   return '\v';
+        case 'r':   return '\r';
+        case 'n':   return '\n';
+        case '\\':  return '\\';
+        case '\'':  return '\'';
+        case '\"':  return '\"';
     }
-    return false;
+    nnc_abort_no_ctx("nnc_get_esc_chr: used incorrectly.");
+    return '\0';
 }
 
 /**
@@ -91,12 +92,14 @@ nnc_static nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
 /**
  * @brief Allocates & initializes new instance of `nnc_dbl_literal`.
  * @param repr String representation of the float number which will be parsed.
+ * @param ctx Context of the double literal.
  * @return Allocated & initialized instance of `nnc_dbl_literal`.
  */
-nnc_dbl_literal* nnc_dbl_new(const char* repr) {
+nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
     nnc_u64 repr_size = strlen(repr);
     nnc_dbl_literal* ptr = anew(nnc_dbl_literal);
+    ptr->ctx = *ctx;
     ptr->type = &unknown_type;
     ptr->suffix = nnc_get_dbl_suffix(repr);
     // if there is no suffix, set f64 as default.
@@ -216,12 +219,14 @@ nnc_static nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
 /**
  * @brief Allocates & initializes new instance of `nnc_int_literal`.
  * @param repr String representation of the float number which will be parsed.
+ * @param ctx Context of int literal.
  * @return Allocated & initialized instance of `nnc_int_literal`.
  * @throw NNC_OVERFLOW in case of `errno == ENOENT` after call to `strtoll` or `strtoull`.
  */
-nnc_int_literal* nnc_int_new(const char* repr) {
+nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
     nnc_int_literal* ptr = anew(nnc_int_literal);
+    ptr->ctx = *ctx;
     ptr->type = &unknown_type;
     ptr->suffix = nnc_get_int_suffix(repr);
     // determine base by it's shorthand
@@ -282,40 +287,47 @@ nnc_int_literal* nnc_int_new(const char* repr) {
 /**
  * @brief Allocates & initializes new instance of `nnc_chr_literal`.
  * @param repr String representation of char literal which will be parsed.
+ * @param ctx Context of the character literal.
  * @return Allocated & initialized instance of `nnc_chr_literal`.
- * @throw NNC_LEX_BAD_CHR in case of `strlen(repr) != 1`.
  */
-nnc_chr_literal* nnc_chr_new(const char* repr) {
+nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx) {
     nnc_chr_literal* ptr = anew(nnc_chr_literal);
+    ptr->ctx = *ctx;
     ptr->type = &unknown_type;
-    if (strlen(repr) != 1) {
-        nnc_abort_no_ctx("nnc_chr_new: bug detected. strlen(repr) != 1\n");
+    if (strlen(repr) < 1) {
+        nnc_abort_no_ctx("nnc_chr_new: strlen(repr) < 1\n");
     }
-    ptr->exact = (nnc_byte)repr[0];
-    ptr->shift = (nnc_u16)nnc_is_esc_chr(repr[0]);
+    ptr->exact = repr[1] != '\\' ? 
+        repr[1] : nnc_get_esc_chr(repr[1]);
     return ptr;
 }
 
 /**
  * @brief Allocates & initializes new instance of `nnc_str_literal`.
  * @param repr String representation of string literal which will be parsed.
+ * @param ctx Context of the string literal.
  * @return Allocated & initialized instance of `nnc_str_literal`.
  */
-nnc_str_literal* nnc_str_new(const char* repr) {
+nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
     nnc_str_literal* ptr = anew(nnc_str_literal);
+    ptr->ctx = *ctx;
     ptr->type = &unknown_type;
-    ptr->bytes = strlen(repr);
-    // calculate length of string literal in text file
-    // this is needed when substracting from current context 
-    // (to determine correct starting position)
-    ptr->shift = ptr->bytes + 2; // + 2 for both quotes
-    for (nnc_u64 i = 0; i < ptr->bytes; i++) {
-        // if character is escape character then
-        // it is represented with 2 symbols in text file. 
-        ptr->shift += nnc_is_esc_chr(repr[i]);
+    nnc_u64 index = 0, repr_len = strlen(repr);
+    ptr->exact = cnew(nnc_byte, repr_len + 1);
+    nnc_bool esc_chr_met = false;
+    for (nnc_u64 i = 1; i < repr_len - 1; i++) {
+        nnc_byte c = repr[i]; 
+        if (esc_chr_met) {
+            c = nnc_get_esc_chr(repr[i]);
+            esc_chr_met = false;
+        }
+        if (repr[i] == '\\') {
+            esc_chr_met = true;
+            continue;
+        }
+        ptr->exact[index++] = c;
     }
-    ptr->exact = cnew(nnc_byte, ptr->bytes + 1);
-    strcpy(ptr->exact, repr);
+    ptr->bytes = strlen(ptr->exact);
     return ptr;
 }
 

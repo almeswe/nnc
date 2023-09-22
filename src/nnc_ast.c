@@ -11,6 +11,9 @@ nnc_ident* nnc_ident_new(const nnc_byte* from) {
 }
 
 nnc_ctx* nnc_expr_get_ctx(const nnc_expression* expr) {
+    if (expr == NULL) {
+        return NULL;
+    } 
     switch (expr->kind) {
         case EXPR_CHR_LITERAL: return &((nnc_chr_literal*)expr->exact)->ctx;        break;
         case EXPR_STR_LITERAL: return &((nnc_str_literal*)expr->exact)->ctx;        break;

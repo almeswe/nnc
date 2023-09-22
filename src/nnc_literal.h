@@ -42,7 +42,6 @@ typedef struct _nnc_int_literal {
 typedef struct _nnc_chr_literal {
     nnc_ctx ctx;
     nnc_type* type;
-    nnc_u16 shift;
     nnc_byte exact;
 } nnc_chr_literal;
 
@@ -50,7 +49,6 @@ typedef struct _nnc_str_literal {
     nnc_ctx ctx;
     nnc_type* type;
     nnc_u64 bytes;
-    nnc_u16 shift;
     nnc_byte* exact;
 } nnc_str_literal;
 
@@ -67,10 +65,10 @@ typedef struct _nnc_bounds {
     } max;
 } nnc_bounds;
 
-nnc_dbl_literal* nnc_dbl_new(const char* repr);
-nnc_int_literal* nnc_int_new(const char* repr);
-nnc_chr_literal* nnc_chr_new(const char* repr);
-nnc_str_literal* nnc_str_new(const char* repr);
+nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx);
+nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx);
+nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx);
+nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx);
 
 void nnc_dbl_free(nnc_dbl_literal* literal);
 void nnc_int_free(nnc_int_literal* literal);

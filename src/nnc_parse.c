@@ -28,6 +28,23 @@ nnc_tok* nnc_parser_get(nnc_parser* parser) {
 }
 
 nnc_ctx* nnc_parser_get_ctx(nnc_parser* parser) {
+    // when trying to get current parser context
+    // we need to shift current char by size of token
+    // because when token is grabbed, it's last character captured,
+    // but in practical use the position of first character is needed.
+    //      <token>
+    //            ^ (captured)
+    //      <token>
+    //      ^       (shifted, used in errors and warnings)
+    nnc_ctx* cctx = &parser->current.ctx;
+    nnc_tok* ctok = &parser->current.tok;
+    parser->current.ctx_copy = *cctx;
+    assert(parser->current.ctx_copy.hint_ch >= ctok->size);
+    parser->current.ctx_copy.hint_ch -= ctok->size;
+    return &parser->current.ctx_copy;
+}
+
+nnc_ctx* nnc_parser_get_ctx2(nnc_parser* parser) {
     nnc_ctx* cctx = &parser->current.ctx;
     const nnc_tok* ctok = nnc_parser_get(parser); 
     cctx->hint_sz = ctok->size;
@@ -285,36 +302,28 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
 
 nnc_static nnc_expression* nnc_parse_dbl(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_dbl_literal* exact = nnc_dbl_new(tok->lexeme);
-    exact->ctx = *nnc_parser_get_ctx(parser);
-    exact->ctx.hint_ch -= tok->size;
+    nnc_dbl_literal* exact = nnc_dbl_new(tok->lexeme, nnc_parser_get_ctx(parser));
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_DBL_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_int(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_int_literal* exact = nnc_int_new(tok->lexeme);
-    exact->ctx = *nnc_parser_get_ctx(parser);
-    exact->ctx.hint_ch -= tok->size;
+    nnc_int_literal* exact = nnc_int_new(tok->lexeme, nnc_parser_get_ctx(parser));
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_INT_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_chr(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_chr_literal* exact = nnc_chr_new(tok->lexeme);
-    exact->ctx = *nnc_parser_get_ctx(parser);
-    exact->ctx.hint_ch -= exact->shift;
+    nnc_chr_literal* exact = nnc_chr_new(tok->lexeme, nnc_parser_get_ctx(parser));
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_CHR_LITERAL, exact);
 }
 
 nnc_static nnc_expression* nnc_parse_str(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
-    nnc_str_literal* exact = nnc_str_new(tok->lexeme);
-    exact->ctx = *nnc_parser_get_ctx(parser);
-    exact->ctx.hint_ch -= exact->shift;
+    nnc_str_literal* exact = nnc_str_new(tok->lexeme, nnc_parser_get_ctx(parser));
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_STR_LITERAL, exact);
 }
@@ -323,7 +332,6 @@ nnc_static nnc_expression* nnc_parse_ident(nnc_parser* parser) {
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_ident* exact = nnc_ident_new(tok->lexeme);
     exact->ctx = *nnc_parser_get_ctx(parser);
-    exact->ctx.hint_ch -= tok->size;
     nnc_parser_next(parser);
     return nnc_expr_new(EXPR_IDENT, exact);
 }
