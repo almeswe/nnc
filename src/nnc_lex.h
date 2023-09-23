@@ -18,10 +18,9 @@
 #define NNC_GET_KEYWORD_KIND()      (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme);
 
 #define NNC_LEX_ADJUST(c)       nnc_lex_adjust(lex, c)
-#define NNC_LEX_SET(k)          lex->ctok.kind = k
-#define NNC_LEX_SET_TERN(k)     (NNC_LEX_SET(k), 0)
+#define NNC_LEX_SET_TERN(k)     (nnc_lex_commit(lex, k), 0)
 #define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
-#define NNC_LEX_COMMIT(k)       NNC_LEX_SET(k); break
+#define NNC_LEX_COMMIT(k)       nnc_lex_commit(lex, k); break
 
 #define NNC_LEX_SKIP_LINE()     nnc_lex_skip_line(lex)
 
@@ -76,6 +75,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex);
 const char* nnc_tok_str(nnc_tok_kind kind);
 void nnc_lex_init(nnc_lex* out_lex, const char* fpath);
 void nnc_lex_init_with_fp(nnc_lex* out_lex, FILE* fp);
+void nnc_lex_recover(nnc_lex* lex);
 void nnc_lex_fini(nnc_lex* lex);
 void nnc_lex_keywords_map_fini();
 

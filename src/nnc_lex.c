@@ -95,6 +95,54 @@ static const char* nnc_tok_strs[] = {
 };
 
 /**
+ * @brief Stores sizes simple tokens. 
+ */
+static const nnc_u8 nnc_tok_sizes[] = {
+    [TOK_AND]        = 2,
+    [TOK_ASSIGN]     = 1,
+    [TOK_ASTERISK]   = 1,
+    [TOK_AMPERSAND]  = 1,
+    [TOK_ATPERSAND]  = 1,
+    [TOK_COLON]      = 1,
+    [TOK_COMMA]      = 1,
+    [TOK_CPAREN]     = 1,
+    [TOK_CBRACE]     = 1,
+    [TOK_CBRACKET]   = 1,
+    [TOK_CIRCUMFLEX] = 1,
+    [TOK_DOT]        = 1,
+    [TOK_DCOLON]     = 2,
+    [TOK_DOLLAR]     = 1,
+    [TOK_EQ]         = 1,
+    [TOK_EOF]        = 0,
+    [TOK_EXCMARK]    = 1,
+    [TOK_GT]         = 1,
+    [TOK_GTE]        = 2,
+    [TOK_GRAVE]      = 1,
+    [TOK_LT]         = 1,
+    [TOK_LTE]        = 2,
+    [TOK_LSHIFT]     = 2,
+    [TOK_MINUS]      = 1,
+    [TOK_NEQ]        = 2,
+    [TOK_OR]         = 2,
+    [TOK_OPAREN]     = 1,
+    [TOK_OBRACE]     = 1,
+    [TOK_OBRACKET]   = 1,
+    [TOK_PLUS]       = 1,
+    [TOK_PERCENT]    = 1,
+    [TOK_QUESTION]   = 1,
+    [TOK_QUOTE]      = 1,
+    [TOK_QUOTES]     = 1,
+    [TOK_RSHIFT]     = 2,
+    [TOK_STR]        = 1,
+    [TOK_SIGN]       = 1,
+    [TOK_SLASH]      = 1,
+    [TOK_SEMICOLON]  = 1,
+    [TOK_TILDE]      = 1,
+    [TOK_UNDERSCORE] = 1,
+    [TOK_VLINE]      = 1
+};
+
+/**
  * @brief Stores keywords supported by nnc.
  */
 static const char* nnc_keywords[] = {
@@ -167,10 +215,8 @@ nnc_static void nnc_lex_skip(nnc_lex* lex) {
  * @param lex Pointer to `nnc_lex` instance.
  */
 nnc_static void nnc_lex_tok_clear(nnc_lex* lex) {
-    if (lex->ctok.size > 0) {
-        memset(lex->ctok.lexeme, 0, lex->ctok.size);
-    }
     lex->ctok.size = 0;
+    memset(lex->ctok.lexeme, 0, NNC_TOK_BUF_MAX);
 }
 
 /**
@@ -191,7 +237,7 @@ nnc_static void nnc_lex_skip_line(nnc_lex* lex) {
  * @brief Performs error-recovery, by skipping whole line of characters.
  * @param lex Pointer to `nnc_lex` instance.
  */
-nnc_static void nnc_lex_make_recovery(nnc_lex* lex) {
+void nnc_lex_recover(nnc_lex* lex) {
     nnc_lex_skip_line(lex);
 }
 
@@ -219,7 +265,7 @@ nnc_static char nnc_lex_grab_esc(nnc_lex* lex) {
     // unget last character for correct
     // context calculation
     nnc_lex_undo(lex);
-    THROW(NNC_LEX_BAD_ESC, "bad escape character met.", &lex->cctx);
+    THROW(NNC_LEX_BAD_ESC, "bad escape character met.", lex->cctx);
     // unreachable code part, just to avoid compiler warning
     return '\0';
 }
@@ -249,7 +295,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_chr(nnc_lex* lex) {
         // unget last character for correct
         // context calculation
         nnc_lex_undo(lex);
-        THROW(NNC_LEX_BAD_CHR, "expected single quote `\'`.", &lex->cctx);
+        THROW(NNC_LEX_BAD_CHR, "expected single quote `\'`.", lex->cctx);
     }
     NNC_TOK_PUT_CC();
     return TOK_CHR;
@@ -282,7 +328,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_str(nnc_lex* lex) {
         // unget last character for correct
         // context calculation
         nnc_lex_undo(lex);
-        THROW(NNC_LEX_BAD_STR, "expected double quote `\"`.", &lex->cctx);
+        THROW(NNC_LEX_BAD_STR, "expected double quote `\"`.", lex->cctx);
     }
     NNC_TOK_PUT_CC();
     return TOK_STR;
@@ -300,7 +346,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_exponent(nnc_lex* lex) {
     nnc_byte sign = lex->cc;
     if (sign != '+' && sign != '-') {
         nnc_lex_undo(lex);
-        THROW(NNC_LEX_BAD_EXP, "expected exponent sign (+ or -).", &lex->cctx);
+        THROW(NNC_LEX_BAD_EXP, "expected exponent sign (+ or -).", lex->cctx);
     }
     NNC_TOK_PUT_C(sign);
     while (nnc_lex_grab(lex) != EOF) {
@@ -354,7 +400,7 @@ nnc_static void nnc_lex_grab_int_suffix(nnc_lex* lex) {
                 default:
                     bad_suffix:
                     nnc_lex_undo(lex);
-                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (i|I|u|U)(8|16|32|64).", &lex->cctx);
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (i|I|u|U)(8|16|32|64).", lex->cctx);
                     break;
             }
             break;
@@ -394,7 +440,7 @@ nnc_static void nnc_lex_grab_float_suffix(nnc_lex* lex) {
                 default:
                     bad_suffix:
                     nnc_lex_undo(lex);
-                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (f|F)(32|64).", &lex->cctx); 
+                    THROW(NNC_LEX_BAD_SUFFIX, "valid suffixes are (f|F)(32|64).", lex->cctx); 
                     break;
             }
             break;
@@ -427,7 +473,7 @@ nnc_static nnc_tok_kind nnc_lex_grab_float(nnc_lex* lex) {
     }
     if (size_after_dot == 0) {
         nnc_lex_undo(lex);
-        THROW(NNC_LEX_BAD_FLOAT, "empty after dot part.", &lex->cctx);
+        THROW(NNC_LEX_BAD_FLOAT, "empty after dot part.", lex->cctx);
     }
     return TOK_NUMBER;
 }
@@ -577,6 +623,18 @@ nnc_static nnc_bool nnc_lex_adjust(nnc_lex* lex, char c) {
     return adjusted == c;
 }
 
+nnc_static void nnc_lex_commit(nnc_lex* lex, nnc_tok_kind kind) {
+    lex->ctok.kind = kind;
+    if (kind != TOK_CHR   &&
+        kind != TOK_STR   &&
+        kind != TOK_IDENT &&
+        kind != TOK_NUMBER) {
+        if (kind < TOK_AS || kind > TOK_ELSE) {
+            lex->ctok.size = nnc_tok_sizes[kind];
+        }
+    }
+}
+
 /**
  * @brief Grabs next token from sequence of characters.
  *  This function is recovers from error automatically.
@@ -660,8 +718,8 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
         return lex->ctok.kind;
     }
     CATCHALL {
-        NNC_SHOW_CATCHED(&lex->cctx);
-        nnc_lex_make_recovery(lex);
+        NNC_SHOW_CATCHED(&CATCHED.where);
+        nnc_lex_recover(lex);
         return nnc_lex_next(lex);
     }
 }
