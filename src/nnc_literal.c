@@ -84,7 +84,7 @@ nnc_static nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
     if (current.min.f > literal->exact ||
         current.max.f < literal->exact) {
         THROW(NNC_OVERFLOW, sformat("value \'%f\' out of bounds "
-            "of it's suffix.", literal->exact), &literal->ctx);
+            "of it's suffix.", literal->exact), literal->ctx);
     }
     return literal;
 }
@@ -203,14 +203,14 @@ nnc_static nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
         if (current.min.d > literal->exact.d ||
             current.max.d < literal->exact.d) {
             THROW(NNC_OVERFLOW, sformat("value \'%ld\' out of bounds "
-                "of it's suffix.", literal->exact.d), &literal->ctx);
+                "of it's suffix.", literal->exact.d), literal->ctx);
         }
     }
     else {
         if (current.min.u > literal->exact.u ||
             current.max.u < literal->exact.u) {
             THROW(NNC_OVERFLOW, sformat("value \'%lu\' out of bounds "
-                "of it's suffix.", literal->exact.u), &literal->ctx);
+                "of it's suffix.", literal->exact.u), literal->ctx);
         }
     }
     return literal;
@@ -275,7 +275,7 @@ nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
     }
     if (errno == ERANGE) {
         THROW(NNC_OVERFLOW, sformat("value \'%s\' out of bounds "
-            "of it's suffix.", repr_buf), &ptr->ctx);
+            "of it's suffix.", repr_buf), ptr->ctx);
     }
     if (errno != 0) {
         nnc_abort_no_ctx(sformat("nnc_int_new [errno: %d]: cannot"

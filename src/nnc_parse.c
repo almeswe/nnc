@@ -87,8 +87,8 @@ nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
 nnc_tok_kind nnc_parser_expect(nnc_parser* parser, nnc_tok_kind kind) {
     nnc_tok_kind current = nnc_parser_peek(parser);
     if (current != kind) {
-        THROW(NNC_SYNTAX, sformat("expected <%s>, but met <%s>.", 
-            nnc_tok_str(kind), nnc_tok_str(current)), nnc_parser_get_ctx(parser));
+        THROW(NNC_SYNTAX, sformat("expected `%s`, but met `%s`.", 
+            nnc_tok_str(kind), nnc_tok_str(current)), *nnc_parser_get_ctx(parser));
     }   
     nnc_parser_next(parser);
     return nnc_parser_peek(parser);
@@ -225,7 +225,7 @@ nnc_static nnc_type* nnc_parse_struct_or_union_type(nnc_parser* parser) {
         case TOK_UNION:  type = nnc_union_type_new();  break;
         case TOK_STRUCT: type = nnc_struct_type_new(); break;
         default: 
-            THROW(NNC_SYNTAX, "expected <TOK_STRUCT> or <TOK_UNION>.", nnc_parser_get_ctx(parser)); 
+            THROW(NNC_SYNTAX, "expected `TOK_STRUCT` or `TOK_UNION`.", *nnc_parser_get_ctx(parser)); 
     }
     nnc_parser_next(parser);
     nnc_parser_expect(parser, TOK_OBRACE);
@@ -252,7 +252,7 @@ nnc_static nnc_type* nnc_parse_ptr_declarator(nnc_parser* parser, nnc_type* type
     nnc_parser_expect(parser, TOK_ASTERISK);
     type = nnc_ptr_type_new(type);
     if (type->base->kind == T_ARRAY) {
-        THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.", nnc_type_tostr(type)), nnc_parser_get_ctx(parser));
+        THROW(NNC_SYNTAX, sformat("cannot declare type \'%s\'.", nnc_type_tostr(type)), *nnc_parser_get_ctx(parser));
     }
     return type;
 }
@@ -290,7 +290,7 @@ nnc_static nnc_type* nnc_parse_type(nnc_parser* parser) {
         case TOK_ENUM:   type = nnc_parse_enum_type(parser); break;
         case TOK_UNION:  type = nnc_parse_struct_or_union_type(parser); break;
         case TOK_STRUCT: type = nnc_parse_struct_or_union_type(parser); break;
-        default: THROW(NNC_SYNTAX, "type expected.", nnc_parser_get_ctx(parser));
+        default: THROW(NNC_SYNTAX, "type expected.", *nnc_parser_get_ctx(parser));
     }
     // todo: fix this condition expression
     if (kind != TOK_IDENT &&
@@ -359,7 +359,8 @@ nnc_static nnc_expression* nnc_parse_primary_expr(nnc_parser* parser) {
         case TOK_IDENT:  return nnc_parse_ident(parser);
         case TOK_NUMBER: return nnc_parse_number(parser);
         case TOK_OPAREN: return nnc_parse_parens(parser);
-        default: THROW(NNC_UNINPLEMENTED, sformat("nnc_parse_primary_expr: %s.", nnc_tok_str(tok->kind)));
+        default: THROW(NNC_SYNTAX, sformat("nnc_parse_primary_expr: %s.", 
+            nnc_tok_str(tok->kind)), *nnc_parser_get_ctx(parser));
     }
     return NULL;
 }
@@ -456,7 +457,7 @@ nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser);
 nnc_static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_expect(parser, TOK_DOT);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
-        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
+        THROW(NNC_SYNTAX, "expected `TOK_IDENT` as member accessor.", *nnc_parser_get_ctx(parser));
     }
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_DOT);
     expr->expr = prefix;
@@ -468,7 +469,7 @@ nnc_static nnc_expression* nnc_parse_dot_expr(nnc_parser* parser, nnc_expression
 nnc_static nnc_expression* nnc_parse_scope_expr(nnc_parser* parser, nnc_expression* prefix) {
     nnc_parser_expect(parser, TOK_DCOLON);
     if (!nnc_parser_match(parser, TOK_IDENT)) {
-        THROW(NNC_SYNTAX, "expected <TOK_IDENT> as member accessor.", nnc_parser_get_ctx(parser));
+        THROW(NNC_SYNTAX, "expected `TOK_IDENT` as member accessor.", *nnc_parser_get_ctx(parser));
     }
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_POSTFIX_SCOPE);
     expr->expr = prefix;
@@ -1029,14 +1030,39 @@ nnc_static nnc_statement* nnc_parse_return_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_RETURN, ret_stmt);
 }
 
+nnc_static void nnc_parser_recover(nnc_parser* parser) {
+    //nnc_lex_recover(&parser->lex);
+    //nnc_parser_next(parser);
+    while (!nnc_parser_match(parser, TOK_EOF)) {
+        const nnc_tok* tok = nnc_parser_get(parser);
+        if (tok->kind == TOK_SEMICOLON) {
+            break;
+        }
+        nnc_parser_next(parser);
+    }
+}
+
 nnc_static nnc_statement* nnc_parse_compound_stmt(nnc_parser* parser, nnc_st_ctx ctx) {
     nnc_parser_enter_scope(parser);
     nnc_compound_statement* compound_stmt = anew(nnc_compound_statement);
     compound_stmt->scope = parser->st;
     compound_stmt->scope->ctx = ctx;
     nnc_parser_expect(parser, TOK_OBRACE);
-    while (!nnc_parser_match(parser, TOK_CBRACE)) {
+    while (!nnc_parser_match(parser, TOK_EOF) &&
+           !nnc_parser_match(parser, TOK_CBRACE)) {
         buf_add(compound_stmt->stmts, nnc_parse_stmt(parser));
+        /*
+        nnc_statement* stmt = NULL;
+        TRY {
+            stmt = nnc_parse_stmt(parser);
+            buf_add(compound_stmt->stmts, stmt);
+            ETRY;
+        }
+        CATCHALL {
+            NNC_SHOW_CATCHED(CATCHED.where);
+            nnc_parser_recover(parser);
+        }
+        */
     }
     nnc_parser_expect(parser, TOK_CBRACE);
     nnc_parser_leave_scope(parser);

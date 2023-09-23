@@ -23,7 +23,7 @@
 typedef enum _nnc_exception_kind {
     NNC_CONTEXT_SAVED   = 0x00,
     NNC_UNHANDLED       = 0x01,
-    NNC_UNINPLEMENTED   = 0x02,
+    NNC_UNIMPLEMENTED   = 0x02,
 
     NNC_OVERFLOW,
 
@@ -66,7 +66,7 @@ typedef struct _nnc_exception {
     nnc_exception_kind kind;    // represents type of exception
     const char* repr;           // represents string representation of exception type
     const char* what;           // represents optional error message attached to exception
-    const void* data;           // represents optional data attached to exception
+    nnc_ctx where;              // represents context where exception occured
 } nnc_exception;
 
 typedef struct _nnc_exception_stack {
