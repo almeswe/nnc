@@ -123,7 +123,7 @@ nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx) {
  * @param repr String representation of float number.
  * @return `nnc_int_suffix` value, or SUFFIX_NONE.
  */
-nnc_int_suffix nnc_get_int_suffix(const char* repr) {
+nnc_static nnc_int_suffix nnc_get_int_suffix(const char* repr) {
     nnc_byte suffix[3] = { 0 };
     nnc_bool met_i_or_u = false;
     nnc_u64 size = strlen(repr);
@@ -303,17 +303,13 @@ nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx) {
 }
 
 /**
- * @brief Allocates & initializes new instance of `nnc_str_literal`.
- * @param repr String representation of string literal which will be parsed.
- * @param ctx Context of the string literal.
- * @return Allocated & initialized instance of `nnc_str_literal`.
+ * @brief Performs folding of escape characters met inside passed representation.
+ * @param literal Pointer to allocated & initialized string literal.
+ * @param repr Pointer to representation of string literal (it's simply lexeme from TOK_STR)
  */
-nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
-    nnc_str_literal* ptr = anew(nnc_str_literal);
-    ptr->ctx = *ctx;
-    ptr->type = &unknown_type;
-    nnc_u64 index = 0, repr_len = strlen(repr);
-    ptr->exact = cnew(nnc_byte, repr_len + 1);
+nnc_static void nnc_str_zip(nnc_str_literal* literal, const char* repr) {
+    nnc_u64 index = 0;
+    nnc_u64 repr_len = strlen(repr);
     nnc_bool esc_chr_met = false;
     for (nnc_u64 i = 1; i < repr_len - 1; i++) {
         nnc_byte c = repr[i]; 
@@ -325,8 +321,22 @@ nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
             esc_chr_met = true;
             continue;
         }
-        ptr->exact[index++] = c;
+        literal->exact[index++] = c;
     }
+}
+
+/**
+ * @brief Allocates & initializes new instance of `nnc_str_literal`.
+ * @param repr String representation of string literal which will be parsed.
+ * @param ctx Context of the string literal.
+ * @return Allocated & initialized instance of `nnc_str_literal`.
+ */
+nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
+    nnc_str_literal* ptr = anew(nnc_str_literal);
+    ptr->ctx = *ctx;
+    ptr->type = &unknown_type;
+    ptr->exact = cnew(nnc_byte, strlen(repr) + 1);
+    nnc_str_zip(ptr, repr);
     ptr->bytes = strlen(ptr->exact);
     return ptr;
 }
