@@ -10,14 +10,14 @@
 nnc_bool nnc_try(nnc_i64 state) {
     nnc_i64 depth = glob_exception_stack.depth;
     if (depth == NNC_EXCEPTION_MAX_DEPTH) {
-        nnc_abort("nnc_try:depth exceeded.\n", NULL);
+        nnc_abort_no_ctx("nnc_try: depth exceeded.\n");
     }
     // set state to last object inside stack
     glob_exception_stack.exceptions[depth] = state;
     // if it was called first time, it means
     // that we increase depth of try-catch statements
     if (state == NNC_CONTEXT_SAVED) {
-        glob_exception_stack.depth++;
+        glob_exception_stack.depth += 1;
     }
     // otherwise, it means that this function was called after 
     // `nnc_throw` was called, so decrease depth, because we leaved try-catch closure.
@@ -31,7 +31,7 @@ nnc_bool nnc_try(nnc_i64 state) {
  * @brief Performs releasing data after try-catch closure.
  */
 void nnc_try_free() {
-    glob_exception_stack.depth--;
+    glob_exception_stack.depth -= 1;
 }
 
 /**
@@ -44,7 +44,7 @@ void nnc_throw(nnc_exception exception) {
     // performs long jump to last `nnc_try` call in stack.
     longjmp(glob_exception_stack.stack[depth], exception.kind);
     // if for some reason it did not jumped, abort, something weird happened.
-    nnc_abort("nnc_throw:longjmp was aborted", NULL);
+    nnc_abort_no_ctx("nnc_throw: longjmp failed.\n");
 }
 
 /**

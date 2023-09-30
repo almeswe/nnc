@@ -706,6 +706,7 @@ nnc_tok_kind nnc_lex_next(nnc_lex* lex) {
             case '/': {
                 if (NNC_LEX_ADJUST('/')) {
                     NNC_LEX_SKIP_LINE();
+                    ETRY;
                     return nnc_lex_next(lex);
                 }
                 else {

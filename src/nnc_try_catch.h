@@ -5,13 +5,31 @@
 #include "nnc_error.h"
 
 #define NNC_EXCEPTION_MAX_DEPTH 16
+#define NNC_ENABLE_TRY_BLOCK_LOGGING 0
 
 #define NNC_EXC_DEPTH glob_exception_stack.depth
 #define NNC_EXC_STACK glob_exception_stack.stack
 #define NNC_EXC_ARRAY glob_exception_stack.exceptions
 
-#define TRY                     if (nnc_try(setjmp(NNC_EXC_STACK[NNC_EXC_DEPTH])))
-#define ETRY                    nnc_try_free()
+#if !NNC_ENABLE_TRY_BLOCK_LOGGING
+    #define NNC_LOG_TRY_ENTER
+    #define NNC_LOG_TRY_LEAVE
+    #define NNC_LOG_TRY_FREED
+#else
+    #define NNC_LOG_TRY_ENTER                           \
+        fprintf(stderr, "%s: try in(%ld)\n",            \
+            __FUNCTION__, glob_exception_stack.depth);
+    #define NNC_LOG_TRY_LEAVE                           \
+        fprintf(stderr, "%s: try out(%ld)\n",           \
+            __FUNCTION__, glob_exception_stack.depth);
+    #define NNC_LOG_TRY_FREED                              \
+        nnc_i64 __nnc_depth = glob_exception_stack.depth;  \
+        fprintf(stderr, "nnc_try_free: depth %ld->%ld.\n", \
+            __nnc_depth + 1, __nnc_depth);
+#endif
+
+#define TRY                     NNC_LOG_TRY_ENTER if (nnc_try(setjmp(NNC_EXC_STACK[NNC_EXC_DEPTH])))
+#define ETRY                    NNC_LOG_TRY_LEAVE NNC_LOG_TRY_FREED nnc_try_free()
 #define THROW(exception, ...)   nnc_throw((nnc_exception){ exception, #exception, __VA_ARGS__ })
 #define CATCH(exception)        else if (nnc_catch(exception))
 #define CATCHALL                else
@@ -70,7 +88,7 @@ typedef struct _nnc_exception {
 } nnc_exception;
 
 typedef struct _nnc_exception_stack {
-    nnc_i64 depth;                                  // represents current depth (length of `exceptions` array)
+    volatile nnc_i64 depth;                         // represents current depth (length of `exceptions` array)
     jmp_buf stack[NNC_EXCEPTION_MAX_DEPTH];         // represents array of saved contexts (used by setjmp and longjmp), to allow nested try-catch statements
     nnc_i64 exceptions[NNC_EXCEPTION_MAX_DEPTH];    // represents array of exception types, reason is the same as for `stack` was.
     nnc_exception thrown;                           // represents last thrown exception, this field is used by `CATCHED` macro.
