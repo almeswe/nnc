@@ -1,30 +1,17 @@
 #include "nnc_core.h"
 
-nnc_arena glob_arena;
-nnc_error_canarie glob_error_canarie;
-nnc_exception_stack glob_exception_stack;
-nnc_deferred_stack glob_deferred_stack;
+nnc_arena glob_arena = { 0 };
+nnc_error_canarie glob_error_canarie = { 0 };
+nnc_exception_stack glob_exception_stack = { 0 };
 
-#include <fcntl.h>
-
-static void test() {
-    char buf[64] = {0};
-    sprintf(buf, "__nnctemp%d", rand());
-    int fp = open(buf, O_CREAT | O_RDWR);
-    if (fp == -1) {
-        perror("open");
-        exit(EXIT_FAILURE);
+static void nnc_check_for_errors() {
+    if (nnc_error_occured()) {
+        //fprintf(stderr, "used memory: %lu B.\n", 
+        //    glob_arena.alloc_bytes);
+        nnc_arena_fini(&glob_arena);
+        nnc_abort_no_ctx(sformat("%ld error(s) detected.\n", glob_error_canarie));
     }
-    close(fp);
-    FILE* file = fopen(buf, "w+");
-    const char* a = 
-        "fn main(): i32 {\n"
-        "   return 0 as i32;\n"
-        "}\n"
-    ;
-    fputs(a, file);
-    fclose(file);
-    remove(buf);
+    nnc_reset_canarie();
 }
 
 static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
@@ -39,11 +26,14 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
         printf("%s\n", nnc_type_tostr(nnc_expr_infer_type(expr)));
         */
         nnc_ast* ast = nnc_parse(argv[1]);
-        if (argc == 2) {
-            while (glob_deferred_stack.entities->len > 0) {
-                nnc_deferred_stack_resolve(&glob_deferred_stack);
-            }
-        }
+        nnc_check_for_errors();
+        nnc_resolve(ast);
+        //if (argc == 2) {
+        //    while (glob_deferred_stack.entities->len > 0) {
+        //        nnc_deferred_stack_resolve(&glob_deferred_stack);
+        //    }
+        //}
+        nnc_check_for_errors();
         nnc_dump_ast(ast);
         /*
         if (ast->expr->kind == EXPR_INT_LITERAL) {
@@ -74,15 +64,12 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
             printf("binary: \n");
         }
         */
-    }
-    CATCH(NNC_SYNTAX) {
-        nnc_abort_no_ctx(sformat("%s: %s (%s)\n", CATCHED.repr, CATCHED.what,
-            nnc_ctx_tostr(CATCHED.data)));
+       ETRY;
     }
     CATCHALL {
-        nnc_abort_no_ctx(sformat("%s: %s\n", CATCHED.repr, CATCHED.what));
+        NNC_SHOW_CATCHED(&CATCHED.where);
     }
-    
+    nnc_check_for_errors();
     /*
     nnc_parser parser = { 0 };
     TRY {
@@ -122,7 +109,6 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
 nnc_i32 main(nnc_i32 argc, char** argv) {
     nnc_reset_canarie();
     nnc_arena_init(&glob_arena);
-    nnc_deferred_stack_init(&glob_deferred_stack);
     nnc_i32 status = nnc_main(argc, argv);
     nnc_arena_fini(&glob_arena);
     return status;
