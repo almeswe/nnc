@@ -65,9 +65,9 @@ nnc_type* nnc_namespace_type_new() {
 nnc_static nnc_str nnc_fn_type_tostr(const nnc_type* type) {
     nnc_str repr = "fn( ";
     for (nnc_u64 i = 0; i < type->exact.fn.paramc; i++) {
-        repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]));
+        repr = sformat("%s%s ", repr, nnc_type_tostr(type->exact.fn.params[i]->type));
     }
-    return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret));
+    return sformat("%s):%s", repr, nnc_type_tostr(type->exact.fn.ret->type));
 }
 
 nnc_static nnc_str nnc_enum_type_tostr(const nnc_type* type) {
@@ -99,13 +99,13 @@ nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     nnc_struct_member* member = NULL;
     if (count >= 1) {
         member = type->exact.struct_or_union.members[0];
-        if (member->type->kind == T_ALIAS) {
+        if (member->texpr->type->kind == T_ALIAS) {
             repr = sformat("%s%s:%s ", repr, 
-                member->var->name, member->type->repr);
+                member->var->name, member->texpr->type->repr);
         }
         else {
-            repr = sformat("%s%s:%s ", repr, 
-                member->var->name, nnc_type_tostr(member->type));
+            repr = sformat("%s%s:%s ", repr, member->var->name, 
+                nnc_type_tostr(member->texpr->type));
         }
     }
     if (count > 2) {
@@ -114,13 +114,13 @@ nnc_static nnc_str nnc_struct_or_union_type_tostr(const nnc_type* type) {
     }
     if (count > 1) {
         member = type->exact.struct_or_union.members[count-1];
-        if (member->type->kind == T_ALIAS) {
-            repr = sformat("%s%s:%s ", repr, 
-                member->var->name, member->type->repr);
+        if (member->texpr->type->kind == T_ALIAS) {
+            repr = sformat("%s%s:%s ", repr, member->var->name,
+                member->texpr->type->repr);
         }
         else {
-            repr = sformat("%s%s:%s ", repr, 
-                member->var->name, nnc_type_tostr(member->type));
+            repr = sformat("%s%s:%s ", repr, member->var->name,
+                nnc_type_tostr(member->texpr->type));
         }
     }
     return sformat("%s}", repr);

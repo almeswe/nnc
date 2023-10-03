@@ -106,9 +106,10 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
  * @brief Tryes to complete type in context of specified symtable.
  * @param type Pointer to `nnc_type` instance to be completed.
  * @param st Pointer to `nnc_st` instance.
+ * @param ctx Pointer to type context.
  * @throw `NNC_SEMANTIC` in case when `type` is not listed in `st`. 
  */
-nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
+nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     if (type->kind != T_INCOMPLETE &&
         type->kind != T_ALIAS) {
         return;
@@ -118,11 +119,23 @@ nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st) {
         st_type = nnc_st_get_type(st, type->repr);
         if (st_type != NULL) {
             *type = *st_type;
-            nnc_complete_type(type->base, st);
+            nnc_complete_type(type->base, st, ctx);
             return;
         }
     }
-    THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr));
+    if (ctx == NULL) {
+        THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr));
+    }
+    THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr), *ctx);
+}
+
+/**
+ * @brief Tryes to complete type in context of specified symtable.
+ * @param type_expr Expression which contains type and context.
+ * @param st Pointer to `nnc_st` instance.
+ */
+nnc_static void nnc_complete_type_expr(nnc_type_expression* type_expr, nnc_st* st) {
+    nnc_complete_type(type_expr->type, st, &type_expr->ctx);
 }
 
 /**
@@ -161,9 +174,9 @@ nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_
         // complete member's type basic information
         // `nnc_resolve_type` function here may cause
         // stack overflow in some cases
-        nnc_complete_type(m->type, st);
+        nnc_complete_type_expr(m->texpr, st);
         // get pure type in context of an array type
-        nnc_type* m_ref = m->type;
+        nnc_type* m_ref = m->texpr->type;
         while (m_ref->kind == T_ARRAY) {
             m_ref = m_ref->base;
         }
@@ -190,9 +203,18 @@ nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_
  * This includes type completion and size calculation.
  * @param type Pointer to `nnc_type` instance.
  * @param st Pointer to `nnc_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if process of resolving succeeded, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st);
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx);
+
+/**
+ * @brief Resolves type node expression.
+ * @param type_expr Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @return `true` if type expression resolved, otherwise `false`.
+ */
+nnc_static nnc_bool nnc_resolve_type_expr(nnc_type_expression* type_expr, nnc_st* st);
 
 /**
  * @brief Resolves aliased union. This is the same as default
@@ -200,6 +222,7 @@ nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st);
  * @param alias Pointer to `nnc_type` which is alias to union type.
  * @param ref_type Pointer to `nnc_type` which is actual unaliased union type.
  * @param st Pointer to `nns_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if process of resolving succeeded, `false` otherwise.
  */
 #define nnc_resolve_aliased_union(...) nnc_resolve_aliased_struct(__VA_ARGS__)
@@ -210,10 +233,11 @@ nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st);
  * @param alias Pointer to `nnc_type` which is alias to struct type.
  * @param ref_type Pointer to `nnc_type` which is actual unaliased struct type.
  * @param st Pointer to `nns_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if process of resolving succeeded, `false` otherwise.
  * @throw `NNC_SEMANTIC` in case when circular dependency met.
  */
-nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* ref_type, nnc_st* st, const nnc_ctx* ctx) {
     const nnc_str a_name = alias->repr;
     struct _nnc_struct_or_union_type* exact = &ref_type->exact.struct_or_union;
     for (nnc_u64 i = 0; i < exact->memberc; i++) {
@@ -221,12 +245,12 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
         // complete member's type basic information
         // `nnc_resolve_type` function here may cause
         // stack overflow in some cases
-        nnc_complete_type(m->type, st);
+        nnc_complete_type_expr(m->texpr, st);
         // then we need to get pure base type of `m->type`,
         // because size of alias and array types will be determined
         // based on `->base` type, we need to be sure that this `->base` type is not the same 
         // as `alias` type. Otherwise it will cause circular dependency => crash the compiler with stack overflow
-        nnc_type* m_ref = m->type;
+        nnc_type* m_ref = m->texpr->type;
         while (m_ref->kind == T_ALIAS ||
                m_ref->kind == T_ARRAY) {
             m_ref = m_ref->base;
@@ -236,14 +260,14 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
         if (nnc_struct_or_union_type(m_ref)) {
             if (nnc_struct_has_circular_dep(a_name, m_ref, st)) {
                 THROW(NNC_SEMANTIC, sformat("circular dependency met when expanding node "
-                    "inside `%s` at `%s::%s`.", a_name, a_name, m->var->name));
+                    "inside `%s` at `%s::%s`.", a_name, a_name, m->var->name), m->var->ctx);
             }
         }
     }
     // this made because union type is resolved
     // by this function too (`nnc_resolve_aliased_struct`), so to resolve type further
     // depending on it's type (struct or union), calling generic `nnc_resolve_type` here.
-    return nnc_resolve_type(ref_type, st);
+    return nnc_resolve_type(ref_type, st, ctx);
 }
 
 /**
@@ -253,12 +277,12 @@ nnc_static nnc_bool nnc_resolve_aliased_struct(const nnc_type* alias, nnc_type* 
  * @param st Pointer to `nns_st` instance.
  * @return `true` if process of resolving succeeded, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_aliased_type(nnc_type* alias, nnc_st* st, const nnc_ctx* ctx) {
     nnc_type* ref_type = nnc_unalias(alias);
     switch (ref_type->kind) {
-        case T_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st); 
-        case T_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st);
-        default:       return nnc_resolve_type(alias->base, st);
+        case T_UNION:  return nnc_resolve_aliased_union(alias, ref_type, st, ctx); 
+        case T_STRUCT: return nnc_resolve_aliased_struct(alias, ref_type, st, ctx);
+        default:       return nnc_resolve_type(alias->base, st, ctx);
     }
 }
 
@@ -309,9 +333,10 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
  * @brief Resolves enum type declaratin.
  * @param type Enum type to be resolved.
  * @param st Pointer to `nnc_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if enum resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     nnc_bool resolved = true;
     for (nnc_u64 i = 0; i < type->exact.enumeration.memberc; i++) {
         nnc_enumerator* enumerator = type->exact.enumeration.members[i];
@@ -324,28 +349,30 @@ nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st) {
  * @brief Resolves alias type.
  * @param type Alias type to be resolved.
  * @param st Pointer to `nnc_st` instance. 
+ * @param ctx Pointer to type context.
  * @return `true` if alias type is resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* st) {
-    return nnc_resolve_aliased_type(type, st);
+nnc_static nnc_bool nnc_resolve_alias(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
+    return nnc_resolve_aliased_type(type, st, ctx);
 }
 
 /**
  * @brief Resolves array type.
  * @param type Array type to be resolved.
  * @param st Pointer to `nnc_st` instance. 
+ * @param ctx Pointer to type context.
  * @return `true` if alias type is resolved, `false` otherwise.
  * @throw `NNC_SEMANTIC` in case when array's index is not constant expression,
  *          so it can't be determined in compile-time.
  *        `NNC_SEMANTIC` in case when array's index type is not integral type.
  */
-nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     nnc_expression* dim = type->exact.array.dim;
     const nnc_ctx* dim_ctx = nnc_expr_get_ctx(dim);
     nnc_resolve_expr(dim, st);
-    nnc_resolve_type(type->base, st);
+    nnc_resolve_type(type->base, st, ctx);
     nnc_type* t_dim = nnc_expr_get_type(dim);
-    nnc_complete_type(t_dim, st);
+    nnc_complete_type(t_dim, st, dim_ctx);
     if (!nnc_can_fold_expr(dim)) {
         THROW(NNC_SEMANTIC, "array dimension value must be constant.", *dim_ctx);
     }
@@ -360,18 +387,19 @@ nnc_static nnc_bool nnc_resolve_array(nnc_type* type, nnc_st* st) {
  * @brief Resolves union type.
  * @param type Union type to be resolved.
  * @param st Pointer to `nnc_st` instance. 
+ * @param ctx Pointer to type context.
  * @return `true` if union resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     type->size = 0;
     struct _nnc_struct_or_union_type* exact = &type->exact.struct_or_union;
     for (nnc_u64 i = 0; i < exact->memberc; i++) {
         nnc_struct_member* m = exact->members[i];
-        nnc_complete_type(m->type, st);
-        if (nnc_type_needs_size_resolve(m->type)) {
-            nnc_resolve_type(m->type, st);
+        nnc_complete_type_expr(m->texpr, st);
+        if (nnc_type_needs_size_resolve(m->texpr->type)) {
+            nnc_resolve_type_expr(m->texpr, st);
         }
-        type->size = nnc_max(type->size, nnc_sizeof(m->type));
+        type->size = nnc_max(type->size, nnc_sizeof(m->texpr->type));
     }
     return true;
 }
@@ -379,19 +407,25 @@ nnc_static nnc_bool nnc_resolve_union(nnc_type* type, nnc_st* st) {
 /**
  * @brief Resolves struct type.
  * @param type Struct type to be resolved.
- * @param st Pointer to `nnc_st` instance. 
+ * @param st Pointer to `nnc_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if struct resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     type->size = 0;
     struct _nnc_struct_or_union_type* exact = &type->exact.struct_or_union;
     for (nnc_u64 i = 0; i < exact->memberc; i++) {
-        nnc_struct_member* m = exact->members[i];
-        nnc_complete_type(m->type, st);
-        if (nnc_type_needs_size_resolve(m->type)) {
-            nnc_resolve_type(m->type, st);
+        TRY {
+            nnc_struct_member* m = exact->members[i];
+            nnc_complete_type_expr(m->texpr, st);
+            if (nnc_type_needs_size_resolve(m->texpr->type)) {
+                nnc_resolve_type_expr(m->texpr, st);
+            }
+            type->size += nnc_sizeof(m->texpr->type);
         }
-        type->size += nnc_sizeof(m->type);
+        CATCHALL {
+            NNC_SHOW_CATCHED(&CATCHED.where);
+        }
     }
     return true;
 }
@@ -400,27 +434,29 @@ nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st) {
  * @brief Resolves pointer type.
  * @param type Pointer type to be resolved.
  * @param st Pointer to `nnc_st` instance. 
+ * @param ctx Pointer to type context.
  * @return `true` if pointer type resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_ptr(nnc_type* type, nnc_st* st) {
-    return nnc_resolve_type(type->base, st);
+nnc_static nnc_bool nnc_resolve_ptr(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
+    return nnc_resolve_type(type->base, st, ctx);
 }
 
 /**
  * @brief Resolves function type.
  * @param type Function type to be resolved.
  * @param st Pointer to `nnc_st` instance. 
+ * @param ctx Pointer to type context.
  * @return `true` if function type resolved, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* st) {
+nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     nnc_bool is_resolved = true;
     for (nnc_u64 i = 0; i < type->exact.fn.paramc && is_resolved; i++) {
-        is_resolved &= nnc_resolve_type(type->exact.fn.params[i], st);
+        is_resolved &= nnc_resolve_type_expr(type->exact.fn.params[i], st);
     }
-    if (type->exact.fn.ret->kind == T_VOID) {
+    if (type->exact.fn.ret->type->kind == T_VOID) {
         return is_resolved;
     }
-    return is_resolved && nnc_resolve_type(type->exact.fn.ret, st);
+    return is_resolved && nnc_resolve_type_expr(type->exact.fn.ret, st);
 }
 
 /**
@@ -428,24 +464,26 @@ nnc_static nnc_bool nnc_resolve_fn(nnc_type* type, nnc_st* st) {
  * This includes type completion and size calculation.
  * @param type Pointer to `nnc_type` instance.
  * @param st Pointer to `nnc_st` instance.
+ * @param ctx Pointer to type context.
  * @return `true` if process of resolving succeeded, `false` otherwise.
  */
-nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st) {
-    nnc_complete_type(type, st);
+nnc_static nnc_bool nnc_resolve_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
+    nnc_complete_type(type, st, ctx);
     if (nnc_primitive_type(type) || 
         nnc_namespace_type(type)) {
         return true;
     }
     switch (type->kind) {
-        case T_ENUM:     return nnc_resolve_enum(type, st);
-        case T_ALIAS:    return nnc_resolve_alias(type, st);
-        case T_ARRAY:    return nnc_resolve_array(type, st);
-        case T_UNION:    return nnc_resolve_union(type, st);
-        case T_STRUCT:   return nnc_resolve_struct(type, st);
-        case T_POINTER:  return nnc_resolve_ptr(type, st);
-        case T_FUNCTION: return nnc_resolve_fn(type, st);
-        default: return false;
+        case T_ENUM:     return nnc_resolve_enum(type, st, ctx);
+        case T_ALIAS:    return nnc_resolve_alias(type, st, ctx);
+        case T_ARRAY:    return nnc_resolve_array(type, st, ctx);
+        case T_UNION:    return nnc_resolve_union(type, st, ctx);
+        case T_STRUCT:   return nnc_resolve_struct(type, st, ctx);
+        case T_POINTER:  return nnc_resolve_ptr(type, st, ctx);
+        case T_FUNCTION: return nnc_resolve_fn(type, st, ctx);
+        default: break;
     }
+    return false;
 }
 
 /**
@@ -560,13 +598,14 @@ nnc_static void nnc_resolve_not_expr(nnc_unary_expression* unary, nnc_st* st) {
  * @throw `NNC_SEMANTIC` in case when cannot explicitly cast type of expression to specified type.
  */
 nnc_static void nnc_resolve_cast_expr(nnc_unary_expression* unary, nnc_st* st) {
-    nnc_resolve_type(unary->exact.cast.to, st);
+    nnc_resolve_type_expr(unary->exact.cast.to, st);
+    const nnc_type* t_cast = unary->exact.cast.to->type;
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
-    if (!nnc_can_exp_cast(t_expr, unary->exact.cast.to)) {
+    if (!nnc_can_exp_cast(t_expr, t_cast)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
-            nnc_type_tostr(t_expr), nnc_type_tostr(unary->exact.cast.to)), unary->ctx);
+            nnc_type_tostr(t_expr), nnc_type_tostr(t_cast)), unary->ctx);
     }
-    unary->type = unary->exact.cast.to;
+    unary->type = unary->exact.cast.to->type;
 }
 
 /**
@@ -618,7 +657,7 @@ nnc_static void nnc_resolve_deref_expr(nnc_unary_expression* unary, nnc_st* st) 
  * @param st Pointer to `nnc_st` instance.
  */
 nnc_static void nnc_resolve_sizeof_expr(nnc_unary_expression* unary, nnc_st* st) {
-    nnc_resolve_type(unary->exact.size.of, st);
+    nnc_resolve_type_expr(unary->exact.size.of, st);
     assert(unary->expr == NULL);
     unary->type = &u64_type;
 }
@@ -656,16 +695,17 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
  * @return `NNC_SEMANTIC` in case when cannot explicitly cast expression type to `as` type. 
  */
 nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
-    nnc_resolve_type(unary->exact.cast.to, st);
+    nnc_resolve_type_expr(unary->exact.cast.to, st);
+    const nnc_type* t_as = unary->exact.cast.to->type;
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
-    if (!nnc_can_exp_cast(t_expr, unary->exact.cast.to)) {
+    if (!nnc_can_exp_cast(t_expr, t_as)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
-            nnc_type_tostr(t_expr), nnc_type_tostr(unary->exact.cast.to)), unary->ctx);
+            nnc_type_tostr(t_expr), nnc_type_tostr(t_as)), unary->ctx);
     }
     else {
         //todo: check for const expression + cast to expansion type
     }
-    unary->type = unary->exact.cast.to;
+    unary->type = unary->exact.cast.to->type;
 }
 
 /**
@@ -685,7 +725,7 @@ nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
     for (nnc_u64 i = 0; i < t_expr->exact.struct_or_union.memberc; i++) {
         nnc_struct_member* s_m = t_expr->exact.struct_or_union.members[i];
         if (nnc_sequal(s_m->var->name, m->name)) {
-            unary->type = s_m->type;
+            unary->type = s_m->texpr->type;
             m->type = unary->type;
             return;
         }
@@ -718,7 +758,7 @@ nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
     // then resolve all arguments, and check their types
     for (nnc_u64 i = 0; i < c_expr->argc; i++) {
         nnc_resolve_expr(c_expr->args[i], st);
-        const nnc_type* t_param = f_type->params[i];
+        const nnc_type* t_param = f_type->params[i]->type;
         const nnc_type* t_arg = nnc_expr_get_type(c_expr->args[i]);  
         if (!nnc_can_imp_cast_assign(t_arg, t_param)) {
             THROW(NNC_CANNOT_RESOLVE_CALL_EXPR, sformat("cannot use argument of type `%s`, "
@@ -726,8 +766,8 @@ nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
         }
     }
     assert(f_type->ret != NULL);
-    nnc_resolve_type(f_type->ret, st);
-    unary->type = f_type->ret;
+    nnc_resolve_type(f_type->ret->type, st, &unary->ctx);
+    unary->type = f_type->ret->type;
 }
 
 /**
@@ -1002,6 +1042,16 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
 }
 
 /**
+ * @brief Resolves type node expression.
+ * @param type_expr Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @return `true` if type expression resolved, otherwise `false`.
+ */
+nnc_static nnc_bool nnc_resolve_type_expr(nnc_type_expression* type_expr, nnc_st* st) {
+    return nnc_resolve_type(type_expr->type, st, &type_expr->ctx);
+}
+
+/**
  * @brief Resolves expression.
  * @param expr Expression to be resolved.
  * @param st Pointer to `nnc_st` instance.
@@ -1032,12 +1082,12 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
 nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
     for (nnc_u64 i = 0; i < buf_len(params); i++) {
         TRY {
-            nnc_resolve_type(params[i]->type, st);
-            params[i]->var->type = params[i]->type;
+            nnc_resolve_type_expr(params[i]->texpr, st);
+            params[i]->var->type = params[i]->texpr->type;
             ETRY;
         }
         CATCHALL {
-            NNC_SHOW_CATCHED(NULL);
+            NNC_SHOW_CATCHED(&CATCHED.where);
         }
     }
 }
@@ -1068,7 +1118,7 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
         THROW(NNC_SEMANTIC, "cannot declare `fn` in this context.", fn_stmt->var->ctx);
     }
     nnc_resolve_params(fn_stmt->params, st);
-    nnc_resolve_type(fn_stmt->ret, st);
+    nnc_resolve_type_expr(fn_stmt->ret, st);
     nnc_resolve_stmt(fn_stmt->body, st);
 }
 
@@ -1129,12 +1179,12 @@ nnc_static void nnc_resolve_for_stmt(nnc_for_statement* for_stmt, nnc_st* st) {
  * @throw `NNC_SEMANTIC` in case when initializer expression is not the same as type of declarable variable.
  */
 nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
-    nnc_resolve_type(let_stmt->type, st);
+    nnc_resolve_type_expr(let_stmt->texpr, st);
     if (let_stmt->init != NULL) {
         nnc_resolve_expr(let_stmt->init, st);
         const nnc_type* t_init = nnc_expr_get_type(let_stmt->init);
         const nnc_ctx* init_expr_ctx = nnc_expr_get_ctx(let_stmt->init);
-        if (!nnc_can_imp_cast_assign(t_init, let_stmt->type)) {
+        if (!nnc_can_imp_cast_assign(t_init, let_stmt->texpr->type)) {
             THROW(NNC_SEMANTIC, sformat("cannot initialize variable "
                 "with expression of `%s` type.", nnc_type_tostr(t_init)), *init_expr_ctx);
         }
@@ -1152,7 +1202,8 @@ nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st)
         st->ctx != ST_CTX_NAMESPACE) {
         THROW(NNC_SEMANTIC, "cannot declare `type` in this context.");
     }
-    nnc_resolve_aliased_type(type_stmt->as, st);
+    const nnc_ctx* ctx = &type_stmt->texpr_as->ctx;
+    nnc_resolve_aliased_type(type_stmt->texpr_as->type, st, ctx);
 }
 
 /**
@@ -1209,18 +1260,19 @@ nnc_static void nnc_resolve_return_stmt(nnc_return_statement* ret_stmt, nnc_st* 
     }
     assert(t_st != NULL);
     nnc_resolve_stmt(ret_stmt->body, st);
+    const nnc_type* t_fn_ret = t_st->ref.fn->ret->type;
     if (ret_stmt->body->kind == STMT_EXPR) {
         const nnc_expression_statement* expr_stmt = ret_stmt->body->exact;
         const nnc_type* t_ret = nnc_expr_get_type(expr_stmt->expr);
-        if (!nnc_can_imp_cast_assign(t_ret, t_st->ref.fn->ret)) {
+        if (!nnc_can_imp_cast_assign(t_ret, t_fn_ret)) {
             THROW(NNC_SEMANTIC, sformat("cannot return value of type `%s` when function has `%s` return type.",
-                nnc_type_tostr(t_ret), nnc_type_tostr(t_st->ref.fn->ret)), ret_stmt->ctx);    
+                nnc_type_tostr(t_ret), nnc_type_tostr(t_fn_ret)), ret_stmt->ctx);    
         }
     }
     else {
         // check if function return type is void or not
         // because we returning nothing here.
-        if (t_st->ref.fn->ret->kind != T_VOID) {
+        if (t_fn_ret->kind != T_VOID) {
             THROW(NNC_SEMANTIC, "cannot return nothing from non-void function.", ret_stmt->ctx);
         }
     }
@@ -1277,6 +1329,7 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
  */
 void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
     switch (stmt->kind) {
+        case STMT_EMPTY:     break;
         case STMT_DO:        nnc_resolve_do_stmt(stmt->exact, st);        break;
         case STMT_FN:        nnc_resolve_fn_stmt(stmt->exact, st);        break;
         case STMT_IF:        nnc_resolve_if_stmt(stmt->exact, st);        break;

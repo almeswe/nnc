@@ -7,6 +7,7 @@
 
 typedef struct _nnc_type                nnc_type;
 typedef struct _nnc_expression          nnc_expression;
+typedef struct _nnc_type_expression     nnc_type_expression;
 typedef struct _nnc_enumerator          nnc_enumerator;
 typedef struct _nnc_namespace_statement nnc_namespace_statement;
 
@@ -41,7 +42,7 @@ typedef struct _nnc_enumerator {
 
 typedef struct _nnc_struct_member {
     nnc_ident* var;
-    nnc_type* type;
+    nnc_type_expression* texpr;
 } nnc_struct_member;
 
 typedef enum _nnc_type_kind {
@@ -74,8 +75,8 @@ typedef struct _nnc_type {
     nnc_str repr;
     union {
     struct _nnc_fn_type {
-        nnc_type*  ret;
-        nnc_type** params;
+        nnc_type_expression* ret;
+        nnc_type_expression** params;
         nnc_u64 paramc;
     } fn;
     struct _nnc_array_type {
@@ -95,6 +96,12 @@ typedef struct _nnc_type {
     } exact;
     nnc_type* base;
 } nnc_type;
+
+typedef struct _nnc_type_expression {
+    nnc_ctx ctx;
+    nnc_type* type;
+    //nnc_binary_expression* scope;
+} nnc_type_expression;
 
 static nnc_type unknown_type __attribute__((unused)) = { .size=0,            .kind=T_UNKNOWN,   .repr="unknown" };
 static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=T_PRIMITIVE_I8,  .repr="i8",  .base=&unknown_type };
