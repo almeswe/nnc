@@ -1,10 +1,12 @@
 #include "nnc_typecheck.h"
 
-//todo: add contexts to add nodes of ast
+//todo: add contexts to add nodes of ast + (add context to type)
+//todo: refactor lexer
 //todo: add ability to address type from another namespace
 //todo: add error-recovery for all front-end
 //todo: add import statement
 //todo: add initializer expression
+//todo: depth for exception stack may be overflowed easily.
 //todo: tests
 
 #define T_IS(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
@@ -198,14 +200,18 @@ nnc_bool nnc_can_imp_cast_fns(const nnc_type* t1, const nnc_type* t2) {
     if (ref_t1->exact.fn.paramc != ref_t2->exact.fn.paramc) {
         return false;
     }
-    nnc_type** t1_params = ref_t1->exact.fn.params;
-    nnc_type** t2_params = ref_t2->exact.fn.params;
+    nnc_type_expression** t1_params = ref_t1->exact.fn.params;
+    nnc_type_expression** t2_params = ref_t2->exact.fn.params;
     for (nnc_u64 i = 0; i < ref_t1->exact.fn.paramc; i++) {
-        if (!nnc_can_imp_cast_assign(t2_params[i], t1_params[i])) {
+        const nnc_type* t1_param = t1_params[i]->type;
+        const nnc_type* t2_param = t2_params[i]->type;
+        if (!nnc_can_imp_cast_assign(t2_param, t1_param)) {
             return false;
         }
     }
-    return nnc_can_imp_cast_assign(ref_t2->exact.fn.ret, ref_t1->exact.fn.ret);
+    const nnc_type* t1_ret = ref_t1->exact.fn.ret->type;
+    const nnc_type* t2_ret = ref_t2->exact.fn.ret->type;
+    return nnc_can_imp_cast_assign(t2_ret, t1_ret);
 }
 
 nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to) {
@@ -315,7 +321,7 @@ nnc_static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_s
     const nnc_type* t_expr = nnc_expr_infer_type(expr->expr, st);
     if (expr->kind == UNARY_CAST ||
         expr->kind == UNARY_POSTFIX_AS) {
-        return expr->type = nnc_exp_cast(t_expr, expr->exact.cast.to);
+        return expr->type = nnc_exp_cast(t_expr, expr->exact.cast.to->type);
     }
     return &unknown_type;
 }

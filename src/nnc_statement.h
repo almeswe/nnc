@@ -36,13 +36,13 @@ typedef struct _nnc_statement {
 
 typedef struct _nnc_let_statement {
     nnc_ident* var;
-    nnc_type* type;
+    nnc_type_expression* texpr;
     nnc_expression* init;
 } nnc_let_statement;
 
 typedef struct _nnc_type_statement {
-	nnc_type* type;
-	nnc_type* as;
+	nnc_type_expression* texpr;
+	nnc_type_expression* texpr_as;
 } nnc_type_statement;
 
 typedef struct _nnc_expression_statement {
@@ -103,7 +103,7 @@ typedef nnc_struct_member nnc_union_member;
 typedef struct _nnc_fn_statement {
 	nnc_ident* var;
 	nnc_fn_param** params;
-	nnc_type* ret;
+	nnc_type_expression* ret;
 	nnc_statement* body;
 } nnc_fn_statement;
 

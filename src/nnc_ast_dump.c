@@ -184,7 +184,7 @@ nnc_static void nnc_dump_unary(nnc_dump_data data) {
         unary->kind == UNARY_SIZEOF ||
         unary->kind == UNARY_POSTFIX_AS) {
         const nnc_type* type = unary->kind == UNARY_SIZEOF ?
-            unary->exact.size.of : unary->exact.cast.to;
+            unary->exact.size.of->type : unary->exact.cast.to->type;
         fprintf(stderr, "<cast-type="); nnc_dump_type(type);
         fprintf(stderr, ",type=");
         nnc_dump_type(unary->type);
@@ -355,7 +355,7 @@ nnc_static void nnc_dump_let_stmt(nnc_dump_data data) {
     fprintf(stderr, _c(BMAG, "let-stmt "));
     fprintf(stderr, "<var=%s,", let_stmt->var->name);
     fprintf(stderr, "type=");
-    nnc_dump_type(let_stmt->type);
+    nnc_dump_type(let_stmt->texpr->type);
     fprintf(stderr, ">\n");
     if (let_stmt->init != NULL) {
         nnc_dump_indent(data.indent + 1);
@@ -374,9 +374,9 @@ nnc_static void nnc_dump_goto_stmt(nnc_dump_data data) {
 nnc_static void nnc_dump_type_stmt(nnc_dump_data data) {
     const nnc_type_statement* type_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "type-stmt ") "<type=");
-    nnc_dump_type(type_stmt->type);
+    nnc_dump_type(type_stmt->texpr->type);
     fprintf(stderr, ",as=");
-    nnc_dump_type(type_stmt->as);
+    nnc_dump_type(type_stmt->texpr_as->type);
     fprintf(stderr, ">\n");
 }
 
@@ -451,7 +451,7 @@ nnc_static void nnc_dump_fn_stmt(nnc_dump_data data) {
         nnc_dump_indent(data.indent + 1);
         fprintf(stderr, TREE_BR "<param%lu>=", i+1);
         fprintf(stderr, "%s: ", fn_stmt->params[i]->var->name);
-        nnc_dump_type(fn_stmt->params[i]->type);
+        nnc_dump_type(fn_stmt->params[i]->texpr->type);
         fprintf(stderr, "\n");
     }
     nnc_statement** stmts = ((nnc_compound_statement*)(fn_stmt->body->exact))->stmts;

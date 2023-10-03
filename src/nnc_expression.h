@@ -13,7 +13,8 @@ typedef enum _nnc_expression_kind {
     EXPR_IDENT,
     EXPR_UNARY,
     EXPR_BINARY,
-    EXPR_TERNARY    
+    EXPR_TERNARY,
+    EXPR_TYPE
 } nnc_expression_kind;
 
 typedef struct _nnc_expression {
@@ -45,10 +46,10 @@ typedef struct _nnc_unary_expression {
     nnc_unary_expression_kind kind;
     union {
         struct _nnc_unary_sizeof {
-            nnc_type* of;    
+            nnc_type_expression* of;    
         } size;
         struct _nnc_unary_cast {
-            nnc_type* to;
+            nnc_type_expression* to;
         } cast;
         struct _nnc_unary_postfix_dot {
             nnc_expression* member;
