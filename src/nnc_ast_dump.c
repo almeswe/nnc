@@ -68,6 +68,14 @@ nnc_static void nnc_dump_ctx(const nnc_ctx* ctx) {
     }
 }
 
+nnc_static void nnc_dump_nesting(const nnc_nesting* nesting) {
+    const nnc_nesting* current = nesting;
+    while (current != NULL) {
+        fprintf(stderr, "%s::", current->nest->name);
+        current = current->next;
+    }
+}
+
 nnc_static void nnc_dump_type(const nnc_type* type) {
     if (type == NULL) {
         fprintf(stderr, _c(RED, "%s"), "?");
@@ -177,7 +185,6 @@ nnc_static void nnc_dump_unary(nnc_dump_data data) {
         [UNARY_POSTFIX_DOT]   = ".",
         [UNARY_POSTFIX_CALL]  = "()",
         [UNARY_POSTFIX_INDEX] = "[]",
-        [UNARY_POSTFIX_SCOPE] = "::"
     };
     fprintf(stderr, _c(BGRN, "unary-expr `%s` "), unary_str[unary->kind]);
     if (unary->kind == UNARY_CAST   ||
@@ -211,11 +218,6 @@ nnc_static void nnc_dump_unary(nnc_dump_data data) {
             fprintf(stderr, TREE_BR "arg%lu=", i+1);
             nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.call.args[i]));
         }
-    }
-    if (unary->kind == UNARY_POSTFIX_SCOPE) {
-        nnc_dump_indent(data.indent + 1);
-        fprintf(stderr, TREE_BR "member=");
-        nnc_dump_expr(DUMP_DATA(data.indent + 1, unary->exact.dot.member));
     }
     if (unary->kind == UNARY_POSTFIX_INDEX) {
         nnc_dump_indent(data.indent + 1);
@@ -275,6 +277,11 @@ nnc_static void nnc_dump_ternary(nnc_dump_data data) {
     nnc_dump_indent(data.indent + 1);
     fprintf(stderr, TREE_BR "rexpr=");
     nnc_dump_expr(DUMP_DATA(data.indent + 1, ternary->rexpr));
+}
+
+nnc_static void nnc_dump_type_expr(nnc_type_expression* type_expr) {
+    nnc_dump_nesting(type_expr->nesting);
+    nnc_dump_type(type_expr->type);
 }
 
 nnc_static void nnc_dump_expr(nnc_dump_data data) {
@@ -355,7 +362,7 @@ nnc_static void nnc_dump_let_stmt(nnc_dump_data data) {
     fprintf(stderr, _c(BMAG, "let-stmt "));
     fprintf(stderr, "<var=%s,", let_stmt->var->name);
     fprintf(stderr, "type=");
-    nnc_dump_type(let_stmt->texpr->type);
+    nnc_dump_type_expr(let_stmt->texpr);
     fprintf(stderr, ">\n");
     if (let_stmt->init != NULL) {
         nnc_dump_indent(data.indent + 1);
@@ -374,7 +381,7 @@ nnc_static void nnc_dump_goto_stmt(nnc_dump_data data) {
 nnc_static void nnc_dump_type_stmt(nnc_dump_data data) {
     const nnc_type_statement* type_stmt = data.exact;
     fprintf(stderr, _c(BMAG, "type-stmt ") "<type=");
-    nnc_dump_type(type_stmt->texpr->type);
+    nnc_dump_type_expr(type_stmt->texpr);
     fprintf(stderr, ",as=");
     nnc_dump_type(type_stmt->texpr_as->type);
     fprintf(stderr, ">\n");
@@ -451,7 +458,7 @@ nnc_static void nnc_dump_fn_stmt(nnc_dump_data data) {
         nnc_dump_indent(data.indent + 1);
         fprintf(stderr, TREE_BR "<param%lu>=", i+1);
         fprintf(stderr, "%s: ", fn_stmt->params[i]->var->name);
-        nnc_dump_type(fn_stmt->params[i]->texpr->type);
+        nnc_dump_type_expr(fn_stmt->params[i]->texpr);
         fprintf(stderr, "\n");
     }
     nnc_statement** stmts = ((nnc_compound_statement*)(fn_stmt->body->exact))->stmts;

@@ -99,7 +99,9 @@ nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
     nnc_u64 repr_size = strlen(repr);
     nnc_dbl_literal* ptr = anew(nnc_dbl_literal);
-    ptr->ctx = *ctx;
+    if (ctx != NULL) {
+        ptr->ctx = *ctx;
+    }
     ptr->type = &unknown_type;
     ptr->suffix = nnc_get_dbl_suffix(repr);
     // if there is no suffix, set f64 as default.
@@ -226,7 +228,9 @@ nnc_static nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
 nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
     nnc_int_literal* ptr = anew(nnc_int_literal);
-    ptr->ctx = *ctx;
+    if (ctx != NULL) {
+        ptr->ctx = *ctx;
+    }
     ptr->type = &unknown_type;
     ptr->suffix = nnc_get_int_suffix(repr);
     // determine base by it's shorthand
@@ -292,7 +296,9 @@ nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
  */
 nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx) {
     nnc_chr_literal* ptr = anew(nnc_chr_literal);
-    ptr->ctx = *ctx;
+    if (ctx != NULL) {
+        ptr->ctx = *ctx;
+    }
     ptr->type = &unknown_type;
     if (strlen(repr) < 1) {
         nnc_abort_no_ctx("nnc_chr_new: strlen(repr) < 1\n");
@@ -333,7 +339,9 @@ nnc_static void nnc_str_zip(nnc_str_literal* literal, const char* repr) {
  */
 nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
     nnc_str_literal* ptr = anew(nnc_str_literal);
-    ptr->ctx = *ctx;
+    if (ctx != NULL) {
+        ptr->ctx = *ctx;
+    }
     ptr->type = &unknown_type;
     ptr->exact = cnew(nnc_byte, strlen(repr) + 1);
     nnc_str_zip(ptr, repr);
