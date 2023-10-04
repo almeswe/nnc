@@ -14,7 +14,6 @@ typedef enum _nnc_expression_kind {
     EXPR_UNARY,
     EXPR_BINARY,
     EXPR_TERNARY,
-    EXPR_TYPE
 } nnc_expression_kind;
 
 typedef struct _nnc_expression {
@@ -35,7 +34,6 @@ typedef enum _nnc_unary_expression_kind {
     UNARY_POSTFIX_AS,
     UNARY_POSTFIX_DOT,
     UNARY_POSTFIX_CALL,
-    UNARY_POSTFIX_SCOPE,
     UNARY_POSTFIX_INDEX
 } nnc_unary_expression_kind;
 

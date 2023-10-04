@@ -36,7 +36,6 @@ nnc_static nnc_bool nnc_can_fold_expr(const nnc_expression* expr) {
             switch (unary->kind) {
                 case UNARY_POSTFIX_DOT:   return false;
                 case UNARY_POSTFIX_INDEX: return false;
-                case UNARY_POSTFIX_SCOPE: return nnc_can_fold_expr(unary->exact.scope.member);
                 default: break;
             }
             return nnc_can_fold_expr(unary->expr);
@@ -85,7 +84,6 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
                 case UNARY_CAST:          return nnc_can_locate_expr(unary->expr);  
                 case UNARY_POSTFIX_DOT:   return true;
                 case UNARY_POSTFIX_INDEX: return true;
-                case UNARY_POSTFIX_SCOPE: return nnc_can_locate_expr(unary->exact.scope.member);
                 case UNARY_POSTFIX_AS:    return nnc_can_locate_expr(unary->expr);
                 default: return false;
             }
@@ -110,8 +108,8 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
  * @throw `NNC_SEMANTIC` in case when `type` is not listed in `st`. 
  */
 nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
-    if (type->kind != T_INCOMPLETE &&
-        type->kind != T_ALIAS) {
+    if (type->kind != T_INCOMPLETE) {// &&
+        //type->kind != T_ALIAS) {
         return;
     } 
     nnc_type* st_type = NULL;
@@ -123,9 +121,7 @@ nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx
             return;
         }
     }
-    if (ctx == NULL) {
-        THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr));
-    }
+    assert(ctx != NULL);
     THROW(NNC_SEMANTIC, sformat("incomplete type `%s` met.", type->repr), *ctx);
 }
 
@@ -541,6 +537,32 @@ nnc_static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
 }
 
 /**
+ * @brief Resolves nesting name. (np1::np2::name etc.)
+ * @param nesting Nesting to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @return Pointer to symtable which is local to member which is accessed via netsted name.
+ * @throw `NNC_SEMANTIC` in case when nest name is not found.
+ *        `NNC_SEMANTIC` in case when nest has non namespace type.
+ */
+nnc_static nnc_st* nnc_resolve_nesting(nnc_nesting* nesting, nnc_st* st) {
+    if (nesting == NULL) {
+        return st;
+    }
+    nnc_ident* nest = nesting->nest;
+    nnc_sym* sym = nnc_st_get_sym(st, nest->name);
+    if (sym == NULL) {
+        THROW(NNC_SEMANTIC, sformat("cannot resolve nesting `%s`.", nest->name), nest->ctx);
+    }
+    if (!nnc_namespace_type(sym->type)) {
+        THROW(NNC_SEMANTIC, sformat("nesting must be namespace, not `%s`.", 
+            nnc_type_tostr(sym->type)), nest->ctx);
+    }
+    *nest = *sym;
+    st = NNC_GET_SYMTABLE(sym->type->exact.name.space);
+    return nnc_resolve_nesting(nesting->next, st);
+}
+
+/**
  * @brief Resolve identifier.
  * @param ident Identifier to be resolved.
  * @param st Pointer to `nnc_st` instance.
@@ -548,12 +570,16 @@ nnc_static nnc_bool nnc_resolve_str_literal(nnc_str_literal* literal) {
  * @throw `NNC_SEMANTIC` in case when identifier is not listed in current context.
  */
 nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
-    nnc_symbol* sym = nnc_st_get(st, ident->name);
+    if (ident->nesting != NULL) {
+        st = nnc_resolve_nesting(ident->nesting, st);
+    }
+    nnc_sym* sym = nnc_st_get_sym(st, ident->name);
     if (sym == NULL) {
         THROW(NNC_SEMANTIC, sformat("undeclared identifier `%s` met.", ident->name), ident->ctx);
     }
     ident->ictx = sym->ictx;
     ident->type = sym->type;
+    nnc_resolve_type(ident->type, st, &ident->ctx);
     if (ident->ictx == IDENT_ENUMERATOR) {
         ident->type = &i64_type;
         ident->refs = sym->refs;
@@ -771,32 +797,6 @@ nnc_static void nnc_resolve_call_expr(nnc_unary_expression* unary, nnc_st* st) {
 }
 
 /**
- * @brief Resolves scope expression. (<expr>::<ident>)
- * @param unary Expression to be resolved.
- * @param st Pointer to `nnc_st` instance.
- * @throw `NNC_CANNOT_RESOLVE_SCOPE_EXPR` in case when applied to non namespace expression.
- *        `NNC_CANNOT_RESOLVE_SCOPE_EXPR` in case when member is not listed in namespace.
- */
-nnc_static void nnc_resolve_scope_expr(nnc_unary_expression* unary, nnc_st* st) {
-    const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
-    if (!nnc_namespace_type(t_expr)) {
-        THROW(NNC_CANNOT_RESOLVE_SCOPE_EXPR, sformat("cannot reference (non namespace) "
-            "`%s` type.", nnc_type_tostr(t_expr)), unary->ctx);
-    }
-    nnc_ident* member = unary->exact.scope.member->exact;
-    nnc_namespace_statement* np = t_expr->exact.name.space;
-    nnc_st* inner_st = NNC_GET_SYMTABLE(np);
-    nnc_symbol* sym = nnc_st_get_below(inner_st, member->name);
-    if (sym == NULL) {
-        THROW(NNC_CANNOT_RESOLVE_SCOPE_EXPR, sformat("`%s` is not listed in "
-            "`%s`.", member->name, nnc_type_tostr(t_expr)), unary->ctx);
-    }
-    member->ictx = sym->ictx;
-    member->type = sym->type;
-    unary->type = member->type;
-}
-
-/**
  * @brief Resolves index expression. (<expr>[<expr>])
  * @param unary Expression to be resolved.
  * @param st Pointer to `nnc_st` instance.
@@ -840,7 +840,6 @@ nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* 
         case UNARY_POSTFIX_AS:    nnc_resolve_as_expr(unary, st);          break;
         case UNARY_POSTFIX_DOT:   nnc_resolve_dot_expr(unary, st);         break;
         case UNARY_POSTFIX_CALL:  nnc_resolve_call_expr(unary, st);        break;
-        case UNARY_POSTFIX_SCOPE: nnc_resolve_scope_expr(unary, st);       break;
         case UNARY_POSTFIX_INDEX: nnc_resolve_index_expr(unary, st);       break;
         default: nnc_abort_no_ctx("nnc_resolve_unary_expr: unknown kind.");
     }
@@ -1048,6 +1047,12 @@ nnc_static nnc_bool nnc_resolve_ternary_expr(nnc_ternary_expression* ternary, nn
  * @return `true` if type expression resolved, otherwise `false`.
  */
 nnc_static nnc_bool nnc_resolve_type_expr(nnc_type_expression* type_expr, nnc_st* st) {
+    if (type_expr->nesting != NULL) {
+        // resolving nested name if it was specified
+        // and use returned local symtable as current symtable
+        // for further type resolving.
+        st = nnc_resolve_nesting(type_expr->nesting, st);
+    }
     return nnc_resolve_type(type_expr->type, st, &type_expr->ctx);
 }
 

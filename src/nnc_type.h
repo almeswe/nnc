@@ -6,6 +6,7 @@
 #include "nnc_format.h"
 
 typedef struct _nnc_type                nnc_type;
+typedef struct _nnc_nesting             nnc_nesting;
 typedef struct _nnc_expression          nnc_expression;
 typedef struct _nnc_type_expression     nnc_type_expression;
 typedef struct _nnc_enumerator          nnc_enumerator;
@@ -25,6 +26,7 @@ typedef struct _nnc_ident {
     nnc_str name;
     nnc_type* type;
     nnc_ident_ctx ictx;
+    nnc_nesting* nesting;
     union _nnc_ident_refs {
         nnc_enumerator* enumerator;
     } refs;
@@ -100,8 +102,14 @@ typedef struct _nnc_type {
 typedef struct _nnc_type_expression {
     nnc_ctx ctx;
     nnc_type* type;
-    //nnc_binary_expression* scope;
+    nnc_nesting* nesting;
 } nnc_type_expression;
+
+typedef struct _nnc_nesting {
+    nnc_ctx ctx;
+    nnc_ident* nest;
+    struct _nnc_nesting* next;
+} nnc_nesting;
 
 static nnc_type unknown_type __attribute__((unused)) = { .size=0,            .kind=T_UNKNOWN,   .repr="unknown" };
 static nnc_type i8_type   __attribute__((unused)) = { .size=sizeof(nnc_i8),  .kind=T_PRIMITIVE_I8,  .repr="i8",  .base=&unknown_type };
