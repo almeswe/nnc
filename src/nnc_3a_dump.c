@@ -89,6 +89,10 @@ nnc_static void nnc_dump_3a_unary(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
+nnc_static void nnc_dump_3a_arg(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    arg %s\n", nnc_dump_3a_addr(&quad->arg1));
+}
+
 nnc_static void nnc_dump_3a_copy(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%6s =", nnc_dump_3a_addr(&quad->res));
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
@@ -98,6 +102,17 @@ nnc_static void nnc_dump_3a_index(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%6s =", nnc_dump_3a_addr(&quad->res));
     dump_3a(" %s[", nnc_dump_3a_addr(&quad->arg1));
     dump_3a("%s]\n", nnc_dump_3a_addr(&quad->arg2));
+}
+
+nnc_static void nnc_dump_3a_fcall(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%6s = call", nnc_dump_3a_addr(&quad->res));
+    dump_3a(" %s,", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg2));
+}
+
+nnc_static void nnc_dump_3a_pcall(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    call %s,", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg2));
 }
 
 nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
@@ -112,8 +127,11 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_NOT:    case OP_BW_NOT:
         case OP_PLUS:   case OP_MINUS:
             nnc_dump_3a_unary(quad); break;
+        case OP_ARG:   nnc_dump_3a_arg(quad);   break;
         case OP_COPY:  nnc_dump_3a_copy(quad);  break;
         case OP_INDEX: nnc_dump_3a_index(quad); break;
+        case OP_FCALL: nnc_dump_3a_fcall(quad); break;
+        case OP_PCALL: nnc_dump_3a_pcall(quad); break;
         default: nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.");
     }
 }
