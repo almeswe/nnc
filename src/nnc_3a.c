@@ -66,7 +66,33 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
         OP_COPY, nnc_3a_mkcgt(), arg
     );
     nnc_3a_quads_add(&quad);
-} 
+}
+
+nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_3a_quad call_quad = {0};
+    const nnc_ident* fn = unary->expr->exact;
+    const struct _nnc_unary_postfix_call* call = &unary->exact.call;
+    for (nnc_u64 i = 0; i < call->argc; i++) {
+        nnc_3a_quad arg_quad = { .op = OP_ARG };
+        nnc_expr_to_3a(call->args[i], st);
+        arg_quad.arg1 = *nnc_3a_quads_res();
+        nnc_3a_quads_add(&arg_quad);
+    }
+    if (unary->type->kind == T_VOID) {
+        call_quad = nnc_3a_mkquad(OP_PCALL, {0},
+            nnc_3a_mkname1(fn),
+            nnc_3a_mki3(call->argc)
+        );
+    }
+    else {
+        call_quad = nnc_3a_mkquad(OP_FCALL,
+            nnc_3a_mkcgt(),
+            nnc_3a_mkname1(fn),
+            nnc_3a_mki3(call->argc)
+        );
+    }
+    nnc_3a_quads_add(&call_quad);
+}
 
 typedef struct _nnc_dim_data {
     nnc_u32 dims;
@@ -102,20 +128,23 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
     }
     data.dims--;
     // if this is not last index in a sequence
-    // calculate next index downwards.
-    if (unary->expr->kind != EXPR_IDENT) {
-        // todo: not in all cases this will be ident
+    // calculate next descendent index.
+    const nnc_unary_expression* expr = unary->expr->exact;
+    if (unary->expr->kind == EXPR_UNARY &&
+        expr->kind == UNARY_POSTFIX_INDEX) {
         // may be function call, cast, etc.
         nnc_index_to_3a_ex(unary->expr->exact, st, false, data);
     }
     // otherwise make OP_INDEX quad from variable name
     // and accumulated index value.
     else {
-        const nnc_ident* x = unary->expr->exact;
+        nnc_3a_addr index = *nnc_3a_quads_res();
+        nnc_expr_to_3a(unary->expr, st);
+        nnc_3a_addr address = *nnc_3a_quads_res();
+        //const nnc_ident* x = unary->expr->exact;
         nnc_3a_quad quad = nnc_3a_mkquad(
             OP_INDEX, nnc_3a_mkcgt(), 
-            nnc_3a_mkname1(x), 
-            *nnc_3a_quads_res()
+            address, index
         );
         nnc_3a_quads_add(&quad);
     }
@@ -155,6 +184,7 @@ nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st*
     switch (unary->kind) {
         case UNARY_SIZEOF:        nnc_sizeof_to_3a(unary, st);   break;
         case UNARY_LENGTHOF:      nnc_lengthof_to_3a(unary, st); break;
+        case UNARY_POSTFIX_CALL:  nnc_call_to_3a(unary, st);     break;
         case UNARY_POSTFIX_INDEX: nnc_index_to_3a(unary, st);    break;
         default: {
             nnc_3a_addr arg = {0};

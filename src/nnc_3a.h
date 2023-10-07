@@ -41,8 +41,11 @@ typedef enum _nnc_3a_op_kind {
     OP_CJUMP,
     OP_CJUMP2,
     OP_ARG,
-    OP_CALL,
+    OP_PCALL,
+    OP_FCALL,
     OP_INDEX,
+    OP_RETP,
+    OP_RETF,
     OP_REF,
     OP_DEREF
     /* ***************** */
@@ -74,6 +77,12 @@ typedef nnc_u64 nnc_3a_cgt;
     .exact.iconst.iconst = x,            \
     .exact.iconst.type = t               \
 }
+
+#define nnc_3a_mki3(x) (nnc_3a_addr){    \
+    .kind = ADDR_ICONST,                 \
+    .exact.iconst.iconst = x,            \
+    .exact.iconst.type = &u32_type       \
+} 
 
 typedef struct _nnc_3a_iconst {
     nnc_u64 iconst;
