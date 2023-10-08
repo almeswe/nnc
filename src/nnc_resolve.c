@@ -712,7 +712,7 @@ nnc_static void nnc_resolve_bitwise_not_expr(nnc_unary_expression* unary, nnc_st
 }
 
 /**
- * @brief Resolves unary as expression (<expr> as <type>).
+ * @brief Resolves unary `as` expression (<expr> as <type>).
  * It differs from default `cast` with independent type declaration order.
  * So if you declare type after `as` expression is used, it will be ok.
  * `cast` expression in this case will not work. (syntax error)
@@ -744,8 +744,15 @@ nnc_static void nnc_resolve_as_expr(nnc_unary_expression* unary, nnc_st* st) {
 nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_struct_or_union_type(t_expr)) {
-        THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("cannot access member of (non union or struct) "
-            "`%s` type.", nnc_type_tostr(t_expr)), unary->ctx);
+        // check if trying to access member 
+        // of pointer to struct or union
+        if (nnc_ptr_type(t_expr)) {
+            t_expr = t_expr->base;
+        }
+        if (!nnc_struct_or_union_type(t_expr)) {
+            THROW(NNC_CANNOT_RESOLVE_DOT_EXPR, sformat("cannot access member of (non union or struct) "
+                "`%s` type.", nnc_type_tostr(t_expr)), unary->ctx);
+        }
     }
     nnc_ident* m = unary->exact.dot.member->exact;
     for (nnc_u64 i = 0; i < t_expr->exact.struct_or_union.memberc; i++) {
