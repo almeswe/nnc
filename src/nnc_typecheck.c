@@ -1,14 +1,5 @@
 #include "nnc_typecheck.h"
 
-//todo: add contexts to add nodes of ast + (add context to type)
-//todo: refactor lexer
-//todo: add ability to address type from another namespace
-//todo: add error-recovery for all front-end
-//todo: add import statement
-//todo: add initializer expression
-//todo: depth for exception stack may be overflowed easily.
-//todo: tests
-
 #define T_IS(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
 #define T_UNALIAS(type) nnc_type* ref_##type = nnc_unalias(type)
 
@@ -52,7 +43,7 @@ nnc_bool nnc_fn_type(const nnc_type* type) {
 
 nnc_bool nnc_ptr_type(const nnc_type* type) {
     const T_UNALIAS(type);
-    return ref_type->kind != T_FUNCTION;
+    return ref_type->kind == T_POINTER;
 }
 
 nnc_bool nnc_arr_type(const nnc_type* type) {
