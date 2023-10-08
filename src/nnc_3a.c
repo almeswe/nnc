@@ -68,6 +68,63 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_u64 size = unary->exact.size.of->type->size;
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), 
+        nnc_3a_mki2(size, unary->type)
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lengthof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    const nnc_type* t_expr = nnc_expr_get_type(unary->expr); 
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), 
+        nnc_3a_mki2(t_expr->size, unary->type)
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_u64 offset = 0;
+    nnc_3a_quad quad = {0};
+    nnc_expr_to_3a(unary->expr, st);
+    const nnc_ident* member = unary->exact.dot.member->exact;
+    const nnc_type* t_struct = nnc_expr_get_type(unary->expr);
+    if (!nnc_ptr_type(t_struct)) {
+        quad = nnc_3a_mkquad(OP_REF,
+            nnc_3a_mkcgt(),
+            *nnc_3a_quads_res()
+        );
+        nnc_3a_quads_add(&quad);
+    }
+    if (t_struct->kind != T_UNION) {
+        const struct _nnc_struct_or_union_type* exact = 
+            &t_struct->exact.struct_or_union;
+        //todo: this is true when pack of struct is 1
+        // in few other cases this may lead to wrong member mappings
+        for (nnc_u64 i = 0; i < exact->memberc; i++) {
+            const nnc_struct_member* m = exact->members[i];
+            if (nnc_sequal(m->var->name, member->name)) {
+                break;
+            }
+            offset += m->texpr->type->size;
+        }
+        quad = nnc_3a_mkquad(OP_ADD,
+            nnc_3a_mkcgt(),
+            *nnc_3a_quads_res(),
+            nnc_3a_mki3(offset)
+        );
+        nnc_3a_quads_add(&quad);
+    }
+    quad = nnc_3a_mkquad(OP_DEREF,
+        nnc_3a_mkcgt(),
+        *nnc_3a_quads_res(),
+    );
+    nnc_3a_quads_add(&quad);
+}
+
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     nnc_3a_quad call_quad = {0};
     const nnc_ident* fn = unary->expr->exact;
@@ -162,28 +219,11 @@ nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st*
     buf_free(data.sizes);
 }
 
-nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_u64 size = unary->exact.size.of->type->size;
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_COPY, nnc_3a_mkcgt(), 
-        nnc_3a_mki2(size, unary->type)
-    );
-    nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_lengthof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    const nnc_type* t_expr = nnc_expr_get_type(unary->expr); 
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_COPY, nnc_3a_mkcgt(), 
-        nnc_3a_mki2(t_expr->size, unary->type)
-    );
-    nnc_3a_quads_add(&quad);
-}
-
 nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     switch (unary->kind) {
         case UNARY_SIZEOF:        nnc_sizeof_to_3a(unary, st);   break;
         case UNARY_LENGTHOF:      nnc_lengthof_to_3a(unary, st); break;
+        case UNARY_POSTFIX_DOT:   nnc_dot_to_3a(unary, st);      break;
         case UNARY_POSTFIX_CALL:  nnc_call_to_3a(unary, st);     break;
         case UNARY_POSTFIX_INDEX: nnc_index_to_3a(unary, st);    break;
         default: {
@@ -208,7 +248,6 @@ nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_
     arg1 = *nnc_3a_quads_res();
     nnc_expr_to_3a(binary->rexpr, st);
     arg2 = *nnc_3a_quads_res();
-
     switch (binary->kind) {
         case BINARY_COMMA:
         case BINARY_ASSIGN: {
@@ -243,6 +282,7 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
 
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     quads = NULL;
+    cgt_cnt = 0;
     nnc_3a_quad_set set = {0};
     set.name = fn_stmt->var->name;
     nnc_stmt_to_3a(fn_stmt->body, st);
