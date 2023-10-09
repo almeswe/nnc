@@ -294,6 +294,22 @@ nnc_static void nnc_expr_stmt_to_3a(const nnc_expression_statement* expr_stmt, c
     nnc_expr_to_3a(expr_stmt->expr, st);
 }
 
+nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, const nnc_st* st) {
+    nnc_3a_op_kind op = OP_RETP;
+    if (return_stmt->body->kind != STMT_EMPTY) {
+        op = OP_RETF;
+        nnc_expr_stmt_to_3a(return_stmt->body->exact, st);
+    }
+    nnc_3a_addr arg = {0};
+    if (op == OP_RETF) {
+        arg = *nnc_3a_quads_res();
+    } 
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        op, {0}, arg
+    );
+    nnc_3a_quads_add(&quad);   
+}
+
 nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_stmt, const nnc_st* st) {
     for (nnc_u64 i = 0; i < buf_len(compound_stmt->stmts); i++) {
         nnc_stmt_to_3a(compound_stmt->stmts[i], compound_stmt->scope);
@@ -304,6 +320,7 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
     switch (stmt->kind) {
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
+        case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
         case STMT_COMPOUND: nnc_compound_stmt_to_3a(stmt->exact, st); break;
     }
 }

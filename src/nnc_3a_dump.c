@@ -103,6 +103,14 @@ nnc_static void nnc_dump_3a_copy(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
+nnc_static void nnc_dump_3a_retf(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%7s %s\n", "ret", nnc_dump_3a_addr(&quad->arg1));
+}
+
+nnc_static void nnc_dump_3a_retp(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%7s\n", "ret");
+}
+
 nnc_static void nnc_dump_3a_deref(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%6s =", nnc_dump_3a_addr(&quad->res));
     dump_3a(" *%s\n", nnc_dump_3a_addr(&quad->arg1));
@@ -140,6 +148,8 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_ARG:   nnc_dump_3a_arg(quad);   break;
         case OP_REF:   nnc_dump_3a_ref(quad);   break;
         case OP_COPY:  nnc_dump_3a_copy(quad);  break;
+        case OP_RETF:  nnc_dump_3a_retf(quad);  break;
+        case OP_RETP:  nnc_dump_3a_retp(quad);  break;
         case OP_DEREF: nnc_dump_3a_deref(quad); break;
         case OP_INDEX: nnc_dump_3a_index(quad); break;
         case OP_FCALL: nnc_dump_3a_fcall(quad); break;
