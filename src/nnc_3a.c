@@ -1,7 +1,8 @@
 #include "nnc_3a.h"
 
 nnc_3a_quad_set* sets = NULL;
-nnc_3a_cgt_cnt cgt_cnt = 0; 
+nnc_3a_cgt_cnt cgt_cnt = 0;
+nnc_3a_label_cnt label_cnt = 0; 
 
 nnc_static nnc_3a_quad* quads = NULL;
 
@@ -91,33 +92,34 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
     nnc_3a_quad quad = {0};
     nnc_expr_to_3a(unary->expr, st);
     const nnc_ident* member = unary->exact.dot.member->exact;
-    const nnc_type* t_struct = nnc_expr_get_type(unary->expr);
-    if (!nnc_ptr_type(t_struct)) {
+    const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
+    if (!nnc_ptr_type(t_expr)) {
         quad = nnc_3a_mkquad(OP_REF,
             nnc_3a_mkcgt(),
             *nnc_3a_quads_res()
         );
         nnc_3a_quads_add(&quad);
     }
-    if (t_struct->kind != T_UNION) {
-        const struct _nnc_struct_or_union_type* exact = 
-            &t_struct->exact.struct_or_union;
-        //todo: this is true when pack of struct is 1
-        // in few other cases this may lead to wrong member mappings
-        for (nnc_u64 i = 0; i < exact->memberc; i++) {
-            const nnc_struct_member* m = exact->members[i];
-            if (nnc_sequal(m->var->name, member->name)) {
-                break;
-            }
-            offset += m->texpr->type->size;
+    const struct _nnc_struct_or_union_type* exact = 
+        &t_expr->exact.struct_or_union;
+    //todo: this is true when pack of struct is 1
+    // in few other cases this may lead to wrong member mappings
+    for (nnc_u64 i = 0; i < exact->memberc; i++) {
+        if (t_expr->kind == T_UNION) {
+            break;
         }
-        quad = nnc_3a_mkquad(OP_ADD,
-            nnc_3a_mkcgt(),
-            *nnc_3a_quads_res(),
-            nnc_3a_mki3(offset)
-        );
-        nnc_3a_quads_add(&quad);
+        const nnc_struct_member* m = exact->members[i];
+        if (nnc_sequal(m->var->name, member->name)) {
+            break;
+        }
+        offset += m->texpr->type->size;
     }
+    quad = nnc_3a_mkquad(OP_ADD,
+        nnc_3a_mkcgt(),
+        *nnc_3a_quads_res(),
+        nnc_3a_mki3(offset)
+    );
+    nnc_3a_quads_add(&quad);
     quad = nnc_3a_mkquad(OP_DEREF,
         nnc_3a_mkcgt(),
         *nnc_3a_quads_res(),
@@ -290,6 +292,49 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     buf_add(sets, set);
 }
 
+nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 
+                                    const nnc_3a_quad* b_next, const nnc_st* st) {
+    nnc_expr_to_3a(branch->cond, st);
+    nnc_3a_addr cond = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPF, nnc_3a_mki3(b_next->label), cond,
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_stmt_to_3a(branch->body, st);
+    if (b_true->label != b_next->label) {
+        quad = nnc_3a_mkquad(
+            OP_UJUMP, nnc_3a_mki3(b_true->label)
+        );
+        nnc_3a_quads_add(&quad);
+    }
+}
+
+nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st* st) {
+    nnc_u64 branches = buf_len(if_stmt->elif_brs);
+    nnc_3a_quad b_true = nnc_3a_mklabel();
+    nnc_3a_quad b_next = b_true;
+    if (branches != 0 || if_stmt->else_br != NULL) {
+        b_next = nnc_3a_mklabel();
+    }
+    nnc_if_branch_to_3a(if_stmt->if_br, &b_true, &b_next, st);
+    for (nnc_u64 i = 0; i < branches; i++) {
+        nnc_3a_quads_add(&b_next);
+        if (i != branches - 1) {
+            b_next = nnc_3a_mklabel();
+        }
+        else {
+            b_next = if_stmt->else_br == NULL ? 
+                b_true : nnc_3a_mklabel();
+        }
+        nnc_if_branch_to_3a(if_stmt->elif_brs[i], &b_true, &b_next, st);
+    }
+    if (if_stmt->else_br != NULL) {
+        nnc_3a_quads_add(&b_next);
+        nnc_stmt_to_3a(if_stmt->else_br, st);
+    }
+    nnc_3a_quads_add(&b_true);
+}
+
 nnc_static void nnc_expr_stmt_to_3a(const nnc_expression_statement* expr_stmt, const nnc_st* st) {
     nnc_expr_to_3a(expr_stmt->expr, st);
 }
@@ -319,6 +364,7 @@ nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_s
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
     switch (stmt->kind) {
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
+        case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
         case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
         case STMT_COMPOUND: nnc_compound_stmt_to_3a(stmt->exact, st); break;

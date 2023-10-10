@@ -6,6 +6,7 @@
 #include "nnc_typecheck.h"
 
 typedef nnc_u64 nnc_3a_cgt_cnt;
+typedef nnc_u32 nnc_3a_label_cnt;
 
 typedef enum _nnc_3a_op_kind {
     /* ***************** */
@@ -37,15 +38,16 @@ typedef enum _nnc_3a_op_kind {
     OP_BW_NOT,
     /*  other operators  */
     OP_COPY,
-    OP_JUMP,
-    OP_CJUMP,
-    OP_CJUMP2,
+    OP_UJUMP,  // Unconditional JUMP
+    OP_CJUMPT, // Conditional JUMP True  (if x goto L) 
+    OP_CJUMPF, // Conditional JUMP False (if not x goto L)
+    OP_RJUMP,  // Relop JUMP (if x relop y goto L)
     OP_ARG,
-    OP_PCALL,
-    OP_FCALL,
+    OP_PCALL,  // Procedure CALL
+    OP_FCALL,  // Function CALL
     OP_INDEX,
-    OP_RETP,
-    OP_RETF,
+    OP_RETP,   // RETurn from Procedure
+    OP_RETF,   // RETurn from Function
     OP_REF,
     OP_DEREF
     /* ***************** */
@@ -127,7 +129,12 @@ typedef struct _nnc_3a_addr {
      .op=opv, .res=resv, __VA_ARGS__\
 }
 
+#define nnc_3a_mklabel() (nnc_3a_quad){\
+    .label = ++label_cnt\
+}
+
 typedef struct _nnc_3a_quad {
+    nnc_u32 label;
     nnc_3a_op_kind op;
     nnc_3a_addr res;
     nnc_3a_addr arg1;
