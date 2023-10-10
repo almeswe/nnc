@@ -133,7 +133,25 @@ nnc_static void nnc_dump_3a_pcall(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg2));
 }
 
+nnc_static void nnc_dump_3a_ujump(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    goto @%s\n", nnc_dump_3a_addr(&quad->res));
+}
+
+nnc_static void nnc_dump_3a_cjumpt(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    if %s", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" goto @%s\n", nnc_dump_3a_addr(&quad->res));
+}
+
+nnc_static void nnc_dump_3a_cjumpf(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    if not %s", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" goto @%s\n", nnc_dump_3a_addr(&quad->res));
+}
+
 nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
+    if (quad->label > 0) {
+        dump_3a(" @%u:\n", quad->label);
+        return;
+    }
     switch (quad->op) {
         case OP_ADD:    case OP_SUB:    case OP_MUL:
         case OP_DIV:    case OP_MOD:    case OP_SHR:
@@ -145,15 +163,18 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_NOT:    case OP_BW_NOT:
         case OP_PLUS:   case OP_MINUS:
             nnc_dump_3a_unary(quad); break;
-        case OP_ARG:   nnc_dump_3a_arg(quad);   break;
-        case OP_REF:   nnc_dump_3a_ref(quad);   break;
-        case OP_COPY:  nnc_dump_3a_copy(quad);  break;
-        case OP_RETF:  nnc_dump_3a_retf(quad);  break;
-        case OP_RETP:  nnc_dump_3a_retp(quad);  break;
-        case OP_DEREF: nnc_dump_3a_deref(quad); break;
-        case OP_INDEX: nnc_dump_3a_index(quad); break;
-        case OP_FCALL: nnc_dump_3a_fcall(quad); break;
-        case OP_PCALL: nnc_dump_3a_pcall(quad); break;
+        case OP_ARG:    nnc_dump_3a_arg(quad);    break;
+        case OP_REF:    nnc_dump_3a_ref(quad);    break;
+        case OP_COPY:   nnc_dump_3a_copy(quad);   break;
+        case OP_RETF:   nnc_dump_3a_retf(quad);   break;
+        case OP_RETP:   nnc_dump_3a_retp(quad);   break;
+        case OP_DEREF:  nnc_dump_3a_deref(quad);  break;
+        case OP_INDEX:  nnc_dump_3a_index(quad);  break;
+        case OP_FCALL:  nnc_dump_3a_fcall(quad);  break;
+        case OP_PCALL:  nnc_dump_3a_pcall(quad);  break;
+        case OP_UJUMP:  nnc_dump_3a_ujump(quad);  break;
+        case OP_CJUMPT: nnc_dump_3a_cjumpt(quad); break;
+        case OP_CJUMPF: nnc_dump_3a_cjumpf(quad); break;
         default: nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.");
     }
 }
