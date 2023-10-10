@@ -418,6 +418,7 @@ nnc_static nnc_bool nnc_resolve_struct(nnc_type* type, nnc_st* st, const nnc_ctx
                 nnc_resolve_type_expr(m->texpr, st);
             }
             type->size += nnc_sizeof(m->texpr->type);
+            ETRY;
         }
         CATCHALL {
             NNC_SHOW_CATCHED(&CATCHED.where);
