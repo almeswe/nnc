@@ -9,10 +9,6 @@ static char buf[128] = {0};
 
 static const char* op_str[] = {
     /*  binary operators */
-    [OP_LT]     = "<", 
-    [OP_GT]     = ">", 
-    [OP_EQ]     = "==",
-    [OP_OR]     = "||",
     [OP_ADD]    = "+",
     [OP_SUB]    = "-",
     [OP_MUL]    = "*",
@@ -20,15 +16,10 @@ static const char* op_str[] = {
     [OP_MOD]    = "%", 
     [OP_SHR]    = ">>",
     [OP_SHL]    = "<<",
-    [OP_LTE]    = "<=", 
-    [OP_GTE]    = ">=",
-    [OP_NEQ]    = "!=",
-    [OP_AND]    = "&&",
     [OP_BW_AND] = "&",
     [OP_BW_XOR] = "^",
     [OP_BW_OR]  = "|",
     /*  unary operators  */
-    [OP_NOT]    = "!",
     [OP_PLUS]   = "+",
     [OP_MINUS]  = "-",
     [OP_BW_NOT] = "~"
@@ -147,34 +138,48 @@ nnc_static void nnc_dump_3a_cjumpf(const nnc_3a_quad* quad) {
     dump_3a(" goto @%s\n", nnc_dump_3a_addr(&quad->res));
 }
 
+nnc_static void nnc_dump_3a_cjumpe(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    if %s ==", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" %s", nnc_dump_3a_addr(&quad->arg2));
+    dump_3a(" goto @%s\n", nnc_dump_3a_addr(&quad->res));
+}
+
+nnc_static void nnc_dump_3a_cjumpne(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "    if %s !=", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" %s", nnc_dump_3a_addr(&quad->arg2));
+    dump_3a(" goto @%s\n", nnc_dump_3a_addr(&quad->res));
+}
+
 nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     if (quad->label > 0) {
         dump_3a(" @%u:\n", quad->label);
         return;
     }
     switch (quad->op) {
-        case OP_ADD:    case OP_SUB:    case OP_MUL:
-        case OP_DIV:    case OP_MOD:    case OP_SHR:
-        case OP_SHL:    case OP_LTE:    case OP_GTE:
-        case OP_LT:     case OP_GT:     case OP_EQ:
-        case OP_OR:     case OP_NEQ:    case OP_AND:
+        case OP_ADD:    
+        case OP_SUB:    case OP_MUL:
+        case OP_DIV:    case OP_MOD:    
+        case OP_SHR:    case OP_SHL:    
         case OP_BW_AND: case OP_BW_XOR: case OP_BW_OR:
             nnc_dump_3a_binary(quad); break;
-        case OP_NOT:    case OP_BW_NOT:
-        case OP_PLUS:   case OP_MINUS:
+        case OP_PLUS:
+        case OP_MINUS:
+        case OP_BW_NOT:
             nnc_dump_3a_unary(quad); break;
-        case OP_ARG:    nnc_dump_3a_arg(quad);    break;
-        case OP_REF:    nnc_dump_3a_ref(quad);    break;
-        case OP_COPY:   nnc_dump_3a_copy(quad);   break;
-        case OP_RETF:   nnc_dump_3a_retf(quad);   break;
-        case OP_RETP:   nnc_dump_3a_retp(quad);   break;
-        case OP_DEREF:  nnc_dump_3a_deref(quad);  break;
-        case OP_INDEX:  nnc_dump_3a_index(quad);  break;
-        case OP_FCALL:  nnc_dump_3a_fcall(quad);  break;
-        case OP_PCALL:  nnc_dump_3a_pcall(quad);  break;
-        case OP_UJUMP:  nnc_dump_3a_ujump(quad);  break;
-        case OP_CJUMPT: nnc_dump_3a_cjumpt(quad); break;
-        case OP_CJUMPF: nnc_dump_3a_cjumpf(quad); break;
+        case OP_ARG:     nnc_dump_3a_arg(quad);     break;
+        case OP_REF:     nnc_dump_3a_ref(quad);     break;
+        case OP_COPY:    nnc_dump_3a_copy(quad);    break;
+        case OP_RETF:    nnc_dump_3a_retf(quad);    break;
+        case OP_RETP:    nnc_dump_3a_retp(quad);    break;
+        case OP_DEREF:   nnc_dump_3a_deref(quad);   break;
+        case OP_INDEX:   nnc_dump_3a_index(quad);   break;
+        case OP_FCALL:   nnc_dump_3a_fcall(quad);   break;
+        case OP_PCALL:   nnc_dump_3a_pcall(quad);   break;
+        case OP_UJUMP:   nnc_dump_3a_ujump(quad);   break;
+        case OP_CJUMPT:  nnc_dump_3a_cjumpt(quad);  break;
+        case OP_CJUMPF:  nnc_dump_3a_cjumpf(quad);  break;
+        case OP_CJUMPE:  nnc_dump_3a_cjumpe(quad);  break;
+        case OP_CJUMPNE: nnc_dump_3a_cjumpne(quad); break;
         default: nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.");
     }
 }
