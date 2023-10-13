@@ -9,7 +9,6 @@ nnc_static nnc_3a_quad* quads = NULL;
 static const nnc_3a_op_kind un_op_map[] = {
     [UNARY_PLUS]        = OP_PLUS,
     [UNARY_MINUS]       = OP_MINUS,
-    [UNARY_POSTFIX_DOT] = OP_DOT,
     [UNARY_BITWISE_NOT] = OP_BW_NOT
 };
 
@@ -23,7 +22,7 @@ static const nnc_3a_op_kind bin_op_map[] = {
     [BINARY_SHL]    = OP_SHL,
     [BINARY_BW_OR]  = OP_BW_OR,
     [BINARY_BW_AND] = OP_BW_AND,
-    [BINARY_BW_XOR] = OP_BW_XOR,
+    [BINARY_BW_XOR] = OP_BW_XOR
 };
 
 nnc_static void nnc_3a_quads_add(const nnc_3a_quad* quad) {
@@ -315,13 +314,71 @@ nnc_static void nnc_and_to_3a(const nnc_binary_expression* binary, const nnc_st*
     nnc_3a_quads_add(&b_next);
 }
 
+nnc_static void nnc_binary_rel_to_3a(const nnc_binary_expression* binary, nnc_3a_op_kind op, const nnc_st* st) {
+    nnc_3a_quad b_true = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_expr_to_3a(binary->lexpr, st);
+    nnc_3a_addr laddr = *nnc_3a_quads_res(); 
+    nnc_expr_to_3a(binary->rexpr, st);
+    nnc_3a_addr raddr = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        op, nnc_3a_mki3(b_true.label), laddr, raddr  
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_addr res = nnc_3a_mkcgt();
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_next.label)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_true);
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(1)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
+nnc_static void nnc_eq_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPE, st);
+}
+
+nnc_static void nnc_lt_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPLT, st);
+}
+
+nnc_static void nnc_gt_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPGT, st);
+}
+
+nnc_static void nnc_lte_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPLTE, st);
+}
+
+nnc_static void nnc_gte_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPGTE, st);
+}
+
+nnc_static void nnc_neq_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_binary_rel_to_3a(binary, OP_CJUMPNE, st);
+}
+
 nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
     nnc_3a_addr arg1 = {0};
     nnc_3a_addr arg2 = {0};
     nnc_3a_op_kind op = OP_NONE;
     switch (binary->kind) {
+        case BINARY_EQ:  nnc_eq_to_3a(binary, st);  break;
         case BINARY_OR:  nnc_or_to_3a(binary, st);  break;
+        case BINARY_LT:  nnc_lt_to_3a(binary, st);  break;
+        case BINARY_GT:  nnc_gt_to_3a(binary, st);  break;
+        case BINARY_LTE: nnc_lte_to_3a(binary, st); break;
+        case BINARY_GTE: nnc_gte_to_3a(binary, st); break;
         case BINARY_AND: nnc_and_to_3a(binary, st); break;
+        case BINARY_NEQ: nnc_neq_to_3a(binary, st); break;
         default: {
             op = bin_op_map[binary->kind];
             nnc_expr_to_3a(binary->lexpr, st);
