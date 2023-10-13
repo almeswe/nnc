@@ -412,6 +412,24 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
     }
 }
 
+nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, nnc_st* st) {
+    nnc_3a_quad b_iter = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_3a_quads_add(&b_iter);
+    nnc_stmt_to_3a(do_stmt->body, st);
+    nnc_expr_to_3a(do_stmt->cond, st);
+    nnc_3a_addr cond = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
+    );
+    nnc_3a_quads_add(&quad);    
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_iter.label), cond   
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     quads = NULL;
     cgt_cnt = 0;
@@ -471,6 +489,24 @@ nnc_static void nnc_expr_stmt_to_3a(const nnc_expression_statement* expr_stmt, c
     nnc_expr_to_3a(expr_stmt->expr, st);
 }
 
+nnc_static void nnc_while_stmt_to_3a(const nnc_while_statement* while_stmt, const nnc_st* st) {
+    nnc_3a_quad b_iter = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_3a_quads_add(&b_iter);
+    nnc_expr_to_3a(while_stmt->cond, st);
+    nnc_3a_addr cond = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
+    );
+    nnc_3a_quads_add(&quad);    
+    nnc_stmt_to_3a(while_stmt->body, st);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_iter.label), cond   
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
 nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, const nnc_st* st) {
     nnc_3a_op_kind op = OP_RETP;
     if (return_stmt->body->kind != STMT_EMPTY) {
@@ -495,9 +531,11 @@ nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_s
 
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
     switch (stmt->kind) {
+        case STMT_DO:       nnc_do_stmt_to_3a(stmt->exact, st);       break;
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
         case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
+        case STMT_WHILE:    nnc_while_stmt_to_3a(stmt->exact, st);    break;
         case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
         case STMT_COMPOUND: nnc_compound_stmt_to_3a(stmt->exact, st); break;
     }

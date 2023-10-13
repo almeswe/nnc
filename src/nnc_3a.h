@@ -23,7 +23,6 @@ typedef enum _nnc_3a_op_kind {
     OP_BW_AND,
     OP_BW_XOR,
     /*  unary operators  */
-    OP_DOT,
     OP_PLUS,
     OP_MINUS,
     OP_BW_NOT,
