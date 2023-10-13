@@ -7,7 +7,6 @@ nnc_3a_label_cnt label_cnt = 0;
 nnc_static nnc_3a_quad* quads = NULL;
 
 static const nnc_3a_op_kind un_op_map[] = {
-    [UNARY_NOT]         = OP_NOT,
     [UNARY_PLUS]        = OP_PLUS,
     [UNARY_MINUS]       = OP_MINUS,
     [UNARY_POSTFIX_DOT] = OP_DOT,
@@ -15,10 +14,6 @@ static const nnc_3a_op_kind un_op_map[] = {
 };
 
 static const nnc_3a_op_kind bin_op_map[] = {
-    [BINARY_EQ]     = OP_EQ,
-    [BINARY_OR]     = OP_OR,
-    [BINARY_LT]     = OP_LT, 
-    [BINARY_GT]     = OP_GT, 
     [BINARY_ADD]    = OP_ADD,
     [BINARY_SUB]    = OP_SUB,
     [BINARY_MUL]    = OP_MUL,
@@ -26,10 +21,6 @@ static const nnc_3a_op_kind bin_op_map[] = {
     [BINARY_MOD]    = OP_MOD, 
     [BINARY_SHR]    = OP_SHR,
     [BINARY_SHL]    = OP_SHL,
-    [BINARY_LTE]    = OP_LTE, 
-    [BINARY_GTE]    = OP_GTE,
-    [BINARY_NEQ]    = OP_NEQ,
-    [BINARY_AND]    = OP_AND,
     [BINARY_BW_OR]  = OP_BW_OR,
     [BINARY_BW_AND] = OP_BW_AND,
     [BINARY_BW_XOR] = OP_BW_XOR,
@@ -40,9 +31,16 @@ nnc_static void nnc_3a_quads_add(const nnc_3a_quad* quad) {
 }
 
 nnc_static const nnc_3a_addr* nnc_3a_quads_res() {
+    size_t offset = 1;
     size_t quads_size = buf_len(quads);
-    assert(quads_size > 0);
-    return &quads[quads_size-1].res;
+    while (quads_size >= offset) {
+        nnc_3a_quad* quad = &quads[quads_size-offset];
+        if (quad->label == 0) {
+            return &quad->res;
+        }
+        offset++;
+    }
+    nnc_abort_no_ctx("nnc_3a_quads_res: bug detected.\n");
 }
 
 nnc_static void nnc_fconst_to_3a(const nnc_dbl_literal* fconst, const nnc_st* st) {
@@ -69,11 +67,35 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static void nnc_not_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_3a_quad b_true = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_expr_to_3a(unary->expr, st);
+    nnc_3a_addr cond = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPE, nnc_3a_mki3(b_true.label), cond, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad(
+        OP_COPY, cond, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_next.label)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_true);
+    quad = nnc_3a_mkquad(
+        OP_COPY, cond, nnc_3a_mki3(1)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
 nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     nnc_u64 size = unary->exact.size.of->type->size;
     nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_COPY, nnc_3a_mkcgt(), 
-        nnc_3a_mki2(size, unary->type)
+        OP_COPY, nnc_3a_mkcgt(), nnc_3a_mki2(size, unary->type)
     );
     nnc_3a_quads_add(&quad);
 }
@@ -81,8 +103,7 @@ nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st
 nnc_static void nnc_lengthof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr); 
     nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_COPY, nnc_3a_mkcgt(), 
-        nnc_3a_mki2(t_expr->size, unary->type)
+        OP_COPY, nnc_3a_mkcgt(), nnc_3a_mki2(t_expr->size, unary->type)
     );
     nnc_3a_quads_add(&quad);
 }
@@ -94,14 +115,12 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
     const nnc_ident* member = unary->exact.dot.member->exact;
     const nnc_type* t_expr = nnc_expr_get_type(unary->expr);
     if (!nnc_ptr_type(t_expr)) {
-        quad = nnc_3a_mkquad(OP_REF,
-            nnc_3a_mkcgt(),
-            *nnc_3a_quads_res()
+        quad = nnc_3a_mkquad(
+            OP_REF, nnc_3a_mkcgt(), *nnc_3a_quads_res()
         );
         nnc_3a_quads_add(&quad);
     }
-    const struct _nnc_struct_or_union_type* exact = 
-        &t_expr->exact.struct_or_union;
+    const struct _nnc_struct_or_union_type* exact = &t_expr->exact.struct_or_union;
     //todo: this is true when pack of struct is 1
     // in few other cases this may lead to wrong member mappings
     for (nnc_u64 i = 0; i < exact->memberc; i++) {
@@ -114,43 +133,34 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
         }
         offset += m->texpr->type->size;
     }
-    quad = nnc_3a_mkquad(OP_ADD,
-        nnc_3a_mkcgt(),
-        *nnc_3a_quads_res(),
-        nnc_3a_mki3(offset)
+    quad = nnc_3a_mkquad(
+        OP_ADD, nnc_3a_mkcgt(), *nnc_3a_quads_res(), nnc_3a_mki3(offset)
     );
     nnc_3a_quads_add(&quad);
-    quad = nnc_3a_mkquad(OP_DEREF,
-        nnc_3a_mkcgt(),
-        *nnc_3a_quads_res(),
+    quad = nnc_3a_mkquad(
+        OP_DEREF, nnc_3a_mkcgt(), *nnc_3a_quads_res(),
     );
     nnc_3a_quads_add(&quad);
 }
 
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_3a_quad call_quad = {0};
     const nnc_ident* fn = unary->expr->exact;
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
-        nnc_3a_quad arg_quad = { .op = OP_ARG };
         nnc_expr_to_3a(call->args[i], st);
-        arg_quad.arg1 = *nnc_3a_quads_res();
-        nnc_3a_quads_add(&arg_quad);
-    }
-    if (unary->type->kind == T_VOID) {
-        call_quad = nnc_3a_mkquad(OP_PCALL, {0},
-            nnc_3a_mkname1(fn),
-            nnc_3a_mki3(call->argc)
+        nnc_3a_quad quad = nnc_3a_mkquad(
+            OP_ARG, {0}, *nnc_3a_quads_res() 
         );
+        nnc_3a_quads_add(&quad);
     }
-    else {
-        call_quad = nnc_3a_mkquad(OP_FCALL,
-            nnc_3a_mkcgt(),
-            nnc_3a_mkname1(fn),
-            nnc_3a_mki3(call->argc)
-        );
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_PCALL, {0}, nnc_3a_mkname1(fn), nnc_3a_mki3(call->argc)
+    );
+    if (unary->type->kind != T_VOID) {
+        quad.op = OP_FCALL;
+        quad.res = nnc_3a_mkcgt();  
     }
-    nnc_3a_quads_add(&call_quad);
+    nnc_3a_quads_add(&quad);
 }
 
 typedef struct _nnc_dim_data {
@@ -170,9 +180,9 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
     nnc_expr_to_3a(unary->exact.index.expr, st);
     nnc_3a_addr index = *nnc_3a_quads_res();
     // then multiply it by the size of type
+    nnc_u32 typesize = data.sizes[data.dims-1];
     nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_MUL, nnc_3a_mkcgt(), index, 
-        nnc_3a_mki2(data.sizes[data.dims-1], &u32_type)
+        OP_MUL, nnc_3a_mkcgt(), index, nnc_3a_mki3(typesize)
     );
     nnc_3a_quads_add(&quad);
     // again, if this is not right-most index
@@ -180,8 +190,7 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
     if (!first) {
         index = *nnc_3a_quads_res();
         quad = nnc_3a_mkquad(
-            OP_ADD, nnc_3a_mkcgt(),
-            base, index 
+            OP_ADD, nnc_3a_mkcgt(), base, index
         );
         nnc_3a_quads_add(&quad);
     }
@@ -202,8 +211,7 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
         nnc_3a_addr address = *nnc_3a_quads_res();
         //const nnc_ident* x = unary->expr->exact;
         nnc_3a_quad quad = nnc_3a_mkquad(
-            OP_INDEX, nnc_3a_mkcgt(), 
-            address, index
+            OP_INDEX, nnc_3a_mkcgt(), address, index
         );
         nnc_3a_quads_add(&quad);
     }
@@ -223,6 +231,7 @@ nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st*
 
 nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     switch (unary->kind) {
+        case UNARY_NOT:           nnc_not_to_3a(unary, st);      break;
         case UNARY_SIZEOF:        nnc_sizeof_to_3a(unary, st);   break;
         case UNARY_LENGTHOF:      nnc_lengthof_to_3a(unary, st); break;
         case UNARY_POSTFIX_DOT:   nnc_dot_to_3a(unary, st);      break;
@@ -242,35 +251,99 @@ nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st*
     }
 }
 
+nnc_static void nnc_or_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_3a_quad b_true = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_expr_to_3a(binary->lexpr, st);
+    nnc_3a_addr laddr = *nnc_3a_quads_res(); 
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPT, nnc_3a_mki3(b_true.label), laddr
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_expr_to_3a(binary->rexpr, st);
+    nnc_3a_addr raddr = *nnc_3a_quads_res();
+    quad = nnc_3a_mkquad(
+        OP_CJUMPT, nnc_3a_mki3(b_true.label), raddr
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_addr res = nnc_3a_mkcgt();
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_next.label)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_true);
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(1)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
+nnc_static void nnc_and_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_3a_quad b_true = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_expr_to_3a(binary->lexpr, st);
+    nnc_3a_addr laddr = *nnc_3a_quads_res(); 
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPE, nnc_3a_mki3(b_true.label), laddr, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_expr_to_3a(binary->rexpr, st);
+    nnc_3a_addr raddr = *nnc_3a_quads_res();
+    quad = nnc_3a_mkquad(
+        OP_CJUMPE, nnc_3a_mki3(b_true.label), raddr, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_addr res = nnc_3a_mkcgt();
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(1)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_next.label)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_true);
+    quad = nnc_3a_mkquad(
+        OP_COPY, res, nnc_3a_mki3(0)
+    );
+    nnc_3a_quads_add(&quad);
+    nnc_3a_quads_add(&b_next);
+}
+
 nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
     nnc_3a_addr arg1 = {0};
     nnc_3a_addr arg2 = {0};
     nnc_3a_op_kind op = OP_NONE;
-    nnc_expr_to_3a(binary->lexpr, st);
-    arg1 = *nnc_3a_quads_res();
-    nnc_expr_to_3a(binary->rexpr, st);
-    arg2 = *nnc_3a_quads_res();
     switch (binary->kind) {
-        case BINARY_COMMA:
-        case BINARY_ASSIGN: {
-            op = OP_COPY;
-            if (binary->kind == BINARY_COMMA) {
-                // right expression is the actual result
-                // of comma expression, so swap them 
-                arg2 = arg1;
-            }
-            break;
-        }
+        case BINARY_OR:  nnc_or_to_3a(binary, st);  break;
+        case BINARY_AND: nnc_and_to_3a(binary, st); break;
         default: {
             op = bin_op_map[binary->kind];
+            nnc_expr_to_3a(binary->lexpr, st);
+            arg1 = *nnc_3a_quads_res();
+            nnc_expr_to_3a(binary->rexpr, st);
+            arg2 = *nnc_3a_quads_res();
+            if (binary->kind == BINARY_COMMA ||
+                binary->kind == BINARY_ASSIGN) {
+                op = OP_COPY;
+                if (binary->kind == BINARY_COMMA) {
+                    // right expression is the actual result
+                    // of comma expression, so swap them 
+                    arg2 = arg1;
+                }
+            }
+            nnc_3a_quad quad = nnc_3a_mkquad(
+                op, nnc_3a_mkcgt(), arg1, arg2
+            );
+            nnc_3a_quads_add(&quad);
         }
     }
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        op, nnc_3a_mkcgt(), arg1, arg2
-    );
-    nnc_3a_quads_add(&quad);
 }
-
 
 void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
     switch (expr->kind) {
@@ -290,6 +363,8 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     nnc_stmt_to_3a(fn_stmt->body, st);
     set.quads = quads;
     buf_add(sets, set);
+    printf("size of `nnc_3a_quad`: %lu\n", sizeof(nnc_3a_quad));
+    printf("`%s` has %lu quads\n", set.name, buf_len(quads));
 }
 
 nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 

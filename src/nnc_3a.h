@@ -12,10 +12,6 @@ typedef enum _nnc_3a_op_kind {
     /* ***************** */
     OP_NONE,
     /*  binary operators */
-    OP_LT,
-    OP_GT,
-    OP_EQ,
-    OP_OR,
     OP_ADD,
     OP_SUB,
     OP_MUL,
@@ -23,25 +19,26 @@ typedef enum _nnc_3a_op_kind {
     OP_MOD,
     OP_SHR,
     OP_SHL,
-    OP_LTE,
-    OP_GTE,
-    OP_NEQ,
-    OP_AND,
     OP_BW_OR,
     OP_BW_AND,
     OP_BW_XOR,
     /*  unary operators  */
-    OP_NOT,
     OP_DOT,
     OP_PLUS,
     OP_MINUS,
     OP_BW_NOT,
+    /*   jump operators  */
+    OP_UJUMP,    // Unconditional JUMP
+    OP_CJUMPT,   // Conditional JUMP True      (if x goto L) 
+    OP_CJUMPF,   // Conditional JUMP False     (if not x goto L)
+    OP_CJUMPLT,  // Conditional JUMP Less Than (if x < y goto L)
+    OP_CJUMPGT,  // Conditional JUMP Less Than (if x > y goto L
+    OP_CJUMPLTE, // Conditional JUMP Less Than Equal (if x <= y goto L)
+    OP_CJUMPGTE, // Conditional JUMP Less Than Equal (if x >= y goto L)
+    OP_CJUMPE,   // Conditional JUMP Equals     (if x == y goto L)
+    OP_CJUMPNE,  // Conditional JUMP Not Equals (if x != y goto L)
     /*  other operators  */
     OP_COPY,
-    OP_UJUMP,  // Unconditional JUMP
-    OP_CJUMPT, // Conditional JUMP True  (if x goto L) 
-    OP_CJUMPF, // Conditional JUMP False (if not x goto L)
-    OP_RJUMP,  // Relop JUMP (if x relop y goto L)
     OP_ARG,
     OP_PCALL,  // Procedure CALL
     OP_FCALL,  // Function CALL
@@ -115,8 +112,10 @@ typedef struct _nnc_3a_name {
     const nnc_nesting* nesting;
 } nnc_3a_name;
 
+#pragma pack(push)
+#pragma pack(1)
 typedef struct _nnc_3a_addr {
-    nnc_3a_addr_kind kind;
+    nnc_3a_addr_kind kind: 8;
     union _nnc_3a_addr_exact {
         nnc_3a_cgt cgt;
         nnc_3a_name name;
@@ -124,6 +123,7 @@ typedef struct _nnc_3a_addr {
         nnc_3a_fconst fconst;
     } exact;
 } nnc_3a_addr;
+#pragma pack(pop)
 
 #define nnc_3a_mkquad(opv, resv, ...) (nnc_3a_quad){\
      .op=opv, .res=resv, __VA_ARGS__\
@@ -133,9 +133,13 @@ typedef struct _nnc_3a_addr {
     .label = ++label_cnt\
 }
 
+// 11236 - 14340
+// 11236 - 15108
+
 typedef struct _nnc_3a_quad {
-    nnc_u32 label;
-    nnc_3a_op_kind op;
+    nnc_u32 label: 26;
+    nnc_3a_op_kind op: 7;
+    nnc_bool signed_op: 1;
     nnc_3a_addr res;
     nnc_3a_addr arg1;
     nnc_3a_addr arg2;
