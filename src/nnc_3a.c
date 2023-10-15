@@ -199,7 +199,6 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
     const nnc_unary_expression* expr = unary->expr->exact;
     if (unary->expr->kind == EXPR_UNARY &&
         expr->kind == UNARY_POSTFIX_INDEX) {
-        // may be function call, cast, etc.
         nnc_index_to_3a_ex(unary->expr->exact, st, false, data);
     }
     // otherwise make OP_INDEX quad from variable name
@@ -208,7 +207,6 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
         nnc_3a_addr index = *nnc_3a_quads_res();
         nnc_expr_to_3a(unary->expr, st);
         nnc_3a_addr address = *nnc_3a_quads_res();
-        //const nnc_ident* x = unary->expr->exact;
         nnc_3a_quad quad = nnc_3a_mkquad(
             OP_INDEX, nnc_3a_mkcgt(), address, index
         );
@@ -412,7 +410,7 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
     }
 }
 
-nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, nnc_st* st) {
+nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const nnc_st* st) {
     nnc_3a_quad b_iter = nnc_3a_mklabel();
     nnc_3a_quad b_next = nnc_3a_mklabel();
     nnc_3a_quads_add(&b_iter);
@@ -424,7 +422,7 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, nnc_st*
     );
     nnc_3a_quads_add(&quad);    
     quad = nnc_3a_mkquad(
-        OP_UJUMP, nnc_3a_mki3(b_iter.label), cond   
+        OP_UJUMP, nnc_3a_mki3(b_iter.label)   
     );
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_next);
@@ -485,6 +483,26 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
     nnc_3a_quads_add(&b_true);
 }
 
+nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_st* st) {
+    nnc_3a_quad b_iter = nnc_3a_mklabel();
+    nnc_3a_quad b_next = nnc_3a_mklabel();
+    nnc_stmt_to_3a(for_stmt->init, st);
+    nnc_3a_quads_add(&b_iter);
+    nnc_stmt_to_3a(for_stmt->cond, st);
+    nnc_3a_addr cond = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
+    );
+    nnc_3a_quads_add(&quad);  
+    nnc_stmt_to_3a(for_stmt->body, st);
+    nnc_stmt_to_3a(for_stmt->step, st);
+    quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(b_iter.label)
+    );
+    nnc_3a_quads_add(&quad);    
+    nnc_3a_quads_add(&b_next);
+}
+
 nnc_static void nnc_expr_stmt_to_3a(const nnc_expression_statement* expr_stmt, const nnc_st* st) {
     nnc_expr_to_3a(expr_stmt->expr, st);
 }
@@ -501,7 +519,7 @@ nnc_static void nnc_while_stmt_to_3a(const nnc_while_statement* while_stmt, cons
     nnc_3a_quads_add(&quad);    
     nnc_stmt_to_3a(while_stmt->body, st);
     quad = nnc_3a_mkquad(
-        OP_UJUMP, nnc_3a_mki3(b_iter.label), cond   
+        OP_UJUMP, nnc_3a_mki3(b_iter.label)   
     );
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_next);
@@ -534,6 +552,7 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
         case STMT_DO:       nnc_do_stmt_to_3a(stmt->exact, st);       break;
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
         case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
+        case STMT_FOR:      nnc_for_stmt_to_3a(stmt->exact, st);      break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
         case STMT_WHILE:    nnc_while_stmt_to_3a(stmt->exact, st);    break;
         case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
