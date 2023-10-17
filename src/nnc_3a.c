@@ -4,6 +4,17 @@ nnc_3a_quad_set* sets = NULL;
 nnc_3a_cgt_cnt cgt_cnt = 0;
 nnc_3a_label_cnt label_cnt = 0; 
 
+typedef struct _nnc_dim_data {
+    nnc_u32 dims;
+    nnc_u32* sizes;
+} nnc_dim_data;
+
+typedef struct _nnc_loop_branches {
+    nnc_u32 b_loop_out;
+    nnc_u32 b_loop_iter_ends;
+} nnc_loop_branches;
+
+nnc_static nnc_loop_branches loop_branches = {0};
 nnc_static nnc_3a_quad* quads = NULL;
 
 static const nnc_3a_op_kind un_op_map[] = {
@@ -23,10 +34,24 @@ static const nnc_3a_op_kind bin_op_map[] = {
     [BINARY_BW_OR]  = OP_BW_OR,
     [BINARY_BW_AND] = OP_BW_AND,
     [BINARY_BW_XOR] = OP_BW_XOR
-};
+}; 
 
 nnc_static void nnc_3a_quads_add(const nnc_3a_quad* quad) {
     buf_add(quads, *quad);
+}
+
+nnc_static nnc_loop_branches nnc_set_loop_branches(const nnc_3a_quad* b_loop_out,
+                                                   const nnc_3a_quad* b_loop_iter_ends) {
+    nnc_loop_branches saved = loop_branches;
+    assert(b_loop_out->label != 0);
+    assert(b_loop_iter_ends->label != 0);
+    loop_branches.b_loop_out = b_loop_out->label;
+    loop_branches.b_loop_iter_ends = b_loop_iter_ends->label;
+    return saved;
+}
+
+nnc_static void nnc_restore_loop_branches(const nnc_loop_branches* branches) {
+    loop_branches = *branches;
 }
 
 nnc_static const nnc_3a_addr* nnc_3a_quads_res() {
@@ -121,7 +146,7 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
     }
     const struct _nnc_struct_or_union_type* exact = &t_expr->exact.struct_or_union;
     //todo: this is true when pack of struct is 1
-    // in few other cases this may lead to wrong member mappings
+    //in few other cases this may lead to wrong member mappings
     for (nnc_u64 i = 0; i < exact->memberc; i++) {
         if (t_expr->kind == T_UNION) {
             break;
@@ -161,11 +186,6 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
     }
     nnc_3a_quads_add(&quad);
 }
-
-typedef struct _nnc_dim_data {
-    nnc_u32 dims;
-    nnc_u32* sizes;
-} nnc_dim_data;
 
 nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_st* st, nnc_bool first, nnc_dim_data data) {
     // previous index is stored here
@@ -411,8 +431,10 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
 }
 
 nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const nnc_st* st) {
+    nnc_loop_branches branches = {0};
     nnc_3a_quad b_iter = nnc_3a_mklabel();
     nnc_3a_quad b_next = nnc_3a_mklabel();
+    branches = nnc_set_loop_branches(&b_next, &b_iter);
     nnc_3a_quads_add(&b_iter);
     nnc_stmt_to_3a(do_stmt->body, st);
     nnc_expr_to_3a(do_stmt->cond, st);
@@ -422,8 +444,9 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
     );
     nnc_3a_quads_add(&quad);    
     quad = nnc_3a_mkquad(
-        OP_UJUMP, nnc_3a_mki3(b_iter.label)   
+        OP_UJUMP, nnc_3a_mki3(b_iter.label)
     );
+    nnc_restore_loop_branches(&branches);
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_next);
 }
@@ -484,8 +507,11 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
 }
 
 nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_st* st) {
+    nnc_loop_branches branches = {0};
     nnc_3a_quad b_iter = nnc_3a_mklabel();
+    nnc_3a_quad b_step = nnc_3a_mklabel();
     nnc_3a_quad b_next = nnc_3a_mklabel();
+    branches = nnc_set_loop_branches(&b_next, &b_step);
     nnc_stmt_to_3a(for_stmt->init, st);
     nnc_3a_quads_add(&b_iter);
     nnc_stmt_to_3a(for_stmt->cond, st);
@@ -493,12 +519,14 @@ nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_
     nnc_3a_quad quad = nnc_3a_mkquad(
         OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
     );
-    nnc_3a_quads_add(&quad);  
+    nnc_3a_quads_add(&quad);
     nnc_stmt_to_3a(for_stmt->body, st);
+    nnc_3a_quads_add(&b_step);
     nnc_stmt_to_3a(for_stmt->step, st);
     quad = nnc_3a_mkquad(
         OP_UJUMP, nnc_3a_mki3(b_iter.label)
     );
+    nnc_restore_loop_branches(&branches);
     nnc_3a_quads_add(&quad);    
     nnc_3a_quads_add(&b_next);
 }
@@ -508,21 +536,32 @@ nnc_static void nnc_expr_stmt_to_3a(const nnc_expression_statement* expr_stmt, c
 }
 
 nnc_static void nnc_while_stmt_to_3a(const nnc_while_statement* while_stmt, const nnc_st* st) {
+    nnc_loop_branches branches = {0};
     nnc_3a_quad b_iter = nnc_3a_mklabel();
     nnc_3a_quad b_next = nnc_3a_mklabel();
+    branches = nnc_set_loop_branches(&b_next, &b_iter);
     nnc_3a_quads_add(&b_iter);
     nnc_expr_to_3a(while_stmt->cond, st);
     nnc_3a_addr cond = *nnc_3a_quads_res();
     nnc_3a_quad quad = nnc_3a_mkquad(
         OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
     );
-    nnc_3a_quads_add(&quad);    
+    nnc_3a_quads_add(&quad);
     nnc_stmt_to_3a(while_stmt->body, st);
     quad = nnc_3a_mkquad(
-        OP_UJUMP, nnc_3a_mki3(b_iter.label)   
+        OP_UJUMP, nnc_3a_mki3(b_iter.label)
     );
+    nnc_restore_loop_branches(&branches);
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_next);
+}
+
+nnc_static void nnc_break_stmt_to_3a(const nnc_break_statement* break_stmt, const nnc_st* st) {
+    assert(loop_branches.b_loop_out != 0);
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(loop_branches.b_loop_out)
+    );
+    nnc_3a_quads_add(&quad);
 }
 
 nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, const nnc_st* st) {
@@ -538,7 +577,15 @@ nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, c
     nnc_3a_quad quad = nnc_3a_mkquad(
         op, {0}, arg
     );
-    nnc_3a_quads_add(&quad);   
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_continue_stmt_to_3a(const nnc_continue_statement* continue_stmt, const nnc_st* st) {
+    assert(loop_branches.b_loop_iter_ends != 0);
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_UJUMP, nnc_3a_mki3(loop_branches.b_loop_iter_ends)
+    );
+    nnc_3a_quads_add(&quad);
 }
 
 nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_stmt, const nnc_st* st) {
@@ -549,13 +596,17 @@ nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_s
 
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
     switch (stmt->kind) {
+        case STMT_TYPE:     break;
+        case STMT_EMPTY:    break;
         case STMT_DO:       nnc_do_stmt_to_3a(stmt->exact, st);       break;
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
         case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
         case STMT_FOR:      nnc_for_stmt_to_3a(stmt->exact, st);      break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
         case STMT_WHILE:    nnc_while_stmt_to_3a(stmt->exact, st);    break;
+        case STMT_BREAK:    nnc_break_stmt_to_3a(stmt->exact, st);    break;
         case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
+        case STMT_CONTINUE: nnc_continue_stmt_to_3a(stmt->exact, st); break;
         case STMT_COMPOUND: nnc_compound_stmt_to_3a(stmt->exact, st); break;
     }
 }
