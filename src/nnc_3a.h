@@ -45,7 +45,8 @@ typedef enum _nnc_3a_op_kind {
     OP_RETP,   // RETurn from Procedure
     OP_RETF,   // RETurn from Function
     OP_REF,
-    OP_DEREF
+    OP_DEREF,
+    OP_DEREF_COPY,
     /* ***************** */
 } nnc_3a_op_kind;
 

@@ -75,6 +75,14 @@ nnc_static void nnc_fconst_to_3a(const nnc_dbl_literal* fconst, const nnc_st* st
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static void nnc_cconst_to_3a(const nnc_chr_literal* cconst, const nnc_st* st) {
+    nnc_3a_addr arg = nnc_3a_mki2(cconst->exact, &u8_type);
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), arg
+    );
+    nnc_3a_quads_add(&quad);
+}
+
 nnc_static void nnc_iconst_to_3a(const nnc_int_literal* iconst, const nnc_st* st) {
     nnc_3a_addr arg = nnc_3a_mki1(iconst);
     nnc_3a_quad quad = nnc_3a_mkquad(
@@ -187,7 +195,7 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
     nnc_3a_quads_add(&quad);
 }
 
-nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_st* st, nnc_bool first, nnc_dim_data data) {
+nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_st* st, nnc_bool lval, nnc_bool first, nnc_dim_data data) {
     // previous index is stored here
     // in case of first (means right-most) index
     // there are no base so no need to retrieve it
@@ -219,11 +227,17 @@ nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_
     const nnc_unary_expression* expr = unary->expr->exact;
     if (unary->expr->kind == EXPR_UNARY &&
         expr->kind == UNARY_POSTFIX_INDEX) {
-        nnc_index_to_3a_ex(unary->expr->exact, st, false, data);
+        nnc_index_to_3a_ex(unary->expr->exact, st, lval, false, data);
     }
     // otherwise make OP_INDEX quad from variable name
     // and accumulated index value.
     else {
+        // if this expression is lvalue, return just address of
+        // the index element (it is already accessible via `nnc_3a_quads_res`) 
+        if (lval) {
+            return;
+        }
+        // otherwise generate index opcode itself
         nnc_3a_addr index = *nnc_3a_quads_res();
         nnc_expr_to_3a(unary->expr, st);
         nnc_3a_addr address = *nnc_3a_quads_res();
@@ -242,7 +256,7 @@ nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st*
         buf_add(data.sizes, expr->type->size);
         expr = expr->expr->exact;
     }
-    nnc_index_to_3a_ex(unary, st, true, data);
+    nnc_index_to_3a_ex(unary, st, false, true, data);
     buf_free(data.sizes);
 }
 
@@ -384,27 +398,97 @@ nnc_static void nnc_neq_to_3a(const nnc_binary_expression* binary, const nnc_st*
     nnc_binary_rel_to_3a(binary, OP_CJUMPNE, st);
 }
 
+nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_REF, nnc_3a_mkcgt(), nnc_3a_mkname1(ident)
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    //todo: this approach doesn't take to account pointer arithmetic
+    nnc_expr_to_3a(unary->expr, st);
+    // get the address for dereference
+    nnc_3a_addr addr = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), addr
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_index_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_dim_data data = {0};
+    const nnc_unary_expression* expr = unary;
+    while (expr->kind == UNARY_POSTFIX_INDEX) {
+        data.dims++;
+        buf_add(data.sizes, expr->type->size);
+        expr = expr->expr->exact;
+    }
+    nnc_index_to_3a_ex(unary, st, true, true, data);
+    buf_free(data.sizes);
+    nnc_3a_addr addr = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), addr
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    switch (unary->kind) {
+        case UNARY_DEREF:         nnc_lval_deref_to_3a(unary, st); break;
+        case UNARY_POSTFIX_INDEX: nnc_lval_index_to_3a(unary, st); break;
+        default: nnc_abort_no_ctx("nnc_lval_unary_to_3a: unknown kind.\n");
+    }
+}
+
+nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
+    switch (expr->kind) {
+        case EXPR_IDENT: nnc_lval_ident_to_3a(expr->exact, st); break;
+        case EXPR_UNARY: nnc_lval_unary_to_3a(expr->exact, st); break;
+        default: nnc_abort_no_ctx("nnc_lval_expr_to_3a: unknown kind.\n");
+    }
+}
+
+nnc_static void nnc_assign_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_expr_to_3a(binary->rexpr, st);
+    nnc_3a_addr copy = *nnc_3a_quads_res();
+    nnc_lval_expr_to_3a(binary->lexpr, st);
+    nnc_3a_addr addr = *nnc_3a_quads_res();
+    // actual assignment to the calculated address
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_DEREF_COPY, addr, copy
+    );
+    nnc_3a_quads_add(&quad);
+    // this is the actual result of the evaluation
+    // of the right expression, this is return value of the
+    // assignment expression
+    quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkcgt(), copy
+    );
+    nnc_3a_quads_add(&quad);
+}
+
 nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
     nnc_3a_addr arg1 = {0};
     nnc_3a_addr arg2 = {0};
     nnc_3a_op_kind op = OP_NONE;
     switch (binary->kind) {
-        case BINARY_EQ:  nnc_eq_to_3a(binary, st);  break;
-        case BINARY_OR:  nnc_or_to_3a(binary, st);  break;
-        case BINARY_LT:  nnc_lt_to_3a(binary, st);  break;
-        case BINARY_GT:  nnc_gt_to_3a(binary, st);  break;
-        case BINARY_LTE: nnc_lte_to_3a(binary, st); break;
-        case BINARY_GTE: nnc_gte_to_3a(binary, st); break;
-        case BINARY_AND: nnc_and_to_3a(binary, st); break;
-        case BINARY_NEQ: nnc_neq_to_3a(binary, st); break;
+        case BINARY_EQ:     nnc_eq_to_3a(binary, st);     break;
+        case BINARY_OR:     nnc_or_to_3a(binary, st);     break;
+        case BINARY_LT:     nnc_lt_to_3a(binary, st);     break;
+        case BINARY_GT:     nnc_gt_to_3a(binary, st);     break;
+        case BINARY_LTE:    nnc_lte_to_3a(binary, st);    break;
+        case BINARY_GTE:    nnc_gte_to_3a(binary, st);    break;
+        case BINARY_AND:    nnc_and_to_3a(binary, st);    break;
+        case BINARY_NEQ:    nnc_neq_to_3a(binary, st);    break;
+        case BINARY_ASSIGN: nnc_assign_to_3a(binary, st); break;
         default: {
             op = bin_op_map[binary->kind];
             nnc_expr_to_3a(binary->lexpr, st);
             arg1 = *nnc_3a_quads_res();
             nnc_expr_to_3a(binary->rexpr, st);
             arg2 = *nnc_3a_quads_res();
-            if (binary->kind == BINARY_COMMA ||
-                binary->kind == BINARY_ASSIGN) {
+            if (binary->kind == BINARY_COMMA) {
                 op = OP_COPY;
                 if (binary->kind == BINARY_COMMA) {
                     // right expression is the actual result
@@ -422,6 +506,7 @@ nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_
 
 void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
     switch (expr->kind) {
+        case EXPR_CHR_LITERAL: nnc_cconst_to_3a(expr->exact, st); break;
         case EXPR_INT_LITERAL: nnc_iconst_to_3a(expr->exact, st); break;
         case EXPR_DBL_LITERAL: nnc_fconst_to_3a(expr->exact, st); break;
         case EXPR_IDENT:  nnc_ident_to_3a(expr->exact, st);  break; 
