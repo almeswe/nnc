@@ -304,7 +304,7 @@ nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx) {
         nnc_abort_no_ctx("nnc_chr_new: strlen(repr) < 1\n");
     }
     ptr->exact = repr[1] != '\\' ? 
-        repr[1] : nnc_get_esc_chr(repr[1]);
+        repr[1] : nnc_get_esc_chr(repr[2]);
     return ptr;
 }
 
