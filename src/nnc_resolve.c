@@ -92,7 +92,7 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
         case EXPR_BINARY: {
             const nnc_binary_expression* binary = expr->exact;
             switch (binary->kind) {
-                case BINARY_ASSIGN: return nnc_can_locate_expr(binary->lexpr);
+                //case BINARY_ASSIGN: return nnc_can_locate_expr(binary->lexpr);
                 default: return false;
             }
         }
