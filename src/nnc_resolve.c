@@ -855,6 +855,29 @@ nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* 
 }
 
 /**
+ * @brief Resolves binary expression type.
+ *  Makes call for `nnc_binary_expr_infer_type`, with try-catch block.
+ * @param binary Expression to be resolved.
+ * @param st Pointer to `nnc_st` instance.
+ * @throw `NNC_CANNOT_ASSIGN_EXPR` in case when cannot locate left expression.
+ */
+nnc_static void nnc_resolve_binary_expr_type(nnc_binary_expression* binary, nnc_st* st) {
+    TRY {
+        nnc_binary_expr_infer_type(binary, st);
+        ETRY;
+    }
+    CATCH (NNC_SEMANTIC) {
+        // make this particular exception catch, for 
+        // setting context to the exception, and then rethrow.
+        const nnc_ctx* ctx = nnc_expr_get_ctx(binary->rexpr);
+        THROW(NNC_SEMANTIC, CATCHED.what, *ctx);
+    }
+    CATCHALL {
+        RETHROW;
+    }
+}
+
+/**
  * @brief Resolves binary addition expression. (<expr>[`+` | `-`]<expr>)
  * @param binary Expression to be resolved.
  * @param st Pointer to `nnc_st` instance.
@@ -886,7 +909,7 @@ nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* st) 
         THROW(NNC_CANNOT_RESOLVE_ADD_EXPR, "both expressions "
             "must have numeric types.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -908,7 +931,7 @@ nnc_static void nnc_resolve_mul_expr(nnc_binary_expression* binary, nnc_st* st) 
         THROW(NNC_CANNOT_RESOLVE_MUL_EXPR, "both expressions "
             "must have numeric types.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -924,7 +947,7 @@ nnc_static void nnc_resolve_shift_expr(nnc_binary_expression* binary, nnc_st* st
         THROW(NNC_CANNOT_RESOLVE_SHIFT_EXPR, "both expressions "
             "must have integral types.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -956,7 +979,7 @@ nnc_static void nnc_resolve_rel_expr(nnc_binary_expression* binary, nnc_st* st) 
         THROW(NNC_CANNOT_RESOLVE_REL_EXPR, "both expressions "
             "must have numeric types.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -972,7 +995,7 @@ nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* 
         THROW(NNC_CANNOT_RESOLVE_BITWISE_EXPR, "both expressions "
             "must have integral types.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -986,7 +1009,7 @@ nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* s
         THROW(NNC_CANNOT_ASSIGN_EXPR, "left expression "
             "must be locatable.", binary->ctx);
     }
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
@@ -995,7 +1018,7 @@ nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* s
  * @param st Pointer to `nnc_st` instance.
  */
 nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* st) {
-    nnc_binary_expr_infer_type(binary, st);
+    nnc_resolve_binary_expr_type(binary, st);
 }
 
 /**
