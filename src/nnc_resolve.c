@@ -82,6 +82,7 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
             const nnc_unary_expression* unary = expr->exact; 
             switch (unary->kind) {
                 case UNARY_CAST:          return nnc_can_locate_expr(unary->expr);  
+                case UNARY_DEREF:         return true;
                 case UNARY_POSTFIX_DOT:   return true;
                 case UNARY_POSTFIX_INDEX: return true;
                 case UNARY_POSTFIX_AS:    return nnc_can_locate_expr(unary->expr);
