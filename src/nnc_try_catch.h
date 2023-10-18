@@ -32,6 +32,7 @@
 #define ETRY                    NNC_LOG_TRY_LEAVE NNC_LOG_TRY_FREED nnc_try_free()
 #define THROW(exception, ...)   nnc_throw((nnc_exception){ exception, #exception, __VA_ARGS__ })
 #define CATCH(exception)        else if (nnc_catch(exception))
+#define RETHROW                 nnc_throw(CATCHED)
 #define CATCHALL                else
 #define CATCHED                 glob_exception_stack.thrown
 #define FINALLY
