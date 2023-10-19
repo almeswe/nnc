@@ -149,6 +149,15 @@ nnc_static void nnc_not_to_3a(const nnc_unary_expression* unary, const nnc_st* s
     nnc_3a_quads_add(&b_next);
 }
 
+nnc_static void nnc_cast_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_expr_to_3a(unary->expr, st);
+    nnc_3a_addr res = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        OP_CAST, nnc_3a_mkcgt(), unary->type, res
+    );
+    nnc_3a_quads_add(&quad);
+}
+
 nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     nnc_u64 size = unary->exact.size.of->type->size;
     nnc_3a_quad quad = nnc_3a_mkquad1(
@@ -290,8 +299,10 @@ nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st*
 nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     switch (unary->kind) {
         case UNARY_NOT:           nnc_not_to_3a(unary, st);      break;
+        case UNARY_CAST:          nnc_cast_to_3a(unary, st);     break;
         case UNARY_SIZEOF:        nnc_sizeof_to_3a(unary, st);   break;
         case UNARY_LENGTHOF:      nnc_lengthof_to_3a(unary, st); break;
+        case UNARY_POSTFIX_AS:    nnc_cast_to_3a(unary, st);     break;
         case UNARY_POSTFIX_DOT:   nnc_dot_to_3a(unary, st);      break;
         case UNARY_POSTFIX_CALL:  nnc_call_to_3a(unary, st);     break;
         case UNARY_POSTFIX_INDEX: nnc_index_to_3a(unary, st);    break;
@@ -722,7 +733,7 @@ nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, c
         arg = *nnc_3a_quads_res();
     }
     nnc_3a_quad quad = nnc_3a_mkquad(
-        op, arg 
+        op, arg
     );
     nnc_3a_quads_add(&quad);
 }

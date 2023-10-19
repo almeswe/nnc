@@ -38,6 +38,7 @@ typedef enum _nnc_3a_op_kind {
     OP_CJUMPNE,  // Conditional JUMP Not Equals (if x != y goto L)
     /*  other operators  */
     OP_COPY,
+    OP_CAST,
     OP_ARG,
     OP_PCALL,  // Procedure CALL
     OP_FCALL,  // Function CALL
