@@ -44,6 +44,12 @@ nnc_static void nnc_dump_3a_name(const nnc_3a_addr* addr) {
     sprintf(buf, "%s", addr->exact.name.name);
 }
 
+nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
+    memset(buf, 0, sizeof buf);
+    const nnc_3a_sconst* sconst = &addr->exact.sconst;
+    sprintf(buf, "\"%s\"", sconst->sconst);
+}
+
 nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
     memset(buf, 0, sizeof buf);
     const nnc_3a_iconst* iconst = &addr->exact.iconst;
@@ -56,11 +62,18 @@ nnc_static void nnc_dump_3a_fconst(const nnc_3a_addr* addr) {
     sprintf(buf, "%f", fconst->fconst);
 }
 
+nnc_static char* nnc_dump_3a_type(const nnc_type* type) {
+    memset(buf, 0, sizeof buf);
+    sprintf(buf, "(%s)", nnc_type_tostr(type));
+    return buf;
+}
+
 nnc_static const char* nnc_dump_3a_addr(const nnc_3a_addr* addr) {
     switch (addr->kind) {
-        case ADDR_CGT:    nnc_dump_3a_cgt(addr); break;
-        case ADDR_NONE:   nnc_dump_3a_none(addr); break;
-        case ADDR_NAME:   nnc_dump_3a_name(addr); break;
+        case ADDR_CGT:    nnc_dump_3a_cgt(addr);    break;
+        case ADDR_NONE:   nnc_dump_3a_none(addr);   break;
+        case ADDR_NAME:   nnc_dump_3a_name(addr);   break;
+        case ADDR_SCONST: nnc_dump_3a_sconst(addr); break;
         case ADDR_ICONST: nnc_dump_3a_iconst(addr); break;
         case ADDR_FCONST: nnc_dump_3a_fconst(addr); break;
     }
@@ -81,7 +94,7 @@ nnc_static void nnc_dump_3a_unary(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_dump_3a_arg(const nnc_3a_quad* quad) {
-    dump_3a(dump_indent "    arg %s\n", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(dump_indent "    arg %s\n", nnc_dump_3a_addr(&quad->res));
 }
 
 nnc_static void nnc_dump_3a_ref(const nnc_3a_quad* quad) {
@@ -95,7 +108,7 @@ nnc_static void nnc_dump_3a_copy(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_dump_3a_retf(const nnc_3a_quad* quad) {
-    dump_3a(dump_indent "%7s %s\n", "ret", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(dump_indent "%7s %s\n", "ret", nnc_dump_3a_addr(&quad->res));
 }
 
 nnc_static void nnc_dump_3a_retp(const nnc_3a_quad* quad) {
@@ -179,11 +192,23 @@ nnc_static void nnc_dump_3a_deref_copy(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
+nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
+    static int pad = 10;
+    const char* repr = "";
+    if (quad->op < OP_UJUMP || quad->op > OP_CJUMPNE) {
+        repr = quad->res.type == NULL ? 
+            "" : nnc_dump_3a_type(quad->res.type); 
+    }
+    pad = nnc_max((int)strlen(repr), pad);
+    dump_3a("%*s", pad, repr);
+}
+
 nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     if (quad->label > 0) {
         dump_3a(" @%u:\n", quad->label);
         return;
     }
+    nnc_dump_3a_quad_type(quad);
     switch (quad->op) {
         case OP_ADD:    
         case OP_SUB:    case OP_MUL:
