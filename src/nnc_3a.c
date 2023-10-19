@@ -601,6 +601,7 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
         case EXPR_CHR_LITERAL: nnc_cconst_to_3a(expr->exact, st);  break;
         case EXPR_INT_LITERAL: nnc_iconst_to_3a(expr->exact, st);  break;
         case EXPR_DBL_LITERAL: nnc_fconst_to_3a(expr->exact, st);  break;
+        default: nnc_abort("nnc_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
     }
 }
 
@@ -680,6 +681,18 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
         nnc_stmt_to_3a(if_stmt->else_br, st);
     }
     nnc_3a_quads_add(&b_true);
+}
+
+nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
+    if (let_stmt->init == NULL) {
+        return;
+    }
+    nnc_expr_to_3a(let_stmt->init, st);
+    nnc_3a_addr resv = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad(
+        OP_COPY, nnc_3a_mkname1(let_stmt->var), resv
+    );
+    nnc_3a_quads_add(&quad);
 }
 
 nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_st* st) {
@@ -777,6 +790,7 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
         case STMT_DO:       nnc_do_stmt_to_3a(stmt->exact, st);       break;
         case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
         case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
+        case STMT_LET:      nnc_let_stmt_to_3a(stmt->exact, st);      break;
         case STMT_FOR:      nnc_for_stmt_to_3a(stmt->exact, st);      break;
         case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
         case STMT_WHILE:    nnc_while_stmt_to_3a(stmt->exact, st);    break;
