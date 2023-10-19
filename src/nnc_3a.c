@@ -123,6 +123,13 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
+nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st);
+
+nnc_static void nnc_ref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_lval_expr_to_3a(unary->expr, st);
+}
+
 nnc_static void nnc_not_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     nnc_3a_quad b_true = nnc_3a_mklabel();
     nnc_3a_quad b_next = nnc_3a_mklabel();
@@ -154,6 +161,15 @@ nnc_static void nnc_cast_to_3a(const nnc_unary_expression* unary, const nnc_st* 
     nnc_3a_addr res = *nnc_3a_quads_res();
     nnc_3a_quad quad = nnc_3a_mkquad1(
         OP_CAST, nnc_3a_mkcgt(), unary->type, res
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_lval_deref_to_3a(unary, st);
+    nnc_3a_addr res = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        OP_DEREF, nnc_3a_mkcgt(), unary->type, res
     );
     nnc_3a_quads_add(&quad);
 }
@@ -298,8 +314,10 @@ nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st*
 
 nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     switch (unary->kind) {
+        case UNARY_REF:           nnc_ref_to_3a(unary, st);      break;
         case UNARY_NOT:           nnc_not_to_3a(unary, st);      break;
         case UNARY_CAST:          nnc_cast_to_3a(unary, st);     break;
+        case UNARY_DEREF:         nnc_deref_to_3a(unary, st);    break;
         case UNARY_SIZEOF:        nnc_sizeof_to_3a(unary, st);   break;
         case UNARY_LENGTHOF:      nnc_lengthof_to_3a(unary, st); break;
         case UNARY_POSTFIX_AS:    nnc_cast_to_3a(unary, st);     break;
