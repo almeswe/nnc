@@ -1389,11 +1389,13 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
  * @param ast AST to be resolved.
  */
 void nnc_resolve(nnc_ast* ast) {
-    TRY {
-        nnc_resolve_stmt(ast->root, ast->st);
-        ETRY;
-    }
-    CATCHALL {
-        NNC_SHOW_CATCHED(&CATCHED.where);
+    for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {
+        TRY {
+            nnc_resolve_stmt(ast->root[i], ast->st);
+            ETRY;
+        }
+        CATCHALL {
+            NNC_SHOW_CATCHED(&CATCHED.where);
+        }
     }
 }

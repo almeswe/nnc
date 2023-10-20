@@ -1012,7 +1012,6 @@ nnc_static nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
 }
 
 nnc_static nnc_statement* nnc_parse_type_stmt(nnc_parser* parser) {
-    //todo: resolve type inside namespace?
     nnc_parser_expect(parser, TOK_TYPE);
     nnc_type_statement* type_stmt = anew(nnc_type_statement);
     type_stmt->texpr = nnc_parse_type_expr(parser);
@@ -1102,6 +1101,7 @@ nnc_static nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
 }
 
 nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
+    //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_FN);
     const nnc_tok* tok = nnc_parser_get(parser);
     nnc_fn_statement* fn_stmt = anew(nnc_fn_statement);
@@ -1113,7 +1113,6 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     fn_stmt->var->ictx = IDENT_FUNCTION; 
     fn_stmt->var->type = nnc_fn_type_new();
     nnc_st_put(parser->st, fn_stmt->var, ST_SYM_IDENT);
-    //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_OPAREN);
     while (!nnc_parser_match(parser, TOK_CPAREN) &&
            !nnc_parser_match(parser, TOK_EOF)) {
@@ -1185,19 +1184,13 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
 }
 
 nnc_ast* nnc_parse(const char* file) {
-    nnc_parser parser = { 0 };
+    nnc_parser parser = {0};
     nnc_parser_init(&parser, file);
     nnc_ast* ast = nnc_ast_new(file);
-    //while (nnc_parser_next(&parser) != TOK_EOF);
-    //exit(EXIT_FAILURE);
-    //TRY {
-    ast->root = nnc_parse_stmt(&parser);
+    while (nnc_parser_peek(&parser) != TOK_EOF) {
+        buf_add(ast->root, nnc_parse_stmt(&parser));
+    }
     ast->st = parser.st;
     nnc_parser_fini(&parser);
-        //ETRY;
-    //}
-    //CATCHALL {
-    //    NNC_SHOW_CATCHED(&CATCHED.where);
-    //}
     return ast;
 }
