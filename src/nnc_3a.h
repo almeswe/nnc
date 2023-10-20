@@ -161,6 +161,7 @@ extern nnc_3a_cgt_cnt cgt_cnt;
 
 void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st);
+void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st);
 void nnc_dump_3a(FILE* to, const nnc_3a_quad_set* sets);
 
 #endif
