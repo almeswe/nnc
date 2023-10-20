@@ -144,9 +144,8 @@ typedef struct _nnc_3a_addr {
 }
 
 typedef struct _nnc_3a_quad {
-    nnc_u32 label: 26;
-    nnc_3a_op_kind op: 7;
-    nnc_bool signed_op: 1;
+    nnc_u32 label: 28;
+    nnc_3a_op_kind op: 6;
     nnc_3a_addr res;
     nnc_3a_addr arg1;
     nnc_3a_addr arg2;
