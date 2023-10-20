@@ -1,8 +1,26 @@
 #include "nnc_typecheck.h"
 
+/**
+ * @brief Checks if type has at least one specifier 
+ *  (of type `nnc_type_kind`) listed in var args.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type fits at least one specifier, otherwise `false`. 
+ */
 #define T_IS(t, ...) nnc_type_is(t, __VA_ARGS__, -1)
+
+/**
+ * @brief Performs type unaliasing, and creating of local variable
+ *  of type `nnc_type` and named `ref_`+`type`. 
+ * @param type Pointer to `nnc_type` to be unaliased.
+ */
 #define T_UNALIAS(type) nnc_type* ref_##type = nnc_unalias(type)
 
+/**
+ * @brief Checks if type has at least one specifier 
+ *  (of type `nnc_type_kind`) listed in var args.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type fits at least one specifier, otherwise `false`. 
+ */
 nnc_bool nnc_type_is(const nnc_type* type, ...) {
     va_list list = {0};
     va_start(list, type);
@@ -21,6 +39,13 @@ nnc_bool nnc_type_is(const nnc_type* type, ...) {
     return false;
 }
 
+/**
+ * @brief Performs type unaliasing. May be not complete unaliasing,
+ *  but at least it guarantees that returned type will be no `T_ALIAS`.
+ *  After, returned type can be unaliased again, to get pure base type.
+ * @param type Pointer to `nnc_type` to be unaliased.
+ * @return Pointer to type that is not `T_ALIAS`.
+ */
 nnc_type* nnc_unalias(const nnc_type* type) {
     nnc_type* base = (nnc_type*)type;
     while (base->kind == T_ALIAS) {
@@ -29,6 +54,13 @@ nnc_type* nnc_unalias(const nnc_type* type) {
     return base;
 }
 
+/**
+ * @brief Checks if specified type is incomplete.
+ *  Performs broad check for `T_VOID`, `T_UNKNOWN` & `T_INCOMPLETE`.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is imcomplete, otherwise `false`.
+ */
 nnc_bool nnc_incomplete_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_VOID    || 
@@ -36,38 +68,80 @@ nnc_bool nnc_incomplete_type(const nnc_type* type) {
            ref_type->kind == T_INCOMPLETE;
 }
 
+/**
+ * @brief Checks if specified type is function.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is function, otherwise `false`.
+ */
 nnc_bool nnc_fn_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_FUNCTION;
 }
 
+/**
+ * @brief Checks if specified type is pointer type.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is pointer, otherwise `false`.
+ */
 nnc_bool nnc_ptr_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_POINTER;
 }
 
+/**
+ * @brief Checks if specified type is array type.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is array, otherwise `false`.
+ */
 nnc_bool nnc_arr_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_ARRAY;
 }
 
+/**
+ * @brief Checks if specified type is namespace type.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is namespace, otherwise `false`.
+ */
 nnc_bool nnc_namespace_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_NAMESPACE;
 }
 
+/**
+ * @brief Checks if specified type is array or pointer type.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is array or pointer, otherwise `false`.
+ */
 nnc_bool nnc_arr_or_ptr_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_POINTER || 
            ref_type->kind == T_ARRAY;
 }
 
+/**
+ * @brief Checks if specified type is struct or union type.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is struct or union, otherwise `false`.
+ */
 nnc_bool nnc_struct_or_union_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_STRUCT || 
            ref_type->kind == T_UNION;
 }
 
+/**
+ * @brief Checks if specified type is primitive.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is primitive, otherwise `false`.
+ */
 nnc_bool nnc_primitive_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_PRIMITIVE_I8  || 
@@ -82,10 +156,22 @@ nnc_bool nnc_primitive_type(const nnc_type* type) {
            ref_type->kind == T_PRIMITIVE_F64;
 }
 
+/**
+ * @brief Checks if unaliased instances of two types are equal (by address).
+ * @param t1 Pointer to first `nnc_type` to be compared.
+ * @param t2 Pointer to second `nnc_type` to be compared.
+ * @return `true` if both unaliased types are equal by address, otherwise `false`.
+ */
 nnc_bool nnc_same_types(const nnc_type* t1, const nnc_type* t2) {
     return nnc_unalias(t1) == nnc_unalias(t2);
 }
 
+/**
+ * @brief Checks if specified type is integral.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is integral, otherwise `false`.
+ */
 nnc_bool nnc_integral_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return ref_type->kind == T_PRIMITIVE_I8  || 
@@ -98,6 +184,12 @@ nnc_bool nnc_integral_type(const nnc_type* type) {
            ref_type->kind == T_PRIMITIVE_U64;
 }
 
+/**
+ * @brief Checks if specified type is numeric (float, integral or enum).
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is numeric, otherwise `false`.
+ */
 nnc_bool nnc_numeric_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return nnc_integral_type(ref_type)    ||
@@ -106,6 +198,11 @@ nnc_bool nnc_numeric_type(const nnc_type* type) {
         ref_type->kind == T_PRIMITIVE_F64;
 }
 
+/**
+ * @brief Gets rank of array or pointer type.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return Rank of array or pointer type.
+ */
 const nnc_i32 nnc_rank(const nnc_type* type) {
     nnc_i32 rank = 0;
     const T_UNALIAS(type);
@@ -116,21 +213,21 @@ const nnc_i32 nnc_rank(const nnc_type* type) {
     return rank;
 }
 
-const nnc_type* nnc_base_type(const nnc_type* type) {
-    if (nnc_incomplete_type(type)) {
-        return type;
-    }
-    const nnc_type* base = type;
-    while (!nnc_incomplete_type(base->base)) {
-        base = base->base;
-    }
-    return base;
-}
-
-nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to);
-
+/**
+ * @brief Checks if one type can be casted to another type arithmetically.
+ *  This means, types are firstly checked if they both numeric or aggregate (struct or union).
+ *  If both are numeric, priorities of both are checked.
+ *  If both are struct or union, they are checked by actual address.
+ *   This keeps equality check of user-defined types simple, because
+ *   in most cases struct or union types are aliased and both these alias types 
+ *   point to same struct or union type.
+ *  This function is not sensitive for alias types.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return `true` if types can be casted implicitly, otherwise `false`.
+ */
 nnc_bool nnc_can_imp_cast_arith(const nnc_type* from, const nnc_type* to) {
-    //todo: maybe rename this function (due to fact that 
+    // todo: maybe rename this function (due to fact that 
     // this is not pure arithmetic (structs and unions involved))
     T_UNALIAS(to); T_UNALIAS(from);
     static const nnc_i32 hierarchy[] = {
@@ -157,6 +254,13 @@ nnc_bool nnc_can_imp_cast_arith(const nnc_type* from, const nnc_type* to) {
     return hierarchy[ref_from->kind] <= hierarchy[ref_to->kind];
 }
 
+/**
+ * @brief Performs implicit arithmetic cast.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return Pointer to type to cast to, if `nnc_can_imp_cast_arith` returned `true`.
+ * @throw `NNC_SEMANTIC` in case when types cannot be casted impilicitly.
+ */
 nnc_type* nnc_cast_imp_arith(const nnc_type* from, const nnc_type* to) {
     if (!nnc_can_imp_cast_arith(from, to)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
@@ -165,6 +269,15 @@ nnc_type* nnc_cast_imp_arith(const nnc_type* from, const nnc_type* to) {
     return (nnc_type*)to;
 }
 
+/**
+ * @brief Checks if one type can be casted to another type if they are both pointers.
+ *  Types checked by rank and they base types are passed to `nnc_can_imp_cast_arith`.
+ *  If at least one base type is `T_VOID`, `true` is returned.
+ *  This function is sensitive for alias types.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return `true` if types can be casted implicitly, otherwise `false`.
+ */
 nnc_bool nnc_can_imp_cast_ptrs(const nnc_type* from, const nnc_type* to) {
     if (nnc_rank(from) != nnc_rank(to)) {
         return false;
@@ -184,6 +297,15 @@ nnc_bool nnc_can_imp_cast_ptrs(const nnc_type* from, const nnc_type* to) {
     return nnc_can_imp_cast_arith(ref_from, ref_to);
 }
 
+/**
+ * @brief Checks if one type can be casted to another type if they are both functions.
+ *  All parameter and return types of both function types
+ *  are passed to `nnc_can_imp_cast_arith`.
+ *  This function is not sensitive for alias types.
+ * @param t1 Pointer to first `nnc_type`.
+ * @param t2 Pointer to second `nnc_type`.
+ * @return `true` if types can be casted implicitly, otherwise `false`.
+ */
 nnc_bool nnc_can_imp_cast_fns(const nnc_type* t1, const nnc_type* t2) {
     T_UNALIAS(t1); T_UNALIAS(t2);
     assert(ref_t1->kind == T_FUNCTION);
@@ -205,6 +327,18 @@ nnc_bool nnc_can_imp_cast_fns(const nnc_type* t1, const nnc_type* t2) {
     return nnc_can_imp_cast_assign(t2_ret, t1_ret);
 }
 
+/**
+ * @brief Checks if one type can be casted to another type if they are in assignment expression.
+ *  There rules are used:
+ *   1) `numeric` = `numeric`
+ *   2) `pointer` = `pointer`
+ *   3) `pointer` = `array`
+ *   4) `function` = `function`
+ *   5) `struct-or-union` = `struct-or-union`
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return `true` if types can be casted implicitly, otherwise `false`.
+ */
 nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to) {
     T_UNALIAS(to); T_UNALIAS(from);
     if (nnc_can_imp_cast_arith(ref_from, ref_to)) {
@@ -219,6 +353,14 @@ nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to) {
     return false;
 }
 
+/**
+ * @brief Performs implicit cast of two types.
+ *  This function is not sensitive to the order in which you pass both types.
+ * @param t1 Pointer to first `nnc_type`.
+ * @param t2 Pointer to second `nnc_type`.
+ * @return Pointer to `nnc_type` which represents casted type.
+ * @throw `NNC_SEMANTIC` in case when none of the attempts to cast implicitly succeeded. 
+ */
 nnc_type* nnc_infer_imp(const nnc_type* t1, const nnc_type* t2) {
     if (nnc_can_imp_cast_arith(t1, t2)) {
         return nnc_cast_imp_arith(t1, t2);
@@ -231,14 +373,13 @@ nnc_type* nnc_infer_imp(const nnc_type* t1, const nnc_type* t2) {
     return NULL;
 }
 
-nnc_type* nnc_infer_imp_rel(const nnc_type* from, const nnc_type* to) {
-    if (!nnc_infer_imp(from, to)) {
-        THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
-            nnc_type_tostr(from), nnc_type_tostr(to)));
-    }
-    return &i8_type;
-}
-
+/**
+ * @brief Performs implicit cast of two types located in assignment expression.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return Pointer to `nnc_type` which represents casted type.
+ * @throw `NNC_SEMANTIC` in case when `nnc_can_imp_cast_assign` returned `false`.
+ */
 nnc_type* nnc_infer_imp_assign(const nnc_type* from, const nnc_type* to) {
     if (!nnc_can_imp_cast_assign(from, to)) {
         THROW(NNC_SEMANTIC, sformat("cannot cast `%s` to `%s`.", 
@@ -247,6 +388,13 @@ nnc_type* nnc_infer_imp_assign(const nnc_type* from, const nnc_type* to) {
     return (nnc_type*)to;
 }
 
+/**
+ * @brief Checks if explicit cast of two types is possible.
+ *  This function is not sensitive for alias types.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return `true` if types can be casted explicitly, otherwise `false`.
+ */
 nnc_bool nnc_can_exp_cast(const nnc_type* from, const nnc_type* to) {
     T_UNALIAS(to); T_UNALIAS(from);
     if (ref_to->kind == T_ARRAY ||
@@ -260,6 +408,13 @@ nnc_bool nnc_can_exp_cast(const nnc_type* from, const nnc_type* to) {
     return true;
 }
 
+/**
+ * @brief Performs explicit cast of two types.
+ * @param from Pointer to `nnc_type` from which to cast.
+ * @param to Pointer to `nnc_type` to cast to.
+ * @return Pointer to `nnc_type` which represents casted type.
+ * @throw `NNC_SEMANTIC` in case when `nnc_can_exp_cast` returned `false`.
+ */
 nnc_type* nnc_exp_cast(const nnc_type* from, const nnc_type* to) {
     if (nnc_can_exp_cast(from, to)) {
         return (nnc_type*)to;
@@ -269,23 +424,29 @@ nnc_type* nnc_exp_cast(const nnc_type* from, const nnc_type* to) {
     return NULL;
 } 
 
+/**
+ * @brief Infers type for character literal.
+ * @param literal Pointer to `nnc_chr_literal`.
+ * @return Pointer to `nnc_type` which is type of literal.
+ */
 nnc_static nnc_type* nnc_chr_infer_type(nnc_chr_literal* literal) {
     return literal->type = &u8_type;
 }
 
+/**
+ * @brief Infers type for string literal.
+ * @param literal Pointer to `nnc_str_literal`.
+ * @return Pointer to `nnc_type` which is type of literal.
+ */
 nnc_static nnc_type* nnc_str_infer_type(nnc_str_literal* literal) {
     return literal->type = nnc_ptr_type_new(&u8_type);
 }
 
-nnc_static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
-    switch (literal->suffix) {
-        case SUFFIX_F32: return literal->type = &f32_type;
-        case SUFFIX_F64: return literal->type = &f64_type;
-        default: nnc_abort_no_ctx("nnc_dbl_infer_type: unknown suffix.\n");
-    }
-    return &unknown_type;
-}
-
+/**
+ * @brief Infers type for integral literal.
+ * @param literal Pointer to `nnc_int_literal`.
+ * @return Pointer to `nnc_type` which is type of literal.
+ */
 nnc_static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_I8:  return literal->type = &i8_type;
@@ -296,18 +457,44 @@ nnc_static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
         case SUFFIX_U32: return literal->type = &u32_type;
         case SUFFIX_I64: return literal->type = &i64_type;
         case SUFFIX_U64: return literal->type = &u64_type;
-        default: nnc_abort_no_ctx("nnc_int_infer_type: unknown suffix.\n");
+        default: nnc_abort("nnc_int_infer_type: unknown suffix.\n", &literal->ctx);
     }
     return &unknown_type;
 }
 
-nnc_static nnc_type* nnc_ident_infer_type(nnc_ident* ident, nnc_st* st) {
-    if (ident->ictx == IDENT_NAMESPACE) {
-        return &unknown_type;
+/**
+ * @brief Infers type for floating-pointliteral.
+ * @param literal Pointer to `nnc_dbl_literal`.
+ * @return Pointer to `nnc_type` which is type of literal.
+ */
+nnc_static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
+    switch (literal->suffix) {
+        case SUFFIX_F32: return literal->type = &f32_type;
+        case SUFFIX_F64: return literal->type = &f64_type;
+        default: nnc_abort("nnc_dbl_infer_type: unknown suffix.\n", &literal->ctx);
     }
+    return &unknown_type;
+}
+
+/**
+ * @brief Infers type for identifier.
+ * @param ident Pointer to `nnc_ident`.
+ * @return Pointer to `nnc_type` which is type of identifer.
+ */
+nnc_static nnc_type* nnc_ident_infer_type(nnc_ident* ident) {
+    //todo: i'm not sure about this yet
+    //if (ident->ictx == IDENT_NAMESPACE) {
+    //    return &unknown_type;
+    //}
     return ident->type;
 }
 
+/**
+ * @brief Infers type for unary expression.
+ * @param expr Pointer to `nnc_unary_expression`. 
+ * @param st Pointer to `nnc_st`.
+ * @return Pointer to resulting `nnc_type`, or `unknown_type` if something went wrong.
+ */
 nnc_static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_st* st) {
     const nnc_type* t_expr = nnc_expr_infer_type(expr->expr, st);
     if (expr->kind == UNARY_CAST ||
@@ -317,6 +504,12 @@ nnc_static nnc_type* nnc_unary_expr_infer_type(nnc_unary_expression* expr, nnc_s
     return &unknown_type;
 }
 
+/**
+ * @brief Infers type for binary expression.
+ * @param expr Pointer to `nnc_binary_expression`. 
+ * @param st Pointer to `nnc_st`.
+ * @return Pointer to resulting `nnc_type`, or `unknown_type` if something went wrong.
+ */
 nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
     nnc_type* t_lexpr = nnc_expr_infer_type(expr->lexpr, st);
     nnc_type* t_rexpr = nnc_expr_infer_type(expr->rexpr, st);
@@ -346,6 +539,12 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
     }
 }
 
+/**
+ * @brief Infers type for ternary expression.
+ * @param expr Pointer to `nnc_ternary_expression`. 
+ * @param st Pointer to `nnc_st`.
+ * @return Pointer to resulting `nnc_type`.
+ */
 nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* st) {
     nnc_type* t_lexpr = nnc_expr_infer_type(expr->lexpr, st);
     nnc_type* t_rexpr = nnc_expr_infer_type(expr->rexpr, st);
@@ -355,6 +554,12 @@ nnc_type* nnc_ternary_expr_infer_type(nnc_ternary_expression* expr, nnc_st* st) 
     return expr->type = nnc_infer_imp_assign(t_lexpr, t_rexpr);
 }
 
+/**
+ * @brief Infers type for generic expression.
+ * @param expr Pointer to `nnc_expression`. 
+ * @param st Pointer to `nnc_st`.
+ * @return Pointer to resulting `nnc_type`, or `unknown_type` if something went wrong.
+ */
 nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* st) {
     nnc_type* t_expr = nnc_expr_get_type(expr);
     if (t_expr->kind != T_UNKNOWN) {
@@ -365,14 +570,20 @@ nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* st) {
         case EXPR_STR_LITERAL: return nnc_str_infer_type(expr->exact);
         case EXPR_DBL_LITERAL: return nnc_dbl_infer_type(expr->exact);
         case EXPR_INT_LITERAL: return nnc_int_infer_type(expr->exact);
-        case EXPR_IDENT:       return nnc_ident_infer_type(expr->exact, st);
+        case EXPR_IDENT:       return nnc_ident_infer_type(expr->exact);
         case EXPR_UNARY:       return nnc_unary_expr_infer_type(expr->exact, st);
         case EXPR_BINARY:      return nnc_binary_expr_infer_type(expr->exact, st);
-        default: nnc_abort_no_ctx("nnc_expr_infer_type: unknown kind.\n");
+        default: nnc_abort("nnc_expr_infer_type: unknown kind.\n", nnc_expr_get_ctx(expr));
     }
     return &unknown_type;
 }
 
+/**
+ * @brief Gets type from generic expression.
+ * @param expr Pointer to `nnc_expression`. 
+ * @param st Pointer to `nnc_st`.
+ * @return Pointer to resulting `nnc_type`, or `unknown_type` if something went wrong.
+ */
 nnc_type* nnc_expr_get_type(const nnc_expression* expr) {
     nnc_type* t_expr = NULL;
     switch (expr->kind) {
@@ -384,7 +595,7 @@ nnc_type* nnc_expr_get_type(const nnc_expression* expr) {
         case EXPR_UNARY:       t_expr = ((nnc_unary_expression*)expr->exact)->type;   break;
         case EXPR_BINARY:      t_expr = ((nnc_binary_expression*)expr->exact)->type;  break;
         case EXPR_TERNARY:     t_expr = ((nnc_ternary_expression*)expr->exact)->type; break;
-        default: nnc_abort_no_ctx("nnc_expr_get_type: unknown kind.\n");
+        default: nnc_abort("nnc_expr_get_type: unknown kind.\n", nnc_expr_get_ctx(expr));
     }
     return t_expr == NULL ? &unknown_type : nnc_unalias(t_expr); 
 }
