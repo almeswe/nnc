@@ -499,7 +499,7 @@ nnc_static nnc_bool nnc_resolve_int_literal(nnc_int_literal* literal) {
         case SUFFIX_U32: literal->type = &u32_type; break;
         case SUFFIX_I64: literal->type = &i64_type; break;
         case SUFFIX_U64: literal->type = &u64_type; break;
-        default: nnc_abort_no_ctx("nnc_resolve_int_literal: unknown suffix.");
+        default: nnc_abort("nnc_resolve_int_literal: unknown suffix.", &literal->ctx);
     }
     return true;
 }
@@ -513,7 +513,7 @@ nnc_static nnc_bool nnc_resolve_dbl_literal(nnc_dbl_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_F32: literal->type = &f32_type; break;
         case SUFFIX_F64: literal->type = &f64_type; break;
-        default: nnc_abort_no_ctx("nnc_resolve_dbl_literal: unknown suffix.");
+        default: nnc_abort("nnc_resolve_dbl_literal: unknown suffix.", &literal->ctx);
     }
     return true;
 }
@@ -850,7 +850,7 @@ nnc_static nnc_bool nnc_resolve_unary_expr(nnc_unary_expression* unary, nnc_st* 
         case UNARY_POSTFIX_DOT:   nnc_resolve_dot_expr(unary, st);         break;
         case UNARY_POSTFIX_CALL:  nnc_resolve_call_expr(unary, st);        break;
         case UNARY_POSTFIX_INDEX: nnc_resolve_index_expr(unary, st);       break;
-        default: nnc_abort_no_ctx("nnc_resolve_unary_expr: unknown kind.");
+        default: nnc_abort("nnc_resolve_unary_expr: unknown kind.", &unary->ctx);
     }
     return true;
 }
@@ -1053,7 +1053,7 @@ nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_s
         case BINARY_BW_AND: nnc_resolve_bitwise_expr(binary, st); break;
         case BINARY_BW_XOR: nnc_resolve_bitwise_expr(binary, st); break;
         case BINARY_ASSIGN: nnc_resolve_assign_expr(binary, st);  break;
-        default: nnc_abort_no_ctx("nnc_resolve_binary_expr: unknown kind.");
+        default: nnc_abort("nnc_resolve_binary_expr: unknown kind.", &binary->ctx);
     } 
     return true;
 }
@@ -1106,7 +1106,7 @@ nnc_bool nnc_resolve_expr(nnc_expression* expr, nnc_st* st) {
         case EXPR_UNARY:        return nnc_resolve_unary_expr(expr->exact, st);
         case EXPR_BINARY:       return nnc_resolve_binary_expr(expr->exact, st);
         case EXPR_TERNARY:      return nnc_resolve_ternary_expr(expr->exact, st);
-        default: nnc_abort_no_ctx("nnc_resolve_expr: unknown kind.");
+        default: nnc_abort("nnc_resolve_expr: unknown kind.", nnc_expr_get_ctx(expr));
     }
     return false;
 }
