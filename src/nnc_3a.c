@@ -124,10 +124,134 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
 }
 
 nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
-nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st);
+
+nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
+    nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        op, nnc_3a_mkcgt(), ident->type, nnc_3a_mkname1(ident)
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    //todo: this approach doesn't take to account pointer arithmetic
+    nnc_expr_to_3a(unary->expr, st);
+    // get the address for dereference
+    nnc_3a_addr addr = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        OP_COPY, nnc_3a_mkcgt(), addr.type, addr
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_u64 offset = 0;
+    nnc_lval_expr_to_3a(unary->expr, st);
+    nnc_type* t_expr = nnc_expr_get_type(unary->expr);
+    const nnc_ident* member = unary->exact.dot.member->exact;
+    const struct _nnc_struct_or_union_type* exact = &t_expr->exact.struct_or_union;
+    //todo: this is true when pack of struct is 1
+    //in few other cases this may lead to wrong member mappings
+    for (nnc_u64 i = 0; i < exact->memberc && t_expr->kind != T_UNION; i++) {
+        const nnc_struct_member* m = exact->members[i];
+        if (nnc_sequal(m->var->name, member->name)) {
+            break;
+        }
+        offset += m->texpr->type->size;
+    }
+    nnc_3a_addr addr = *nnc_3a_quads_res();
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        OP_ADD, nnc_3a_mkcgt(), nnc_ptr_type_new(member->type), addr, nnc_3a_mki3(offset)
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_lval_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_st* st, nnc_bool first, nnc_dim_data data) {
+    // previous index is stored here
+    // in case of first (means right-most) index
+    // there are no base so no need to retrieve it
+    nnc_3a_addr base = {0};
+    if (!first) {
+        base = *nnc_3a_quads_res();
+    }
+    // translating index expression
+    nnc_expr_to_3a(unary->exact.index.expr, st);
+    nnc_3a_addr index = *nnc_3a_quads_res();
+    // then multiply it by the size of type
+    nnc_u32 typesize = data.sizes[data.dims-1];
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        OP_MUL, nnc_3a_mkcgt(), &i64_type, index, nnc_3a_mki3(typesize)
+    );
+    nnc_3a_quads_add(&quad);
+    // again, if this is not right-most index
+    // sum it with previous one, and store the sum.
+    if (!first) {
+        index = *nnc_3a_quads_res();
+        quad = nnc_3a_mkquad1(
+            OP_ADD, nnc_3a_mkcgt(), &i64_type, base, index
+        );
+        nnc_3a_quads_add(&quad);
+    }
+    data.dims--;
+    // if this is not last index in a sequence
+    // calculate next descendent index.
+    const nnc_unary_expression* expr = unary->expr->exact;
+    if (unary->expr->kind == EXPR_UNARY &&
+        expr->kind == UNARY_POSTFIX_INDEX) {
+        nnc_lval_index_to_3a_ex(unary->expr->exact, st, false, data);
+    }
+    else {
+        nnc_3a_quad quad = {0};
+        nnc_3a_addr index = *nnc_3a_quads_res();
+        nnc_expr_to_3a(unary->expr, st);
+        nnc_3a_addr address = *nnc_3a_quads_res();
+        quad = nnc_3a_mkquad1(
+            OP_ADD, nnc_3a_mkcgt(), address.type, address, index
+        );
+        nnc_3a_quads_add(&quad);
+    }
+}
+
+nnc_static void nnc_lval_index_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_dim_data data = {0};
+    const nnc_unary_expression* expr = unary;
+    while (expr->kind == UNARY_POSTFIX_INDEX) {
+        data.dims++;
+        buf_add(data.sizes, expr->type->size);
+        expr = expr->expr->exact;
+    }
+    nnc_lval_index_to_3a_ex(unary, st, true, data);
+    buf_free(data.sizes);
+}
+
+nnc_static void nnc_lval_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    switch (unary->kind) {
+        case UNARY_DEREF:         nnc_lval_deref_to_3a(unary, st); break;
+        case UNARY_POSTFIX_DOT:   nnc_lval_dot_to_3a(unary, st);   break;
+        case UNARY_POSTFIX_INDEX: nnc_lval_index_to_3a(unary, st); break;
+        default: nnc_abort("nnc_lval_unary_to_3a: unknown kind.\n", &unary->ctx);
+    }
+}
+
+nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
+    switch (expr->kind) {
+        case EXPR_IDENT: nnc_lval_ident_to_3a(expr->exact, st); break;
+        case EXPR_UNARY: nnc_lval_unary_to_3a(expr->exact, st); break;
+        default: nnc_abort("nnc_lval_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
+    }
+}
 
 nnc_static void nnc_ref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_lval_expr_to_3a(unary->expr, st);
+    if (unary->expr->kind != EXPR_IDENT) {
+        nnc_lval_expr_to_3a(unary->expr, st);
+    }
+    else {
+        const nnc_ident* ident = unary->expr->exact;
+        nnc_3a_quad quad = nnc_3a_mkquad1(
+            OP_REF, nnc_3a_mkcgt(), unary->type, nnc_3a_mkname1(ident)
+        );
+        nnc_3a_quads_add(&quad);
+    }
 }
 
 nnc_static void nnc_not_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
@@ -190,49 +314,14 @@ nnc_static void nnc_lengthof_to_3a(const nnc_unary_expression* unary, const nnc_
     nnc_3a_quads_add(&quad);
 }
 
-nnc_static void nnc_dot_to_3a_ex(const nnc_unary_expression* unary, nnc_bool lval, const nnc_st* st) {
-    nnc_u64 offset = 0;
-    nnc_expr_to_3a(unary->expr, st);
-    nnc_type* t_expr = nnc_expr_get_type(unary->expr);
+nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     const nnc_ident* member = unary->exact.dot.member->exact;
-    if (!nnc_ptr_type(t_expr)) {
-        nnc_3a_addr addr = *nnc_3a_quads_res();
-        nnc_3a_quad quad = nnc_3a_mkquad1(
-            OP_REF, nnc_3a_mkcgt(), nnc_ptr_type_new(t_expr), addr
-        );
-        nnc_3a_quads_add(&quad);
-    }
-    const struct _nnc_struct_or_union_type* exact = &t_expr->exact.struct_or_union;
-    //todo: this is true when pack of struct is 1
-    //in few other cases this may lead to wrong member mappings
-    for (nnc_u64 i = 0; i < exact->memberc && t_expr->kind != T_UNION; i++) {
-        const nnc_struct_member* m = exact->members[i];
-        if (nnc_sequal(m->var->name, member->name)) {
-            break;
-        }
-        offset += m->texpr->type->size;
-    }
+    nnc_lval_dot_to_3a(unary, st);
     nnc_3a_addr addr = *nnc_3a_quads_res();
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_ADD, nnc_3a_mkcgt(), nnc_ptr_type_new(member->type), addr, nnc_3a_mki3(offset)
+        OP_DEREF, nnc_3a_mkcgt(), member->type, addr
     );
     nnc_3a_quads_add(&quad);
-    // if dot expression is not lvalue
-    // dereference address and get value of particular
-    // struct or union field.
-    if (!lval) {
-        addr = *nnc_3a_quads_res();
-        quad = nnc_3a_mkquad1(
-            OP_DEREF, nnc_3a_mkcgt(), member->type, addr
-        );
-        nnc_3a_quads_add(&quad);
-    }
-    // if this is lvalue, only address
-    // of the field is calculated and returned
-}
-
-nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_dot_to_3a_ex(unary, false, st);
 }
 
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
@@ -256,76 +345,13 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
     nnc_3a_quads_add(&quad);
 }
 
-nnc_static void nnc_index_to_3a_ex(const nnc_unary_expression* unary, const nnc_st* st, nnc_bool lval, nnc_bool first, nnc_dim_data data) {
-    // previous index is stored here
-    // in case of first (means right-most) index
-    // there are no base so no need to retrieve it
-    nnc_3a_addr base = {0};
-    if (!first) {
-        base = *nnc_3a_quads_res();
-    }
-    // translating index expression
-    nnc_expr_to_3a(unary->exact.index.expr, st);
-    nnc_3a_addr index = *nnc_3a_quads_res();
-    // then multiply it by the size of type
-    nnc_u32 typesize = data.sizes[data.dims-1];
+nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_lval_index_to_3a(unary, st);
+    nnc_3a_addr addr = *nnc_3a_quads_res();
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_MUL, nnc_3a_mkcgt(), &i64_type, index, nnc_3a_mki3(typesize)
+        OP_DEREF, nnc_3a_mkcgt(), addr.type->base, addr
     );
     nnc_3a_quads_add(&quad);
-    // again, if this is not right-most index
-    // sum it with previous one, and store the sum.
-    if (!first) {
-        index = *nnc_3a_quads_res();
-        quad = nnc_3a_mkquad1(
-            OP_ADD, nnc_3a_mkcgt(), &i64_type, base, index
-        );
-        nnc_3a_quads_add(&quad);
-    }
-    data.dims--;
-    // if this is not last index in a sequence
-    // calculate next descendent index.
-    const nnc_unary_expression* expr = unary->expr->exact;
-    if (unary->expr->kind == EXPR_UNARY &&
-        expr->kind == UNARY_POSTFIX_INDEX) {
-        nnc_index_to_3a_ex(unary->expr->exact, st, lval, false, data);
-    }
-    // otherwise make OP_INDEX quad from variable name
-    // and accumulated index value.
-    else {
-        nnc_3a_quad quad = {0};
-        nnc_3a_addr index = *nnc_3a_quads_res();
-        nnc_expr_to_3a(unary->expr, st);
-        nnc_3a_addr address = *nnc_3a_quads_res();
-        if (lval) {
-            // if this expression is lvalue, return just address of
-            // the index element (it is already accessible via `nnc_3a_quads_res`) 
-            quad = nnc_3a_mkquad1(
-                OP_ADD, nnc_3a_mkcgt(), address.type, address, index
-            );
-        }
-        else {
-            // otherwise generate index opcode itself
-            quad = nnc_3a_mkquad1(
-                OP_INDEX, nnc_3a_mkcgt(), data.base, address, index
-            );
-        }
-        nnc_3a_quads_add(&quad);
-    }
-}
-
-nnc_static void nnc_index_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_dim_data data = {0};
-    const nnc_unary_expression* expr = unary;
-    while (expr->kind == UNARY_POSTFIX_INDEX) {
-        data.dims++;
-        buf_add(data.sizes, expr->type->size);
-        expr = expr->expr->exact;
-    }
-    // set array's base type
-    data.base = unary->type;
-    nnc_index_to_3a_ex(unary, st, false, true, data);
-    buf_free(data.sizes);
 }
 
 nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
@@ -478,62 +504,6 @@ nnc_static void nnc_comma_to_3a(const nnc_binary_expression* binary, const nnc_s
         OP_COPY, nnc_3a_mkcgt(), arg.type, arg
     );
     nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
-    nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_REF, nnc_3a_mkcgt(), nnc_ptr_type_new(ident->type), nnc_3a_mkname1(ident)
-    );
-    nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    //todo: this approach doesn't take to account pointer arithmetic
-    nnc_expr_to_3a(unary->expr, st);
-    // get the address for dereference
-    nnc_3a_addr addr = *nnc_3a_quads_res();
-    nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_COPY, nnc_3a_mkcgt(), addr.type, addr
-    );
-    nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_lval_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_dot_to_3a_ex(unary, true, st);
-}
-
-nnc_static void nnc_lval_index_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_dim_data data = {0};
-    const nnc_unary_expression* expr = unary;
-    while (expr->kind == UNARY_POSTFIX_INDEX) {
-        data.dims++;
-        buf_add(data.sizes, expr->type->size);
-        expr = expr->expr->exact;
-    }
-    nnc_index_to_3a_ex(unary, st, true, true, data);
-    buf_free(data.sizes);
-    nnc_3a_addr addr = *nnc_3a_quads_res();
-    nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_COPY, nnc_3a_mkcgt(), addr.type, addr
-    );
-    nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_lval_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    switch (unary->kind) {
-        case UNARY_DEREF:         nnc_lval_deref_to_3a(unary, st); break;
-        case UNARY_POSTFIX_DOT:   nnc_lval_dot_to_3a(unary, st);   break;
-        case UNARY_POSTFIX_INDEX: nnc_lval_index_to_3a(unary, st); break;
-        default: nnc_abort("nnc_lval_unary_to_3a: unknown kind.\n", &unary->ctx);
-    }
-}
-
-nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
-    switch (expr->kind) {
-        case EXPR_IDENT:   nnc_lval_ident_to_3a(expr->exact, st);  break;
-        case EXPR_UNARY:   nnc_lval_unary_to_3a(expr->exact, st);  break;
-        default: nnc_abort("nnc_lval_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
-    }
 }
 
 nnc_static void nnc_assign_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
