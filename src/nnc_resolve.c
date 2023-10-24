@@ -309,8 +309,6 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
     if (enumerator->init == NULL) {
         return true;
     }
-    //todo: bug when trying to get size of enumerator
-    //before it's declaration (it's just 0 in this case)
     nnc_resolve_expr(enumerator->init, st);
     const nnc_ctx* init_expr_ctx = nnc_expr_get_ctx(enumerator->init); 
     if (!nnc_can_fold_expr(enumerator->init)) {
@@ -322,6 +320,7 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
         THROW(NNC_SEMANTIC, "enumerator initializer "
             "must be of integral type.", *init_expr_ctx);
     }
+    enumerator->var->type = &i64_type;
     enumerator->init_const.d = nnc_evald(enumerator->init, st);
     return true;
 }
@@ -335,10 +334,12 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
  */
 nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
     nnc_bool resolved = true;
+    /*
     for (nnc_u64 i = 0; i < type->exact.enumeration.memberc; i++) {
         nnc_enumerator* enumerator = type->exact.enumeration.members[i];
         resolved &= nnc_resolve_enumerator(enumerator, st);
     }
+    */
     return resolved;
 }
 
@@ -585,6 +586,7 @@ nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
     if (ident->ictx == IDENT_ENUMERATOR) {
         ident->type = &i64_type;
         ident->refs = sym->refs;
+        nnc_resolve_enumerator(sym->refs.enumerator, st);
     }
     return true;
 }
@@ -756,6 +758,7 @@ nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
                 "`%s` type.", nnc_type_tostr(t_expr)), unary->ctx);
         }
     }
+    t_expr = nnc_unalias(t_expr);
     nnc_ident* m = unary->exact.dot.member->exact;
     for (nnc_u64 i = 0; i < t_expr->exact.struct_or_union.memberc; i++) {
         nnc_struct_member* s_m = t_expr->exact.struct_or_union.members[i];
@@ -887,7 +890,6 @@ nnc_static void nnc_resolve_binary_expr_type(nnc_binary_expression* binary, nnc_
  *        `NNC_CANNOT_RESOLVE_ADD_EXPR` in case when both expressions have non numeric types.
  */
 nnc_static void nnc_resolve_add_expr(nnc_binary_expression* binary, nnc_st* st) {
-    //todo: pointer arithmetic?
     nnc_type* t_lexpr = nnc_expr_get_type(binary->lexpr);
     nnc_type* t_rexpr = nnc_expr_get_type(binary->rexpr);
     if (nnc_arr_or_ptr_type(t_lexpr)) {

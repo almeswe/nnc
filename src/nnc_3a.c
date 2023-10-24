@@ -117,6 +117,13 @@ nnc_static void nnc_iconst_to_3a(const nnc_int_literal* iconst, const nnc_st* st
 
 nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     nnc_3a_addr arg = nnc_3a_mkname1(ident);
+    if (ident->ictx == IDENT_ENUMERATOR) {
+        const nnc_enumerator* enumerator = ident->refs.enumerator;
+        arg = nnc_3a_mki2(
+            enumerator->init_const.u, 
+            enumerator->var->type
+        );
+    }
     nnc_3a_quad quad = nnc_3a_mkquad1(
         OP_COPY, nnc_3a_mkcgt(), ident->type, arg
     );
@@ -794,12 +801,6 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
 
 void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st) {
     for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {
-        TRY {
-            nnc_stmt_to_3a(ast->root[i], ast->st);
-            ETRY;
-        }
-        CATCHALL {
-            NNC_SHOW_CATCHED(&CATCHED.where);
-        }
+        nnc_stmt_to_3a(ast->root[i], ast->st);
     }
 }
