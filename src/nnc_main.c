@@ -1,4 +1,5 @@
 #include "nnc_core.h"
+#include <sys/time.h>
 
 nnc_arena glob_arena = { 0 };
 nnc_error_canarie glob_error_canarie = { 0 };
@@ -16,6 +17,17 @@ static void nnc_check_for_errors() {
 
 static void nnc_print_used_mem() {
     printf("used mem: %lu\n", glob_arena.alloc_bytes);
+}
+
+static struct timeval start, end;
+static void nnc_start_count_time() {
+    gettimeofday(&start, NULL); 
+}
+
+static void nnc_stop_count_time() {
+    gettimeofday(&end, NULL);
+    nnc_f64 elapsed = (end.tv_usec - start.tv_usec) / 1000.0;
+    fprintf(stderr, "[elapsed: %.3lfms]\n", elapsed); 
 }
 
 /*
@@ -46,7 +58,7 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
             nnc_print_used_mem();
         #endif
         //nnc_dump_ast(ast);
-        nnc_ast_to_3a(ast, ast->st);
+        //nnc_ast_to_3a(ast, ast->st);
         #ifdef NNC_SHOW_MEMORY_INFO
             nnc_print_used_mem();
         #endif
@@ -63,7 +75,9 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
 nnc_i32 main(nnc_i32 argc, char** argv) {
     nnc_reset_canarie();
     nnc_arena_init(&glob_arena);
+    nnc_start_count_time();
     nnc_i32 status = nnc_main(argc, argv);
+    nnc_stop_count_time();
     nnc_arena_fini(&glob_arena);
     return status;
 }
