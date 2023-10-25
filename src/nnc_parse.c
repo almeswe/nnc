@@ -380,6 +380,17 @@ nnc_static nnc_expression* nnc_parse_parens(nnc_parser* parser) {
     return expr;
 }
 
+nnc_static nnc_type_expression* nnc_parse_fn_ret_type_expr(nnc_parser* parser) {
+    if (nnc_parser_match(parser, TOK_COLON)) {
+        nnc_parser_expect(parser, TOK_COLON);
+        return nnc_parse_type_expr(parser);
+    }
+    nnc_type_expression* type_expr = anew(nnc_type_expression);
+    type_expr->ctx = *nnc_parser_get_ctx(parser);
+    type_expr->type = &void_type;
+    return type_expr;
+}
+
 nnc_static nnc_type_expression* nnc_parse_type_expr(nnc_parser* parser) {
     nnc_type_expression* type_expr = anew(nnc_type_expression);
     type_expr->nesting = nnc_parse_nesting(parser);
@@ -1126,8 +1137,7 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
         nnc_parser_expect(parser, TOK_COMMA);
     }
     nnc_parser_expect(parser, TOK_CPAREN);
-    nnc_parser_expect(parser, TOK_COLON);
-    fn_stmt->ret = nnc_parse_type_expr(parser);
+    fn_stmt->ret = nnc_parse_fn_ret_type_expr(parser);
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
     fn_stmt->body = nnc_parse_compound_stmt(parser, ST_CTX_FN);
     assert(fn_stmt->body->kind == STMT_COMPOUND);
