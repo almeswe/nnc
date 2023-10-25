@@ -1,6 +1,7 @@
 #include "nnc_resolve.h"
 #include "nnc_typecheck.h"
 #include "nnc_expression.h"
+#include "nnc_3a.h"
 
 /**
  * @brief Resolves & determines size of specified type. (in bytes)
@@ -1221,8 +1222,15 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     nnc_resolve_type_expr(let_stmt->texpr, st);
     if (let_stmt->init != NULL) {
         nnc_resolve_expr(let_stmt->init, st);
-        const nnc_type* t_init = nnc_expr_get_type(let_stmt->init);
         const nnc_ctx* init_expr_ctx = nnc_expr_get_ctx(let_stmt->init);
+        if (st->ctx == ST_CTX_GLOBAL ||
+            st->ctx == ST_CTX_NAMESPACE) {
+            if (!nnc_can_fold_expr(let_stmt->init)) {
+                THROW(NNC_SEMANTIC, "cannot initialize global variable"
+                    " with non-constant expression.", *init_expr_ctx);
+            }
+        }
+        const nnc_type* t_init = nnc_expr_get_type(let_stmt->init);
         if (!nnc_can_imp_cast_assign(t_init, let_stmt->texpr->type)) {
             THROW(NNC_SEMANTIC, sformat("cannot initialize variable "
                 "with expression of `%s` type.", nnc_type_tostr(t_init)), *init_expr_ctx);
@@ -1354,11 +1362,32 @@ nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt,
  * @throw `NNC_SEMANTIC` in case when not declared in global scope. 
  */
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
+    THROW(NNC_UNIMPLEMENTED, "namespaces are not implemented in nnc yet.", namespace_stmt->var->ctx);
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
         THROW(NNC_SEMANTIC, "cannot declare `namespace` in this context.", namespace_stmt->var->ctx);
     }
     nnc_resolve_stmt(namespace_stmt->body, st);
+}
+
+/**
+ * @brief Generates three-address code from resolved statement.
+ *  Statement must be STMT_FN or STMT_LET in global or namespace scope.
+ * @param stmt Statement to be converted to three-address code.
+ * @param st Pointer to `nnc_st` instance.
+ */
+nnc_static void nnc_resolved_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
+    if (stmt->kind == STMT_FN || 
+        stmt->kind == STMT_LET) {
+        if (st->ctx == ST_CTX_GLOBAL) {
+            nnc_stmt_to_3a(stmt, st);
+        }
+    }
+    /*
+    if (stmt->kind == STMT_NAMESPACE) {
+        nnc_stmt_to_3a(stmt, st);
+    }
+    */
 }
 
 /**
@@ -1384,6 +1413,7 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
         case STMT_NAMESPACE: nnc_resolve_namespace_stmt(stmt->exact, st); break;
         default: nnc_abort_no_ctx("nnc_resolve_stmt: unknown kind.");
     }
+    nnc_resolved_stmt_to_3a(stmt, st);
 }
 
 /**
