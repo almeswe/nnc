@@ -81,6 +81,7 @@ nnc_static const nnc_3a_addr* nnc_3a_quads_res() {
         offset++;
     }
     nnc_abort_no_ctx("nnc_3a_quads_res: bug detected.\n");
+    return NULL;
 }
 
 nnc_static void nnc_fconst_to_3a(const nnc_dbl_literal* fconst, const nnc_st* st) {
@@ -115,8 +116,29 @@ nnc_static void nnc_iconst_to_3a(const nnc_int_literal* iconst, const nnc_st* st
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static const char* nnc_mk_nested_name(const char* name, const nnc_nesting* nesting, const nnc_st* st) {
+    nnc_u64 size = 0;
+    const nnc_nesting* current = NULL;
+    for (current = nesting; current != NULL; current = current->next) {
+        size += current->nest->size;
+        // add separator size
+        size += 1;
+    }
+    if (size == 0) {
+        return name;
+    }
+    char* nested_name = cnew(char, size + 1);
+    for (current = nesting; current != NULL; current = current->next) {
+        nested_name = strcat(nested_name, current->nest->name);
+        nested_name = strcat(nested_name, "_");
+    }
+    nested_name = strcat(nested_name, name);
+    return nested_name;
+}
+
 nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
-    nnc_3a_addr arg = nnc_3a_mkname1(ident);
+    const char* ident_name = nnc_mk_nested_name(ident->name, ident->nesting, st);
+    nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     if (ident->ictx == IDENT_ENUMERATOR) {
         const nnc_enumerator* enumerator = ident->refs.enumerator;
         arg = nnc_3a_mki2(
@@ -125,7 +147,7 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
         );
     }
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_COPY, nnc_3a_mkcgt(), ident->type, arg
+        OP_COPY, nnc_3a_mkcgt(), arg.type, arg
     );
     nnc_3a_quads_add(&quad);
 }
@@ -133,9 +155,11 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
 nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
 
 nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
+    const char* ident_name = nnc_mk_nested_name(ident->name, ident->nesting, st);
+    nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        op, nnc_3a_mkcgt(), ident->type, nnc_3a_mkname1(ident)
+        op, nnc_3a_mkcgt(), ident->type, arg
     );
     nnc_3a_quads_add(&quad);
 }
@@ -632,10 +656,6 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     nnc_stmt_to_3a(fn_stmt->body, st);
     set.quads = quads;
     buf_add(sets, set);
-    #ifdef NNC_SHOW_MEMORY_INFO
-        fprintf(stderr, "size of `nnc_3a_quad`: %lu\n", sizeof(nnc_3a_quad));
-        fprintf(stderr, "`%s` has %lu quads\n", set.name, buf_len(quads));
-    #endif
 }
 
 nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 
@@ -682,6 +702,8 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
 }
 
 nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
+    //todo: in case when there are not function context, three-address
+    // instructions are lost
     if (let_stmt->init == NULL) {
         return;
     }
@@ -781,25 +803,34 @@ nnc_static void nnc_compound_stmt_to_3a(const nnc_compound_statement* compound_s
     }
 }
 
+nnc_static void nnc_namespace_stmt_to_3a(const nnc_namespace_statement* namespace_stmt, const nnc_st* st) {
+    nnc_stmt_to_3a(namespace_stmt->body, st);
+}
+
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
     switch (stmt->kind) {
-        case STMT_TYPE:     break;
-        case STMT_EMPTY:    break;
-        case STMT_DO:       nnc_do_stmt_to_3a(stmt->exact, st);       break;
-        case STMT_FN:       nnc_fn_stmt_to_3a(stmt->exact, st);       break;
-        case STMT_IF:       nnc_if_stmt_to_3a(stmt->exact, st);       break;
-        case STMT_LET:      nnc_let_stmt_to_3a(stmt->exact, st);      break;
-        case STMT_FOR:      nnc_for_stmt_to_3a(stmt->exact, st);      break;
-        case STMT_EXPR:     nnc_expr_stmt_to_3a(stmt->exact, st);     break;
-        case STMT_WHILE:    nnc_while_stmt_to_3a(stmt->exact, st);    break;
-        case STMT_BREAK:    nnc_break_stmt_to_3a(stmt->exact, st);    break;
-        case STMT_RETURN:   nnc_return_stmt_to_3a(stmt->exact, st);   break;
-        case STMT_CONTINUE: nnc_continue_stmt_to_3a(stmt->exact, st); break;
-        case STMT_COMPOUND: nnc_compound_stmt_to_3a(stmt->exact, st); break;
+        case STMT_TYPE:      break;
+        case STMT_EMPTY:     break;
+        case STMT_DO:        nnc_do_stmt_to_3a(stmt->exact, st);        break;
+        case STMT_FN:        nnc_fn_stmt_to_3a(stmt->exact, st);        break;
+        case STMT_IF:        nnc_if_stmt_to_3a(stmt->exact, st);        break;
+        case STMT_LET:       nnc_let_stmt_to_3a(stmt->exact, st);       break;
+        case STMT_FOR:       nnc_for_stmt_to_3a(stmt->exact, st);       break;
+        case STMT_EXPR:      nnc_expr_stmt_to_3a(stmt->exact, st);      break;
+        case STMT_WHILE:     nnc_while_stmt_to_3a(stmt->exact, st);     break;
+        case STMT_BREAK:     nnc_break_stmt_to_3a(stmt->exact, st);     break;
+        case STMT_RETURN:    nnc_return_stmt_to_3a(stmt->exact, st);    break;
+        case STMT_CONTINUE:  nnc_continue_stmt_to_3a(stmt->exact, st);  break;
+        case STMT_COMPOUND:  nnc_compound_stmt_to_3a(stmt->exact, st);  break;
+        case STMT_NAMESPACE: nnc_namespace_stmt_to_3a(stmt->exact, st); break;
     }
 }
 
 void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st) {
+    #ifdef NNC_SHOW_MEMORY_INFO
+        fprintf(stderr, "size of `nnc_3a_quad`: %lu\n", sizeof(nnc_3a_quad));
+        fprintf(stderr, "`%s` has %lu quads\n", set.name, buf_len(quads));
+    #endif
     for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {
         nnc_stmt_to_3a(ast->root[i], ast->st);
     }
