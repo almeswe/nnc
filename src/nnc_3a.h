@@ -111,6 +111,12 @@ typedef struct _nnc_3a_sconst {
     .exact.name.nesting = x->nesting     \
 }
 
+#define nnc_3a_mkname2(x, t) (nnc_3a_addr){ \
+    .kind = ADDR_NAME,                      \
+    .type = t,                              \
+    .exact.name.name = x                    \
+}
+
 typedef struct _nnc_3a_name {
     const char* name;
     const nnc_nesting* nesting;
@@ -144,7 +150,7 @@ typedef struct _nnc_3a_addr {
 }
 
 typedef struct _nnc_3a_quad {
-    nnc_u32 label: 28;
+    nnc_u32 label: 26;
     nnc_3a_op_kind op: 6;
     nnc_3a_addr res;
     nnc_3a_addr arg1;
@@ -158,6 +164,11 @@ typedef struct _nnc_3a_quad_set {
 
 extern nnc_3a_quad_set* sets;
 extern nnc_3a_cgt_cnt cgt_cnt;
+
+typedef struct _nnc_3a_basic {
+    nnc_u32 id;
+    _vec_(nnc_3a_quad_set) quads;
+} nnc_3a_basic;
 
 void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st);

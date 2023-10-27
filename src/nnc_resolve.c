@@ -334,14 +334,15 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
  * @return `true` if enum resolved, `false` otherwise.
  */
 nnc_static nnc_bool nnc_resolve_enum(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
-    nnc_bool resolved = true;
     /*
+    nnc_bool resolved = true;
     for (nnc_u64 i = 0; i < type->exact.enumeration.memberc; i++) {
         nnc_enumerator* enumerator = type->exact.enumeration.members[i];
         resolved &= nnc_resolve_enumerator(enumerator, st);
     }
-    */
     return resolved;
+    */
+    return true;
 }
 
 /**
@@ -566,6 +567,33 @@ nnc_static nnc_st* nnc_resolve_nesting(nnc_nesting* nesting, nnc_st* st) {
     return nnc_resolve_nesting(nesting->next, st);
 }
 
+nnc_static nnc_nesting* nnc_get_imp_nesting(nnc_st* st) {
+    nnc_st** path = NULL;
+    while (st != NULL && st->root != NULL) {
+        if (st->ctx == ST_CTX_NAMESPACE) {
+            buf_add(path, st);
+        }
+        st = st->root;
+    }
+    if (buf_len(path) == 0) {
+        return NULL;
+    }
+    nnc_nesting* root = NULL;
+    nnc_nesting* nesting = NULL;
+    for (nnc_i64 i = (nnc_i64)buf_len(path) - 1; i >= 0; i--) {
+        if (nesting == NULL) {
+            nesting = anew(nnc_nesting);
+            root = nesting;    
+        }
+        else {
+            nesting->next = anew(nnc_nesting);
+            nesting = nesting->next;
+        }
+        nesting->nest = path[i]->ref.np->var;
+    }
+    return root;
+}
+
 /**
  * @brief Resolve identifier.
  * @param ident Identifier to be resolved.
@@ -574,8 +602,15 @@ nnc_static nnc_st* nnc_resolve_nesting(nnc_nesting* nesting, nnc_st* st) {
  * @throw `NNC_SEMANTIC` in case when identifier is not listed in current context.
  */
 nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
-    if (ident->nesting != NULL) {
-        st = nnc_resolve_nesting(ident->nesting, st);
+    if (ident->nesting == NULL) {
+        ident->nesting = nnc_get_imp_nesting(st);
+    }
+    else {
+        //todo: made an assumption that nesting
+        // via symtables will be correct. (?)
+        if (ident->nesting != NULL) {
+            st = nnc_resolve_nesting(ident->nesting, st);
+        }
     }
     nnc_sym* sym = nnc_st_get_sym(st, ident->name);
     if (sym == NULL) {
@@ -1362,7 +1397,6 @@ nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt,
  * @throw `NNC_SEMANTIC` in case when not declared in global scope. 
  */
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
-    THROW(NNC_UNIMPLEMENTED, "namespaces are not implemented in nnc yet.", namespace_stmt->var->ctx);
     if (st->ctx != ST_CTX_GLOBAL &&
         st->ctx != ST_CTX_NAMESPACE) {
         THROW(NNC_SEMANTIC, "cannot declare `namespace` in this context.", namespace_stmt->var->ctx);
@@ -1383,11 +1417,9 @@ nnc_static void nnc_resolved_stmt_to_3a(const nnc_statement* stmt, const nnc_st*
             nnc_stmt_to_3a(stmt, st);
         }
     }
-    /*
     if (stmt->kind == STMT_NAMESPACE) {
         nnc_stmt_to_3a(stmt, st);
     }
-    */
 }
 
 /**

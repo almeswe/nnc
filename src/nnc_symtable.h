@@ -35,6 +35,7 @@ typedef struct _nnc_st {
     _map_(nnc_str, nnc_sym*) syms;
     struct _nnc_st_ref {
         nnc_fn_statement* fn;
+        nnc_namespace_statement* np;
     } ref;
 } nnc_st;
 

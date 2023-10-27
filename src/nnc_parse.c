@@ -1170,6 +1170,8 @@ nnc_static nnc_statement* nnc_parse_namespace_stmt(nnc_parser* parser) {
     namespace_stmt->var->type->repr = namespace_stmt->var->name;
     namespace_stmt->var->type->exact.name.space = namespace_stmt;
     namespace_stmt->body = nnc_parse_compound_stmt(parser, ST_CTX_NAMESPACE);
+    nnc_st* inner = NNC_GET_SYMTABLE(namespace_stmt);
+    inner->ref.np = namespace_stmt;
     nnc_st_put(parser->st, namespace_stmt->var, ST_SYM_IDENT);
     return nnc_stmt_new(STMT_NAMESPACE, namespace_stmt);
 }
