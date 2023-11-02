@@ -3,6 +3,7 @@
 
 static FILE* stream = NULL;
 static char buf[128] = {0};
+static int pad = 10;
 
 #define dump_indent "   "
 #define dump_3a(fmt, ...) fprintf(stream, fmt, __VA_ARGS__)
@@ -41,7 +42,7 @@ nnc_static void nnc_dump_3a_none(const nnc_3a_addr* addr) {
 
 nnc_static void nnc_dump_3a_name(const nnc_3a_addr* addr) {
     memset(buf, 0, sizeof buf);
-    sprintf(buf, "%s", addr->exact.name.name);
+    sprintf(buf, "_%s", addr->exact.name.name);
 }
 
 nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
@@ -134,12 +135,12 @@ nnc_static void nnc_dump_3a_index(const nnc_3a_quad* quad) {
 
 nnc_static void nnc_dump_3a_fcall(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%6s = call", nnc_dump_3a_addr(&quad->res));
-    dump_3a(" %s,", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(" @%s,", nnc_dump_3a_addr(&quad->arg1));
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg2));
 }
 
 nnc_static void nnc_dump_3a_pcall(const nnc_3a_quad* quad) {
-    dump_3a(dump_indent "    call %s,", nnc_dump_3a_addr(&quad->arg1));
+    dump_3a(dump_indent "    call @%s,", nnc_dump_3a_addr(&quad->arg1));
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg2));
 }
 
@@ -199,7 +200,6 @@ nnc_static void nnc_dump_3a_deref_copy(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
-    static int pad = 10;
     const char* repr = "";
     if (quad->op < OP_UJUMP || quad->op > OP_CJUMPNE) {
         repr = quad->res.type == NULL ? 
