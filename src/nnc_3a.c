@@ -116,29 +116,29 @@ nnc_static void nnc_iconst_to_3a(const nnc_int_literal* iconst, const nnc_st* st
     nnc_3a_quads_add(&quad);
 }
 
-nnc_static const char* nnc_mk_nested_name(const char* name, const nnc_nesting* nesting, const nnc_st* st) {
+nnc_static const char* nnc_mk_nested_name(const nnc_ident* ident, const nnc_st* st) {
     nnc_u64 size = 0;
     const nnc_nesting* current = NULL;
-    for (current = nesting; current != NULL; current = current->next) {
+    for (current = ident->nesting; current != NULL; current = current->next) {
         size += current->nest->size;
         // add separator size
         size += 1;
     }
     if (size == 0) {
-        return name;
+        return ident->name;
     }
     char* nested_name = cnew(char, size + 1);
-    for (current = nesting; current != NULL; current = current->next) {
+    for (current = ident->nesting; current != NULL; current = current->next) {
         nested_name = strcat(nested_name, current->nest->name);
         nested_name = strcat(nested_name, "_");
     }
-    nested_name = strcat(nested_name, name);
+    nested_name = strcat(nested_name, ident->name);
     return nested_name;
 }
 
 nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
-    const char* ident_name = nnc_mk_nested_name(ident->name, ident->nesting, st);
-    nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
+    const char* name = nnc_mk_nested_name(ident, st);
+    nnc_3a_addr arg = nnc_3a_mkname2(name, ident->type);
     if (ident->ictx == IDENT_ENUMERATOR) {
         const nnc_enumerator* enumerator = ident->refs.enumerator;
         arg = nnc_3a_mki2(
@@ -155,7 +155,7 @@ nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
 nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
 
 nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
-    const char* ident_name = nnc_mk_nested_name(ident->name, ident->nesting, st);
+    const char* ident_name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
     nnc_3a_quad quad = nnc_3a_mkquad1(
@@ -356,7 +356,7 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
 }
 
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    const nnc_ident* fn = unary->expr->exact;
+    const char* name = nnc_mk_nested_name(unary->expr->exact, st);
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
         nnc_expr_to_3a(call->args[i], st);
@@ -366,7 +366,7 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
         nnc_3a_quads_add(&quad);
     }
     nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_PCALL, {0}, nnc_3a_mkname1(fn), nnc_3a_mki3(call->argc)
+        OP_PCALL, {0}, nnc_3a_mkname2(name, unary->type), nnc_3a_mki3(call->argc)
     );
     if (unary->type->kind != T_VOID) {
         quad.op = OP_FCALL;
@@ -652,7 +652,7 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     quads = NULL;
     cgt_cnt = 0;
     nnc_3a_quad_set set = {0};
-    set.name = fn_stmt->var->name;
+    set.name = nnc_mk_nested_name(fn_stmt->var, st);
     nnc_stmt_to_3a(fn_stmt->body, st);
     set.quads = quads;
     buf_add(sets, set);

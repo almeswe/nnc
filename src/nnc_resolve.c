@@ -567,6 +567,27 @@ nnc_static nnc_st* nnc_resolve_nesting(nnc_nesting* nesting, nnc_st* st) {
     return nnc_resolve_nesting(nesting->next, st);
 }
 
+/**
+ * @brief Appends implicit nesting to existing.
+ * @param ident Pointer to `nnc_ident` to which nesting must be appended.
+ * @param nesting Nesting itself to be appended.
+ */
+nnc_static void nnc_add_imp_nesting(nnc_ident* ident, nnc_nesting* nesting) {
+    if (ident->nesting != NULL) {
+        nnc_nesting* root = nesting;
+        while (root->next != NULL) {
+            root = root->next;
+        }
+        root->next = ident->nesting;
+    }
+    ident->nesting = nesting;
+}
+
+/**
+ * @brief Retrieves implicit nesting by traversing the symtable backwards.
+ * @param st Pointer to `nns_st`.
+ * @return `nnc_nesting` instance from traversed symtable or NULL.
+ */
 nnc_static nnc_nesting* nnc_get_imp_nesting(nnc_st* st) {
     nnc_st** path = NULL;
     while (st != NULL && st->root != NULL) {
@@ -602,15 +623,19 @@ nnc_static nnc_nesting* nnc_get_imp_nesting(nnc_st* st) {
  * @throw `NNC_SEMANTIC` in case when identifier is not listed in current context.
  */
 nnc_static nnc_bool nnc_resolve_ident(nnc_ident* ident, nnc_st* st) {
-    if (ident->nesting == NULL) {
-        ident->nesting = nnc_get_imp_nesting(st);
+    // get explicit nesting for resolving
+    // need to save it before it can be modified by `nnc_add_imp_nesting`
+    nnc_nesting* exp_nesting = ident->nesting;
+    // get implicit nesting
+    nnc_nesting* imp_nesting = nnc_get_imp_nesting(st);
+    if (imp_nesting != NULL) {
+        // append it to existing nesting
+        nnc_add_imp_nesting(ident, imp_nesting);    
     }
-    else {
-        //todo: made an assumption that nesting
-        // via symtables will be correct. (?)
-        if (ident->nesting != NULL) {
-            st = nnc_resolve_nesting(ident->nesting, st);
-        }
+    if (exp_nesting != NULL) {
+        // `st_to_resolve` is original `st` before
+        // any implicit nesting is added
+        st = nnc_resolve_nesting(exp_nesting, st);
     }
     nnc_sym* sym = nnc_st_get_sym(st, ident->name);
     if (sym == NULL) {
@@ -1192,6 +1217,7 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
         st->ctx != ST_CTX_NAMESPACE) {
         THROW(NNC_SEMANTIC, "cannot declare `fn` in this context.", fn_stmt->var->ctx);
     }
+    fn_stmt->var->nesting = nnc_get_imp_nesting(st);
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type_expr(fn_stmt->ret, st);
     nnc_resolve_stmt(fn_stmt->body, st);
@@ -1411,14 +1437,12 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
  * @param st Pointer to `nnc_st` instance.
  */
 nnc_static void nnc_resolved_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
-    if (stmt->kind == STMT_FN || 
-        stmt->kind == STMT_LET) {
+    if (stmt->kind == STMT_FN  || 
+        stmt->kind == STMT_LET ||
+        stmt->kind == STMT_NAMESPACE) {
         if (st->ctx == ST_CTX_GLOBAL) {
             nnc_stmt_to_3a(stmt, st);
         }
-    }
-    if (stmt->kind == STMT_NAMESPACE) {
-        nnc_stmt_to_3a(stmt, st);
     }
 }
 

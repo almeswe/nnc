@@ -158,7 +158,7 @@ typedef struct _nnc_3a_quad {
 } nnc_3a_quad;
 
 typedef struct _nnc_3a_quad_set {
-    char* name;
+    const char* name;
     nnc_3a_quad* quads;
 } nnc_3a_quad_set;
 
