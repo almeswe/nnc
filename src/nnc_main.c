@@ -62,7 +62,8 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
         #ifdef NNC_SHOW_MEMORY_INFO
             nnc_print_used_mem();
         #endif
-        nnc_dump_3a(stderr, sets);
+        nnc_dump_3a_data(stderr, data);
+        nnc_dump_3a_code(stderr, code);
         ETRY;
     }
     CATCHALL {
