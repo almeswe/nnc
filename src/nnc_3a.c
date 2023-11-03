@@ -1,6 +1,11 @@
 #include "nnc_3a.h"
 
-nnc_3a_quad_set* sets = NULL;
+nnc_3a_code code = NULL;
+nnc_3a_data data = {
+    .name = ".data",
+    .quads = NULL
+};
+
 nnc_3a_cgt_cnt cgt_cnt = 0;
 nnc_3a_label_cnt label_cnt = 0; 
 
@@ -54,6 +59,10 @@ nnc_static nnc_3a_addr nnc_3a_mkaddr(nnc_3a_addr resv, const nnc_type* rest) {
 
 nnc_static void nnc_3a_quads_add(const nnc_3a_quad* quad) {
     buf_add(quads, *quad);
+}
+
+nnc_static void nnc_3a_data_quads_add(const nnc_3a_quad* quad) {
+    buf_add(data.quads, *quad);
 }
 
 nnc_static nnc_loop_branches nnc_set_loop_branches(const nnc_3a_quad* b_loop_out,
@@ -655,7 +664,8 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     set.name = nnc_mk_nested_name(fn_stmt->var, st);
     nnc_stmt_to_3a(fn_stmt->body, st);
     set.quads = quads;
-    buf_add(sets, set);
+    quads = NULL;
+    buf_add(code, set);
 }
 
 nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 
@@ -702,8 +712,6 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
 }
 
 nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
-    //todo: in case when there are not function context, three-address
-    // instructions are lost
     if (let_stmt->init == NULL) {
         return;
     }
@@ -713,6 +721,15 @@ nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_
         OP_COPY, nnc_3a_mkname1(let_stmt->var), resv
     );
     nnc_3a_quads_add(&quad);
+    if (st->ctx == ST_CTX_GLOBAL ||
+        st->ctx == ST_CTX_NAMESPACE) {
+        // in this case let-stmt is in global scope
+        // so it's value must be allocated in data segment
+        for (nnc_u64 i = 0; i < buf_len(quads); i++) {
+            nnc_3a_data_quads_add(&quads[i]);
+        }
+        quads = NULL;
+    }
 }
 
 nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_st* st) {

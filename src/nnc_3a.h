@@ -162,7 +162,11 @@ typedef struct _nnc_3a_quad_set {
     nnc_3a_quad* quads;
 } nnc_3a_quad_set;
 
-extern nnc_3a_quad_set* sets;
+typedef nnc_3a_quad_set* nnc_3a_code;
+typedef nnc_3a_quad_set  nnc_3a_data;
+
+extern nnc_3a_code code;
+extern nnc_3a_data data;
 extern nnc_3a_cgt_cnt cgt_cnt;
 
 typedef struct _nnc_3a_basic {
@@ -173,6 +177,7 @@ typedef struct _nnc_3a_basic {
 void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
 void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st);
 void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st);
-void nnc_dump_3a(FILE* to, const nnc_3a_quad_set* sets);
+void nnc_dump_3a_code(FILE* to, const nnc_3a_code code);
+void nnc_dump_3a_data(FILE* to, const nnc_3a_data data);
 
 #endif
