@@ -258,7 +258,10 @@ nnc_static void nnc_dump_3a_quads(const nnc_3a_quad* quads) {
 
 nnc_static void nnc_dump_3a_set(const nnc_3a_quad_set* set) {
     dump_3a("@_%s:\n", set->name);
-    nnc_dump_3a_quads(set->quads);
+    for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
+        dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
+        nnc_dump_3a_quads(set->blocks[i].quads);
+    }
 }
 
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {
@@ -270,5 +273,7 @@ void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {
 
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data) {
     stream = to;
-    nnc_dump_3a_set(&data);
+    if (buf_len(data.quads) != 0) {
+        nnc_dump_3a_set(&data);
+    }
 }

@@ -658,12 +658,15 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
 }
 
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
-    quads = NULL;
     cgt_cnt = 0;
-    nnc_3a_quad_set set = {0};
-    set.name = nnc_mk_nested_name(fn_stmt->var, st);
-    nnc_stmt_to_3a(fn_stmt->body, st);
-    set.quads = quads;
+    nnc_3a_quad_set optimized_set = {0};
+    nnc_3a_quad_set set = {
+        .name = nnc_mk_nested_name(fn_stmt->var, st),
+        .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
+    };
+    nnc_3a_optimize(&set, &optimized_set);
+    set = optimized_set;
+    set.blocks = nnc_3a_basic_blocks(&set);
     quads = NULL;
     buf_add(code, set);
 }
