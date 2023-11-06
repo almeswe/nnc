@@ -80,14 +80,21 @@ typedef nnc_u64 nnc_3a_cgt;
     .exact.iconst.iconst = x          \
 } 
 
-typedef struct _nnc_3a_iconst {
+typedef union _nnc_3a_iconst {
     nnc_u64 iconst;
+    nnc_i64 sconst;
 } nnc_3a_iconst;
 
 #define nnc_3a_mkf1(x) (nnc_3a_addr){ \
     .kind = ADDR_FCONST,              \
     .type = x->type,                  \
     .exact.fconst.fconst = x->exact   \
+}
+
+#define nnc_3a_mkf2(x, t) (nnc_3a_addr){ \
+    .kind = ADDR_FCONST,                 \
+    .type = t,                           \
+    .exact.fconst.fconst = x             \
 }
 
 typedef struct _nnc_3a_fconst {

@@ -54,7 +54,12 @@ nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
 nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
     memset(buf, 0, sizeof buf);
     const nnc_3a_iconst* iconst = &addr->exact.iconst;
-    sprintf(buf, "%lu", iconst->iconst);
+    if (nnc_signed_type(addr->type)) {
+        sprintf(buf, "%ld", iconst->sconst);
+    }
+    else {
+        sprintf(buf, "%lu", iconst->iconst);
+    }
 }
 
 nnc_static void nnc_dump_3a_fconst(const nnc_3a_addr* addr) {
