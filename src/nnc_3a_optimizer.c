@@ -64,8 +64,9 @@ nnc_static nnc_3a_peep_pattern nnc_3a_copy_pattern(nnc_u64 index) {
     }
     const nnc_3a_quad* quad1 = &target_set->quads[index];
     const nnc_3a_quad* quad2 = &target_set->quads[index+1];
-    // tX = x
-    // tY = tX
+    //  tX = x
+    //  tY = tX || 
+    // *tY = tX
     if (quad2->op == OP_COPY ||
         quad2->op == OP_DEREF_COPY) {
         if (quad1->res.kind == ADDR_CGT &&
@@ -77,26 +78,36 @@ nnc_static nnc_3a_peep_pattern nnc_3a_copy_pattern(nnc_u64 index) {
         }
     }
     // tX = const1
-    // tZ = unOp tX 
-    if (quad1->arg1.kind == ADDR_ICONST || 
-        quad1->arg1.kind == ADDR_FCONST) {
-        if (nnc_3a_unary_op(quad2->op)) {
-            return OPT_UNARY_CONST_FOLD;
+    // tZ = unOp   tX ||
+    // tz = (type) tX
+    if (quad1->res.kind == ADDR_CGT) {
+        if (quad1->arg1.kind == ADDR_ICONST || 
+            quad1->arg1.kind == ADDR_FCONST) {
+            if (nnc_3a_unary_op(quad2->op) || quad2->op == OP_CAST) {
+                if (quad1->res.exact.cgt == quad2->arg1.exact.cgt) {
+                    return OPT_UNARY_CONST_FOLD;
+                }
+            }
         }
     }
     // tX = const1
     // tY = const2
     // tZ = tX binOp tY
-    // todo: check for CGT's in all cases
-    if ((quad1->arg1.kind == ADDR_ICONST || 
-            quad1->arg1.kind == ADDR_FCONST) &&
-        (quad2->arg1.kind == ADDR_ICONST ||
-            quad2->arg1.kind == ADDR_FCONST)) {
-        const nnc_3a_quad* quad3 = NULL;
-        if (index + 2 < buf_len(target_set->quads)) {
-            quad3 = &target_set->quads[index+2];
-            if (nnc_3a_binary_op(quad3->op)) {
-                return OPT_BINARY_CONST_FOLD;
+    if (quad1->res.kind == ADDR_CGT &&
+        quad2->res.kind == ADDR_CGT) {
+        if ((quad1->arg1.kind == ADDR_ICONST || 
+             quad1->arg1.kind == ADDR_FCONST) &&
+            (quad2->arg1.kind == ADDR_ICONST ||
+             quad2->arg1.kind == ADDR_FCONST)) {
+            const nnc_3a_quad* quad3 = NULL;
+            if (index + 2 < buf_len(target_set->quads)) {
+                quad3 = &target_set->quads[index+2];
+                if (nnc_3a_binary_op(quad3->op)) {
+                    if (quad3->arg1.exact.cgt == quad1->res.exact.cgt &&
+                        quad3->arg2.exact.cgt == quad2->res.exact.cgt) {
+                        return OPT_BINARY_CONST_FOLD;
+                    }
+                }
             }
         }
     }
@@ -107,8 +118,9 @@ nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
     switch (target_set->quads[index].op) {
         case OP_REF:  return nnc_3a_ref_pattern(index);
         case OP_COPY: return nnc_3a_copy_pattern(index);
-        default:      return OPT_NONE;
+        default: break;
     }
+    return OPT_NONE;
 }
 
 nnc_static nnc_u64 nnc_3a_opt_none(nnc_u64 index) {
@@ -128,6 +140,18 @@ nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
     switch (un_op_quad->op) {
         case OP_PLUS:  break;
         case OP_MINUS: val = -val; break;
+        case OP_CAST: {
+            nnc_f64 fval = op_quad->arg1.exact.fconst.fconst;
+            if (op_quad->arg1.kind == ADDR_ICONST) {
+                fval = op_quad->arg1.exact.iconst.iconst;
+            }
+            switch (un_op_type->kind) {
+                case T_PRIMITIVE_F32: val = (nnc_f32)fval; break;
+                case T_PRIMITIVE_F64: val = (nnc_f64)fval; break;
+                default: nnc_abort_no_ctx("nnc_3a_opt_unary_fconst_fold: unknown un_op_type."); 
+            }
+            break;
+        }
         default: nnc_abort_no_ctx("nnc_3a_opt_unary_fconst_fold: unknown op.");
     }
     nnc_3a_quad opt_quad = {
@@ -146,6 +170,24 @@ nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
         case OP_PLUS:   break;
         case OP_MINUS:  val = -val; break;
         case OP_BW_NOT: val = ~val; break;
+        case OP_CAST: {
+            nnc_f64 fval = op_quad->arg1.exact.fconst.fconst;
+            if (op_quad->arg1.kind == ADDR_ICONST) {
+                fval = op_quad->arg1.exact.iconst.iconst;
+            }
+            switch (un_op_type->kind) {
+                case T_PRIMITIVE_I8:  val = (nnc_i8)fval;  break;
+                case T_PRIMITIVE_U8:  val = (nnc_u8)fval;  break;
+                case T_PRIMITIVE_U16: val = (nnc_u16)fval; break;
+                case T_PRIMITIVE_I16: val = (nnc_i16)fval; break;
+                case T_PRIMITIVE_U32: val = (nnc_u32)fval; break;
+                case T_PRIMITIVE_I32: val = (nnc_i32)fval; break;
+                case T_PRIMITIVE_U64: val = (nnc_u64)fval; break;
+                case T_PRIMITIVE_I64: val = (nnc_i64)fval; break;
+                default: nnc_abort_no_ctx("nnc_3a_opt_unary_iconst_fold: unknown un_op_type."); 
+            }
+            break;
+        }
         default: nnc_abort_no_ctx("nnc_3a_opt_unary_iconst_fold: unknown op.");
     }
     nnc_3a_quad opt_quad = {
