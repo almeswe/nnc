@@ -185,6 +185,33 @@ nnc_bool nnc_integral_type(const nnc_type* type) {
 }
 
 /**
+ * @brief Checks if specified type is real.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is real, otherwise `false`.
+ */
+nnc_bool nnc_real_type(const nnc_type* type) {
+    const T_UNALIAS(type);
+    return ref_type->kind == T_PRIMITIVE_F32  || 
+           ref_type->kind == T_PRIMITIVE_F64;
+}
+
+/**
+ * @brief Checks if specified type is signed.
+ *  This function is not sensitive for alias types.
+ * @param type Pointer to `nnc_type` to be checked.
+ * @return `true` if type is signed, otherwise `false`.
+ */
+nnc_bool nnc_signed_type(const nnc_type* type) {
+    const T_UNALIAS(type);
+    return ref_type->kind == T_ENUM          ||
+           ref_type->kind == T_PRIMITIVE_I8  || 
+           ref_type->kind == T_PRIMITIVE_I16 || 
+           ref_type->kind == T_PRIMITIVE_I32 || 
+           ref_type->kind == T_PRIMITIVE_I64;
+}
+
+/**
  * @brief Checks if specified type is numeric (float, integral or enum).
  *  This function is not sensitive for alias types.
  * @param type Pointer to `nnc_type` to be checked.
@@ -193,9 +220,8 @@ nnc_bool nnc_integral_type(const nnc_type* type) {
 nnc_bool nnc_numeric_type(const nnc_type* type) {
     const T_UNALIAS(type);
     return nnc_integral_type(ref_type)    ||
-        ref_type->kind == T_ENUM          ||
-        ref_type->kind == T_PRIMITIVE_F32 ||
-        ref_type->kind == T_PRIMITIVE_F64;
+        nnc_real_type(ref_type)           ||
+        ref_type->kind == T_ENUM;
 }
 
 /**

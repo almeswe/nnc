@@ -7,6 +7,8 @@ nnc_bool nnc_fn_type(const nnc_type* type);
 nnc_bool nnc_ptr_type(const nnc_type* type);
 nnc_bool nnc_arr_type(const nnc_type* type);
 nnc_bool nnc_numeric_type(const nnc_type* type);
+nnc_bool nnc_real_type(const nnc_type* type);
+nnc_bool nnc_signed_type(const nnc_type* type);
 nnc_bool nnc_integral_type(const nnc_type* type);
 nnc_bool nnc_namespace_type(const nnc_type* type);
 nnc_bool nnc_arr_or_ptr_type(const nnc_type* type);
