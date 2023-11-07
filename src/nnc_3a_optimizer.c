@@ -1,16 +1,16 @@
 #include "nnc_3a.h"
 
-#define _NNC_ENABLE_PASS_LOGGING 0
+#define _NNC_ENABLE_PASS_LOGGING 1
 
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
 
-extern void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set);
+extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
 
 typedef enum _nnc_3a_peep_pattern {
-    OPT_RED_CROSS_TEMP_COPY,
-    OPT_RED_CROSS_TEMP_COPY3,
-    OPT_RED_CROSS_TEMP_REF,
+    OPT_CROSS_COPY,
+    OPT_CROSS_COPY3,
+    OPT_CROSS_REF,
     OPT_UNARY_CONST_FOLD,
     OPT_BINARY_CONST_FOLD,
     OPT_NONE
@@ -56,72 +56,187 @@ nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
             quad2->res.kind == ADDR_CGT) {
             if (quad1->res.exact.cgt ==
                 quad2->res.exact.cgt) {
-                return OPT_RED_CROSS_TEMP_REF;
+                return OPT_CROSS_REF;
             }
         }
     }
     return OPT_NONE;
 }
 
-nnc_static nnc_3a_peep_pattern nnc_3a_copy_pattern(nnc_u64 index) {
-    if (index >= buf_len(unopt)) {
-        return OPT_NONE;
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
+    /*
+    Pattern's Trigger:
+        tX = x                   (OP_COPY)
+
+    Following part:    
+        tY = tX         ||   [1] (OP_COPY)
+       *tY = tX         ||   [2] (OP_DEREF_COPY)
+        if tX goto L    ||   [3] (OP_CJUMPT)
+        if not tX goto L     [4] (OP_CJUMPF)
+
+    Variable part (for cases [1] or [2])
+        tZ = tX || (?)           (OP_COPY)
+       *tZ = tX    (?)           (OP_DEREF_COPY)
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    const nnc_3a_quad* quad3 = NULL;
+    if (index+2 < buf_len(unopt)) {
+        quad3 = &unopt[index+2];
     }
+    /*
+        Both quad1 and quad2 must be ADDR_CGTs
+        and quad1's result CGT must be equal 
+        quad2's first argument CGT.
+    */
+    if (quad1->res.kind  == ADDR_CGT && 
+        quad2->arg1.kind == ADDR_CGT &&
+       (quad1->res.exact.cgt == 
+        quad2->arg1.exact.cgt)) {
+        switch (quad2->op) {
+            case OP_COPY:
+            case OP_DEREF_COPY: {
+                /*
+                    quad3 must be OP_COPY or OP_DEREF_COPY,
+                    it's first argument must be ADDR_CGT which
+                    equals quad1's first argument.
+                    This is `Variable part` from pattern above.
+                */
+                if (quad3 != NULL &&
+                    quad3->arg1.kind == ADDR_CGT &&
+                   (quad3->op == OP_COPY ||
+                    quad3->op == OP_DEREF_COPY)) {
+                    if (quad1->res.exact.cgt == 
+                        quad3->arg1.exact.cgt) {
+                        return OPT_CROSS_COPY3;
+                    }
+                }
+            }
+            case OP_CJUMPT:
+            case OP_CJUMPF: {
+                /*
+                    This is `Following part` from pattern above.
+                */
+                return OPT_CROSS_COPY;              
+            }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part2(nnc_u64 index) {
+    /*
+    Pattern's Trigger:
+        tX = x                   (OP_COPY)
+
+    Following part: (where x = const)
+        tZ = unOp tX   ||        (Unary operator)
+        tZ = (type) tX           (OP_CAST)
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    /*
+        quad1's result must be CGT,
+        and it's first argument must be constant.
+    */
+    if (quad1->res.kind == ADDR_CGT &&
+       (quad1->arg1.kind == ADDR_ICONST || 
+        quad1->arg1.kind == ADDR_FCONST)) {
+        /*
+            quad2 must be unary operator or OP_CAST
+            This is `Following part` of pattern above.
+        */
+        switch (quad2->op) {
+            case OP_CAST:
+            case OP_PLUS:
+            case OP_MINUS:
+            case OP_BW_NOT: {
+                if (quad1->res.exact.cgt == 
+                    quad2->arg1.exact.cgt) {
+                    return OPT_UNARY_CONST_FOLD;
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
+    /*
+    Pattern's Trigger:
+        tX = x                  (OP_COPY)
+
+    Following part: (where x = const)
+                    (where y = const)
+        tY = y                  (OP_COPY)
+        tZ = tX binOp tY        (Binary operator)
+    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
     if (index + 2 < buf_len(unopt)) {
         quad3 = &unopt[index+2];
     }
-    //  tX = x
-    //  tY = tX || 
-    // *tY = tX
-    //  tZ = tX || (?)
-    // *tZ = tx    (?)
-    if (quad2->op == OP_COPY ||
-        quad2->op == OP_DEREF_COPY) {
-        if (quad1->res.kind == ADDR_CGT &&
-            quad2->arg1.kind == ADDR_CGT) {
-            if (quad1->res.exact.cgt == quad2->arg1.exact.cgt) {
-                if (quad3 != NULL && (quad3->op == OP_COPY || quad3->op == OP_DEREF_COPY)) {
-                    if (quad3->arg1.kind == ADDR_CGT) {
-                        if (quad3->arg1.exact.cgt == quad1->res.exact.cgt) {
-                            return OPT_RED_CROSS_TEMP_COPY3;
-                        }
-                    }
-                }
-                return OPT_RED_CROSS_TEMP_COPY;
-            }
-        }
+    if (quad3 == NULL) {
+        return OPT_NONE;
     }
-    // tX = const1
-    // tZ = unOp   tX ||
-    // tz = (type) tX
-    if (quad1->res.kind == ADDR_CGT) {
-        if (quad1->arg1.kind == ADDR_ICONST || 
-            quad1->arg1.kind == ADDR_FCONST) {
-            if (nnc_3a_unary_op(quad2->op) || quad2->op == OP_CAST) {
-                if (quad1->res.exact.cgt == quad2->arg1.exact.cgt) {
-                    return OPT_UNARY_CONST_FOLD;
-                }
-            }
-        }
-    }
-    // tX = const1
-    // tY = const2
-    // tZ = tX binOp tY
+    /*
+        Both quad1 and quad2 results must be ADDR_CGTs
+        and their first arguments must be constant.
+    */
     if (quad1->res.kind == ADDR_CGT &&
-        quad2->res.kind == ADDR_CGT) {
-        if ((quad1->arg1.kind == ADDR_ICONST || 
-             quad1->arg1.kind == ADDR_FCONST) &&
-            (quad2->arg1.kind == ADDR_ICONST ||
-             quad2->arg1.kind == ADDR_FCONST)) {
-            if (quad3 != NULL && nnc_3a_binary_op(quad3->op)) {
-                if (quad3->arg1.exact.cgt == quad1->res.exact.cgt &&
-                    quad3->arg2.exact.cgt == quad2->res.exact.cgt) {
+        quad2->res.kind == ADDR_CGT &&
+       (quad1->arg1.kind == ADDR_ICONST  || 
+        quad1->arg1.kind == ADDR_FCONST) &&
+       (quad2->arg1.kind == ADDR_ICONST  ||
+        quad2->arg1.kind == ADDR_FCONST)) {
+        /*
+            quad3 must be binary operator
+            This is `Following part` of pattern above.
+        */
+        switch (quad3->op) {
+            case OP_ADD: 
+            case OP_SUB:
+            case OP_MUL: 
+            case OP_DIV:
+            case OP_MOD: 
+            case OP_SHR:
+            case OP_SHL:
+            case OP_BW_OR:
+            case OP_BW_AND:
+            case OP_BW_XOR: {
+                nnc_3a_cgt q1_res = quad1->res.exact.cgt;
+                nnc_3a_cgt q2_res = quad2->res.exact.cgt;
+                if (quad3->arg1.exact.cgt == q1_res &&
+                    quad3->arg2.exact.cgt == q2_res) {
                     return OPT_BINARY_CONST_FOLD;
                 }
             }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
+    typedef nnc_3a_peep_pattern (pat_fn)(nnc_u64);
+    static pat_fn* pat_fns[] = {
+        nnc_3a_op_copy_pat_part1,
+        nnc_3a_op_copy_pat_part2,
+        nnc_3a_op_copy_pat_part3
+    };
+    if (index >= buf_len(unopt)) {
+        return OPT_NONE;
+    }
+    nnc_3a_peep_pattern pat = OPT_NONE;
+    const nnc_u64 pat_fns_count = sizeof(pat_fns)/sizeof(pat_fn*);
+    for (nnc_u64 i = 0; i < pat_fns_count; i++) {
+        pat = pat_fns[i](index);
+        if (pat != OPT_NONE) {
+            return pat;
         }
     }
     return OPT_NONE;
@@ -130,7 +245,7 @@ nnc_static nnc_3a_peep_pattern nnc_3a_copy_pattern(nnc_u64 index) {
 nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
     switch (unopt[index].op) {
         case OP_REF:  return nnc_3a_ref_pattern(index);
-        case OP_COPY: return nnc_3a_copy_pattern(index);
+        case OP_COPY: return nnc_3a_op_copy_pat(index);
         default: break;
     }
     return OPT_NONE;
@@ -348,15 +463,15 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
         case OPT_NONE:                 return nnc_3a_opt_none(index);
         case OPT_UNARY_CONST_FOLD:     return nnc_3a_opt_unary_const_fold(index);
         case OPT_BINARY_CONST_FOLD:    return nnc_3a_opt_binary_const_fold(index);
-        case OPT_RED_CROSS_TEMP_REF:   return nnc_3a_opt_red_cross_temp_ref(index);
-        case OPT_RED_CROSS_TEMP_COPY:  return nnc_3a_opt_red_cross_temp_copy(index);
-        case OPT_RED_CROSS_TEMP_COPY3: return nnc_3a_opt_red_cross_temp_copy3(index);
+        case OPT_CROSS_REF:   return nnc_3a_opt_red_cross_temp_ref(index);
+        case OPT_CROSS_COPY:  return nnc_3a_opt_red_cross_temp_copy(index);
+        case OPT_CROSS_COPY3: return nnc_3a_opt_red_cross_temp_copy3(index);
         default: nnc_abort_no_ctx("nnc_3a_optimize_peep: unknown search pattern."); 
     }
     return 1;
 }
 
-nnc_static void nnc_3a_opt_dead_cgts() {
+nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
     nnc_u64 size = buf_len(opt);
     _map_(nnc_i32, nnc_3a_quad*) unused = map_init_with(size);
     for (nnc_u64 i = 0; i < size; i++) {
@@ -408,13 +523,14 @@ nnc_static void nnc_3a_opt_dead_cgts() {
     }
     _vec_(nnc_3a_quad) used = NULL;
     for (nnc_u64 i = 0; i < size; i++) {
-        if (opt[i].op != OP_NONE) {
+        if (opt[i].op != OP_NONE || opt[i].label != 0) {
             buf_add(used, opt[i]);
         }
     }
     nnc_dispose(opt);
     opt = used;
     map_fini(unused);
+    return size - buf_len(used);
 }
 
 nnc_static nnc_u64 nnc_3a_optimization_pass() {
@@ -426,11 +542,10 @@ nnc_static nnc_u64 nnc_3a_optimization_pass() {
     return len - buf_len(opt);
 }
 
-nnc_static void nnc_3a_show_pass(nnc_i32 pass, nnc_3a_quad_set* set) {
-    #if _NNC_ENABLE_PASS_LOGGING 
+nnc_static void nnc_3a_show_pass(nnc_i32 pass, nnc_3a_quad* quads) {
+    #if _NNC_ENABLE_PASS_LOGGING
         printf("\n################PASS%d################\n", pass);
-        set->blocks = nnc_3a_basic_blocks(set);
-        nnc_dump_3a_set(stderr, set);
+        nnc_dump_3a_quads(stderr, quads);
         //printf("pass %d reduced %lu\n", pass, reduced);
     #endif
 }
@@ -446,12 +561,17 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
         }
         unopt = opt == NULL ? quads : opt;
         opt = NULL;
+        nnc_3a_show_pass(pass, unopt);
         nnc_u64 reduced_at_pass = nnc_3a_optimization_pass(); 
         if (reduced_at_pass == 0) {
             break;
         }
         reduced += reduced_at_pass;
     }
+    if (unopt != NULL) {
+        buf_free(unopt);
+    }
+    reduced += nnc_3a_opt_dead_cgts();
     if (stat != NULL) {
         *stat = (nnc_3a_opt_stat) {
             .passes = pass,
@@ -459,9 +579,5 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
             .percent = (nnc_i32)(((len == 0 ? 0 : reduced / (nnc_f32)len)) * 100)
         };
     }
-    if (unopt != NULL) {
-        buf_free(unopt);
-    }
-    nnc_3a_opt_dead_cgts();
     return opt;
 }

@@ -8,6 +8,12 @@
 typedef nnc_u64 nnc_3a_cgt_cnt;
 typedef nnc_u32 nnc_3a_label_cnt;
 
+typedef struct _nnc_3a_opt_stat {
+    nnc_i32 passes;
+    nnc_u64 reduced;
+    nnc_i32 percent;
+} nnc_3a_opt_stat;
+
 typedef enum _nnc_3a_op_kind {
     /* ***************** */
     OP_NONE,
@@ -42,7 +48,6 @@ typedef enum _nnc_3a_op_kind {
     OP_ARG,
     OP_PCALL,  // Procedure CALL
     OP_FCALL,  // Function CALL
-    OP_INDEX,
     OP_RETP,   // RETurn from Procedure
     OP_RETF,   // RETurn from Function
     OP_REF,
@@ -173,6 +178,7 @@ typedef struct _nnc_3a_quad_set {
     const char* name;
     nnc_3a_quad* quads;
     nnc_3a_bblock* blocks;
+    nnc_3a_opt_stat stat;
 } nnc_3a_quad_set;
 
 typedef nnc_3a_quad_set* nnc_3a_code;
@@ -189,6 +195,6 @@ void nnc_dump_3a_code(FILE* to, const nnc_3a_code code);
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data);
 
 nnc_3a_bblock* nnc_3a_basic_blocks(const nnc_3a_quad_set* set);
-void nnc_3a_optimize(nnc_3a_quad_set* set, nnc_3a_quad_set* opt_set);
+_vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat);
 
 #endif

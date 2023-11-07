@@ -132,12 +132,6 @@ nnc_static void nnc_dump_3a_deref(const nnc_3a_quad* quad) {
     dump_3a(" *%s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
-nnc_static void nnc_dump_3a_index(const nnc_3a_quad* quad) {
-    dump_3a(dump_indent "%6s =", nnc_dump_3a_addr(&quad->res));
-    dump_3a(" %s[", nnc_dump_3a_addr(&quad->arg1));
-    dump_3a("%s]\n", nnc_dump_3a_addr(&quad->arg2));
-}
-
 nnc_static void nnc_dump_3a_fcall(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%6s = call", nnc_dump_3a_addr(&quad->res));
     dump_3a(" @%s,", nnc_dump_3a_addr(&quad->arg1));
@@ -238,7 +232,6 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_RETF:       nnc_dump_3a_retf(quad);       break;
         case OP_RETP:       nnc_dump_3a_retp(quad);       break;
         case OP_DEREF:      nnc_dump_3a_deref(quad);      break;
-        case OP_INDEX:      nnc_dump_3a_index(quad);      break;
         case OP_FCALL:      nnc_dump_3a_fcall(quad);      break;
         case OP_PCALL:      nnc_dump_3a_pcall(quad);      break;
         case OP_UJUMP:      nnc_dump_3a_ujump(quad);      break;
@@ -255,30 +248,36 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     }
 }
 
-nnc_static void nnc_dump_3a_quads(const nnc_3a_quad* quads) {
+void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads) {
+    stream = to;
     for (nnc_u64 i = 0; i < buf_len(quads); i++) {
         nnc_dump_3a_quad(&quads[i]);
     }
 }
 
-nnc_static void nnc_dump_3a_set(const nnc_3a_quad_set* set) {
-    dump_3a("@_%s:\n", set->name);
+void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set) {
+    stream = to;
+    dump_3a("@_%s: (%lu=%d%% after %d passes)\n", set->name,
+        set->stat.reduced, set->stat.percent, set->stat.passes);
+    nnc_dump_3a_quads(to, set->quads);
+    /*
     for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
         dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
         nnc_dump_3a_quads(set->blocks[i].quads);
     }
+    */
 }
 
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {
     stream = to;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
-        nnc_dump_3a_set(&code[i]);
+        nnc_dump_3a_set(to, &code[i]);
     }
 }
 
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data) {
     stream = to;
     if (buf_len(data.quads) != 0) {
-        nnc_dump_3a_set(&data);
+        nnc_dump_3a_set(to, &data);
     }
 }
