@@ -1,6 +1,6 @@
 #include "nnc_3a.h"
 
-#define _NNC_ENABLE_PASS_LOGGING 1
+#define _NNC_ENABLE_PASS_LOGGING 0
 
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
@@ -13,39 +13,18 @@ typedef enum _nnc_3a_peep_pattern {
     OPT_CROSS_REF,
     OPT_UNARY_CONST_FOLD,
     OPT_BINARY_CONST_FOLD,
+    OPT_INDEX_CONST_FOLD,
     OPT_NONE
 } nnc_3a_peep_pattern;
 
-nnc_static nnc_bool nnc_3a_unary_op(nnc_3a_op_kind op) {
-    switch (op) {
-        case OP_PLUS:
-        case OP_MINUS:
-        case OP_BW_NOT:
-            return true;
-        default: break;
-    }
-    return false;    
-}
-
-nnc_static nnc_bool nnc_3a_binary_op(nnc_3a_op_kind op) {
-    switch (op) {
-        case OP_ADD:
-        case OP_SUB:
-        case OP_MUL:
-        case OP_DIV:
-        case OP_MOD:
-        case OP_SHR:
-        case OP_SHL:
-        case OP_BW_OR:
-        case OP_BW_AND:
-        case OP_BW_XOR:
-            return true;
-        default: break;
-    }
-    return false;
-}
-
 nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
+    /*
+    Pattern's Trigger:
+        tX = &x            (OP_REF)
+
+    Following part:    
+       *tX = tZ            (OP_DEREF_COPY)
+    */
     if (index >= buf_len(unopt)) {
         return OPT_NONE;
     }  
@@ -221,12 +200,42 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
     return OPT_NONE;
 }
 
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part4(nnc_u64 index) {
+    /*
+    This optimization targets index calculation.
+    Pattern's Trigger:
+        tX = x                  (OP_COPY)
+
+    Following part: (where x  = const)
+        tZ = tX binOp const     (Binary operator: OP_ADD, OP_MUL)
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    if ((quad1->res.kind  == ADDR_CGT    &&
+         quad2->arg1.kind == ADDR_CGT)   &&
+        (quad1->arg1.kind == ADDR_ICONST && 
+         quad2->arg2.kind == ADDR_ICONST)) {
+        switch (quad2->op) {
+            case OP_ADD: 
+            case OP_MUL: {
+                if (quad1->res.exact.cgt ==
+                    quad2->arg1.exact.cgt) {
+                    return OPT_INDEX_CONST_FOLD;
+                }
+            }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     typedef nnc_3a_peep_pattern (pat_fn)(nnc_u64);
     static pat_fn* pat_fns[] = {
         nnc_3a_op_copy_pat_part1,
         nnc_3a_op_copy_pat_part2,
-        nnc_3a_op_copy_pat_part3
+        nnc_3a_op_copy_pat_part3,
+        nnc_3a_op_copy_pat_part4
     };
     if (index >= buf_len(unopt)) {
         return OPT_NONE;
@@ -412,6 +421,29 @@ nnc_static nnc_u64 nnc_3a_opt_binary_const_fold(nnc_u64 index) {
     return 1;
 }
 
+nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
+    /*
+        tX = const1
+        tZ = tX binOp const2
+        ----------------
+        tZ = const3
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    nnc_u64 lval = quad1->arg1.exact.iconst.iconst;
+    nnc_u64 rval = quad2->arg2.exact.iconst.iconst;
+    switch (quad2->op) {
+        case OP_ADD: lval += rval; break;
+        case OP_MUL: lval *= rval; break;
+        default: nnc_abort_no_ctx("nnc_3a_opt_index_const_fold: unknown op.");
+    }
+    nnc_3a_quad opt_quad = {
+        .op = OP_COPY, .res = quad2->res, .arg1 = nnc_3a_mki3(lval)
+    };
+    buf_add(opt, opt_quad);
+    return 2;
+}
+
 nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_ref(nnc_u64 index) {
     //  tX = &x
     // *tX = Y
@@ -463,6 +495,7 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
         case OPT_NONE:                 return nnc_3a_opt_none(index);
         case OPT_UNARY_CONST_FOLD:     return nnc_3a_opt_unary_const_fold(index);
         case OPT_BINARY_CONST_FOLD:    return nnc_3a_opt_binary_const_fold(index);
+        case OPT_INDEX_CONST_FOLD:     return nnc_3a_opt_index_const_fold(index);
         case OPT_CROSS_REF:   return nnc_3a_opt_red_cross_temp_ref(index);
         case OPT_CROSS_COPY:  return nnc_3a_opt_red_cross_temp_copy(index);
         case OPT_CROSS_COPY3: return nnc_3a_opt_red_cross_temp_copy3(index);
@@ -471,56 +504,94 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     return 1;
 }
 
+nnc_static void nnc_3a_unused_cgts_iter(nnc_map_key key, nnc_map_val val) {
+    nnc_3a_quad* unused_quad = val;
+    unused_quad->op = OP_NONE;
+}
+
 nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
     nnc_u64 size = buf_len(opt);
     _map_(nnc_i32, nnc_3a_quad*) unused = map_init_with(size);
     for (nnc_u64 i = 0; i < size; i++) {
         const nnc_3a_quad* quad = &opt[i];
+        /*
+            If quad's result is CGT and it is
+            not stored in `unused` map, put it.
+        */
         if (quad->res.kind == ADDR_CGT) {
             if (!map_has(unused, quad->res.exact.cgt)) {
                 map_put(unused, quad->res.exact.cgt, quad);
             }
         }
-        nnc_3a_cgt cgts[] = { 0, 0 };
-        if (quad->op == OP_DEREF_COPY) {
-            if (quad->res.kind == ADDR_CGT) {
-                cgts[0] = quad->res.exact.cgt;
+        /* 
+            This switch-case sets dependecy
+            list for each type of operator,
+            and then checks if any dependency is
+            stored in `unused` map. If so, removes
+            it from the map, othewise leaves it for future.
+        */
+        nnc_3a_addr deps[2] = { 0 };
+        switch (quad->op) {
+            /* Ignored operators */
+            case OP_REF:
+            case OP_NONE: {
+                break;
             }
-            if (quad->arg1.kind == ADDR_CGT) {
-                cgts[1] = quad->arg1.exact.cgt;
+            /* Other operators */
+            case OP_DEREF_COPY: {
+                deps[0] = quad->res;
+                deps[1] = quad->arg1;
+                break;
             }
+            /* Jump operators */
+            /* todo: finish it */
+            case OP_CJUMPT:
+            case OP_CJUMPF: {
+                deps[0] = quad->arg1;
+                break;
+            }
+            /* Unary operators + OP_COPY,OP_DEREF */
+            case OP_COPY:
+            case OP_CAST:
+            case OP_PLUS:
+            case OP_MINUS:
+            case OP_DEREF:
+            case OP_BW_NOT: {
+                deps[0] = quad->arg1; 
+                break;
+            }
+            /* Binary operators */
+            case OP_ADD: 
+            case OP_SUB:
+            case OP_MUL: 
+            case OP_DIV:
+            case OP_MOD: 
+            case OP_SHR:
+            case OP_SHL:
+            case OP_BW_OR:
+            case OP_BW_AND:
+            case OP_BW_XOR: {
+                deps[0] = quad->arg1;
+                deps[1] = quad->arg2;
+                break;
+            }
+            default: break;
         }
-        if (nnc_3a_unary_op(quad->op) || quad->op == OP_DEREF) {
-            if (quad->arg1.kind == ADDR_CGT) {
-                cgts[0] = quad->arg1.exact.cgt;
-            }
-        }
-        if (nnc_3a_binary_op(quad->op)) {
-            if (quad->arg1.kind == ADDR_CGT) {
-                cgts[0] = quad->arg1.exact.cgt;
-            }
-            if (quad->arg2.kind == ADDR_CGT) {
-                cgts[1] = quad->arg2.exact.cgt;
-            }
-        }
-        for (nnc_i32 j = 0; j < 2; j++) {
-            if (cgts[j] != 0 && map_has(unused, cgts[j])) {
-                map_pop(unused, cgts[j]);
+        for (nnc_i32 j = 0; j < sizeof(deps)/sizeof(nnc_3a_addr); j++) {
+            if (deps[j].kind == ADDR_CGT) {
+                nnc_3a_cgt cgt = deps[j].exact.cgt;
+                if (map_has(unused, cgt)) {
+                    map_pop(unused, cgt);
+                }
             }
         }
     }
-    nnc_map_bucket* bucks = unused->buckets;
-    for (nnc_u64 i = 0; i < unused->cap; i++) {
-        if (!bucks[i].has_key) {
-            continue;
-        }
-        nnc_map_bucket* buck = &bucks[i];
-        for (; buck != NULL; buck = buck->next) {
-            assert(buck->val != NULL);
-            nnc_3a_quad* unused_quad = buck->val;
-            unused_quad->op = OP_NONE;
-        }
-    }
+    /*
+        If CGT is left in `unused` map
+        after filtering, set their quads
+        as OP_NONE, and remove from resulting list.
+    */
+    nnc_map_iter(unused, nnc_3a_unused_cgts_iter);
     _vec_(nnc_3a_quad) used = NULL;
     for (nnc_u64 i = 0; i < size; i++) {
         if (opt[i].op != OP_NONE || opt[i].label != 0) {
