@@ -167,8 +167,12 @@ nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     const char* ident_name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
+    const nnc_type* type = ident->type;
+    if (op == OP_REF) {
+        type = nnc_ptr_type_new(type);
+    }
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        op, nnc_3a_mkcgt(), ident->type, arg
+        op, nnc_3a_mkcgt(), type, arg
     );
     nnc_3a_quads_add(&quad);
 }
@@ -339,9 +343,9 @@ nnc_static void nnc_deref_to_3a(const nnc_unary_expression* unary, const nnc_st*
 }
 
 nnc_static void nnc_sizeof_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_u64 size = unary->exact.size.of->type->size;
+    const nnc_type* type = nnc_unalias(unary->exact.size.of->type);
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_COPY, nnc_3a_mkcgt(), unary->type, nnc_3a_mki2(size, unary->type)
+        OP_COPY, nnc_3a_mkcgt(), unary->type, nnc_3a_mki2(type->size, unary->type)
     );
     nnc_3a_quads_add(&quad);
 }

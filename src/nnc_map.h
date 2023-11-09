@@ -30,6 +30,8 @@ typedef nnc_u64 nnc_map_idx;
 typedef nnc_u64 nnc_map_key;
 typedef nnc_u64 nnc_map_hash;
 
+typedef void (map_iter_fn)(nnc_map_key, nnc_map_val);
+
 typedef struct _nnc_map_bucket {
     nnc_bool has_key;
     nnc_map_key key;
@@ -50,6 +52,7 @@ nnc_map* nncmap_init(nnc_u64 inicap);
 nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key);
 void nncmap_pop(nnc_map* map, nnc_map_key key);
 void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val);
+void nnc_map_iter(nnc_map* map, map_iter_fn* iter);
 nnc_bool nncmap_has(nnc_map* map, nnc_map_key key);
 void nncmap_fini(nnc_map* map);
 
