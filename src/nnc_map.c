@@ -215,6 +215,25 @@ void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val) {
 }
 
 /**
+ * @brief Iterates through map and calls callback function on each bucket.
+ * @param map Pointer to map instance.
+ * @param iter Callback function called each time when bucket met.
+ */
+void nnc_map_iter(nnc_map* map, map_iter_fn* iter) {
+    nnc_map_bucket* bucks = map->buckets;
+    for (nnc_u64 i = 0; i < map->cap; i++) {
+        if (!bucks[i].has_key) {
+            continue;
+        }
+        nnc_map_bucket* buck = &bucks[i];
+        for (; buck != NULL; buck = buck->next) {
+            assert(buck->val != NULL);
+            iter(buck->key, buck->val);
+        }
+    }
+}
+
+/**
  * @brief Determines if value by key is stored in map.
  * @param map Pointer to map instance.
  * @param key Key with which to check.
