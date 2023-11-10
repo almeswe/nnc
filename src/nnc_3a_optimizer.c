@@ -1,6 +1,7 @@
 #include "nnc_3a.h"
 
 #define _NNC_ENABLE_PASS_LOGGING 0
+#define NNC_POW_OF_TWO(x) ((x != 0) && ((x & (x-1)) == 0))
 
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
@@ -8,13 +9,24 @@ nnc_static _vec_(nnc_3a_quad) unopt = NULL;
 extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
 
 typedef enum _nnc_3a_peep_pattern {
+    /* Redundant cross operator optimizations */
+    OPT_CROSS_REF,
     OPT_CROSS_COPY,
     OPT_CROSS_COPY3,
-    OPT_CROSS_REF,
+
+    /* Contant folding optimizations */
+    OPT_INDEX_CONST_FOLD,
     OPT_UNARY_CONST_FOLD,
     OPT_BINARY_CONST_FOLD,
-    OPT_INDEX_CONST_FOLD,
-    OPT_NONE
+
+    /* Algebraic optimizations */
+    OPT_ALG_MUL_ONE,
+    OPT_ALG_MUL_ZERO,
+    OPT_ALG_ADD_ZERO,
+    OPT_ALG_MUL_POW_TWO,
+
+    /* Other optimizations */
+    OPT_NONE,
 } nnc_3a_peep_pattern;
 
 nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
@@ -229,13 +241,100 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part4(nnc_u64 index) {
     return OPT_NONE;
 }
 
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part5(nnc_u64 index) {
+    /*
+    This optimization targets redundant algebraic operations.
+    Pattern's Trigger:
+        tX = 0  ||                (OP_COPY)
+        tX = x                    (OP_COPY)
+
+    Following part:
+        tY = tX binOp 0 ||        (Binary operator: *, +)
+        tY = 0 binOp tX 
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    const nnc_3a_quad* quad3 = NULL;
+    if (index + 2 < buf_len(unopt)) {
+        quad3 = &unopt[index+2];
+    }
+    if (quad3 == NULL) {
+        return OPT_NONE;
+    }
+    if (quad1->arg1.kind == ADDR_ICONST ||
+        quad2->arg1.kind == ADDR_ICONST) {
+        switch (quad3->op) {
+            case OP_ADD:
+            case OP_MUL: {
+                if (quad1->arg1.exact.iconst.iconst == 0 ||
+                    quad2->arg1.exact.iconst.iconst == 0) {
+                    if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
+                        (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
+                        return quad3->op == OP_MUL ? 
+                            OPT_ALG_MUL_ZERO : OPT_ALG_ADD_ZERO;
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
+    /*
+    This optimization targets redundant algebraic operations.
+    Pattern's Trigger:
+        tX = 1  ||                (OP_COPY)
+        tX = 2^n                  (OP_COPY)
+        tX = x                    (OP_COPY)
+
+    Following part:
+        tY = tX * 1   ||          (Binary operator: *)
+        tY = 1 * tX   ||          (Binary operator: *)
+        tY = 2^n * tX ||          (Binary operator: *)
+        tY = tX * 2^n ||          (Binary operator: *)
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    const nnc_3a_quad* quad3 = NULL;
+    if (index + 2 < buf_len(unopt)) {
+        quad3 = &unopt[index+2];
+    }
+    if (quad3 == NULL) {
+        return OPT_NONE;
+    }
+    if (quad3->op == OP_MUL &&
+       (quad1->arg1.kind == ADDR_ICONST ||
+        quad2->arg1.kind == ADDR_ICONST)) {
+        if (quad1->arg1.exact.iconst.iconst == 1 ||
+            quad2->arg1.exact.iconst.iconst == 1) {
+            if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
+                (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
+                return OPT_ALG_MUL_ONE;
+            }
+        }
+        if (NNC_POW_OF_TWO(quad1->arg1.exact.iconst.iconst) ||
+            NNC_POW_OF_TWO(quad2->arg1.exact.iconst.iconst)) {
+            if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
+                (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
+                return OPT_ALG_MUL_POW_TWO;
+            }
+        }
+    }
+    return OPT_NONE;
+}
+
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     typedef nnc_3a_peep_pattern (pat_fn)(nnc_u64);
     static pat_fn* pat_fns[] = {
         nnc_3a_op_copy_pat_part1,
         nnc_3a_op_copy_pat_part2,
         nnc_3a_op_copy_pat_part3,
-        nnc_3a_op_copy_pat_part4
+        nnc_3a_op_copy_pat_part4,
+        nnc_3a_op_copy_pat_part5,
+        nnc_3a_op_copy_pat_part6,
     };
     if (index >= buf_len(unopt)) {
         return OPT_NONE;
@@ -425,7 +524,7 @@ nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
     /*
         tX = const1
         tZ = tX binOp const2
-        ----------------
+        --------------------
         tZ = const3
     */
     const nnc_3a_quad* quad1 = &unopt[index];
@@ -445,10 +544,12 @@ nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
 }
 
 nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_ref(nnc_u64 index) {
-    //  tX = &x
-    // *tX = Y
-    // -------
-    // x = Y
+    /*
+        tX = &x
+        *tX = Y
+        --------
+        x = Y
+    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_3a_quad opt_quad = {
@@ -459,10 +560,12 @@ nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_ref(nnc_u64 index) {
 }
 
 nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy(nnc_u64 index) {
-    // tX = x
-    // tY = tX
-    // -------
-    // tY = x
+    /*
+        tX = x
+        tY = tX
+        -------
+        tY = x
+    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_3a_quad opt_quad = *quad2;
@@ -472,12 +575,14 @@ nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy(nnc_u64 index) {
 }
 
 nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy3(nnc_u64 index) {
-    // tX = x
-    // tY = tX
-    // tZ = tX
-    // -------
-    // tY = x
-    // tZ = x
+    /*
+        tX = x
+        tY = tX
+        tZ = tX
+        -------
+        tY = x
+        tZ = x
+    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_3a_quad* quad3 = &unopt[index+2];
@@ -490,15 +595,90 @@ nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy3(nnc_u64 index) {
     return 2;
 }
 
+nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) {
+    /*
+    1) OPT_ALG_MUL_ZERO
+        tX = x (or 0)
+        tY = 0 (or x)
+        tZ = tX * tY
+        -------------
+        tZ = 0
+
+    2) OPT_ALG_ADD_ZERO
+        tX = x (or 0)
+        tY = 0 (or x)
+        tZ = tX + tY
+        -------------
+        tZ = tX (or tY)
+
+    3) OPT_ALG_MUL_ONE
+        tX = x (or 1)
+        tY = 1 (or x)
+        tZ = tX * tY
+        -------------
+        tZ = tX (or tY)
+
+    4) OPT_ALG_MUL_POW_TWO
+        tX = x (or 2^n)
+        tY = 2^n (or x)
+        tZ = tX * tY
+        -------------
+        tZ = tX (or tY) << n
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1]; 
+    const nnc_3a_quad* quad3 = &unopt[index+2];
+    nnc_3a_quad opt_quad = (nnc_3a_quad){
+        .op = OP_COPY, .res = quad3->res
+    };
+    nnc_3a_addr opt_const_arg = quad2->arg1;
+    nnc_3a_addr opt_non_const_arg = quad1->arg1;
+    if (quad1->arg1.kind == ADDR_ICONST) {
+        opt_const_arg = quad1->arg1; 
+        opt_non_const_arg = quad2->arg1;
+    } 
+    switch (pat) {
+        case OPT_ALG_MUL_ONE:
+        case OPT_ALG_ADD_ZERO: {
+            opt_quad.arg1 = opt_non_const_arg;
+            break;
+        }
+        case OPT_ALG_MUL_ZERO: {
+            opt_quad.arg1 = nnc_3a_mki3(0); 
+            break;
+        }
+        case OPT_ALG_MUL_POW_TWO: {
+            nnc_i32 pow = 0;
+            nnc_u64 val = opt_const_arg.exact.iconst.iconst;
+            for (; val != 0; pow++) {
+                val /= 2;
+            }
+            opt_quad.op = OP_SHL;
+            opt_quad.arg1 = opt_non_const_arg;
+            opt_quad.arg2 = nnc_3a_mki3(pow-1);
+            break;
+        }
+        default: nnc_abort_no_ctx("nnc_3a_opt_red_alg: unknown search pattern."); 
+    }
+    buf_add(opt, opt_quad);
+    return 3;
+}
+
 nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
-    switch (nnc_3a_search_peep_pattern(index)) {
+    nnc_3a_peep_pattern pat = nnc_3a_search_peep_pattern(index);
+    switch (pat) {
         case OPT_NONE:                 return nnc_3a_opt_none(index);
         case OPT_UNARY_CONST_FOLD:     return nnc_3a_opt_unary_const_fold(index);
         case OPT_BINARY_CONST_FOLD:    return nnc_3a_opt_binary_const_fold(index);
         case OPT_INDEX_CONST_FOLD:     return nnc_3a_opt_index_const_fold(index);
-        case OPT_CROSS_REF:   return nnc_3a_opt_red_cross_temp_ref(index);
-        case OPT_CROSS_COPY:  return nnc_3a_opt_red_cross_temp_copy(index);
-        case OPT_CROSS_COPY3: return nnc_3a_opt_red_cross_temp_copy3(index);
+        case OPT_CROSS_REF:            return nnc_3a_opt_red_cross_temp_ref(index);
+        case OPT_CROSS_COPY:           return nnc_3a_opt_red_cross_temp_copy(index);
+        case OPT_CROSS_COPY3:          return nnc_3a_opt_red_cross_temp_copy3(index);
+        case OPT_ALG_MUL_ONE:
+        case OPT_ALG_ADD_ZERO:
+        case OPT_ALG_MUL_ZERO:         
+        case OPT_ALG_MUL_POW_TWO:  
+            return nnc_3a_opt_algebraic(index, pat);
         default: nnc_abort_no_ctx("nnc_3a_optimize_peep: unknown search pattern."); 
     }
     return 1;
