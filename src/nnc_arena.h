@@ -9,6 +9,7 @@
 
 #define nnc_max(a, b) ((a) >= (b) ? (a) : (b))
 #define nnc_min(a, b) ((a) <= (b) ? (a) : (b))
+#define nnc_pow2(x) ((x != 0) && ((x & (x-1)) == 0))
 
 typedef struct _nnc_arena_entry {
     nnc_u64 bytes;
