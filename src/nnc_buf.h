@@ -29,6 +29,7 @@ typedef struct _nnc_buf {
 #define buf_len(buf) 		((buf) ? nncbuf__len(buf) : 0)
 #define buf_cap(buf) 		((buf) ? nncbuf__cap(buf) : 0)
 #define buf_add(buf, item) 	(nncbuf__fits(buf), (buf)[nncbuf__len(buf)++] = (item))
+#define buf_pop(buf)        ((buf) ? (nncbuf__len(buf)--) : 0)
 #define buf_free(buf) 		((buf) ? nnc_dispose(nncbuf__hdr(buf)) : (void)0)
 
 void* nncbuf_grow(void* buf, nnc_u64 type, nnc_u16 inicap);
