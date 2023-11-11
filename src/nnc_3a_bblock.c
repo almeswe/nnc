@@ -39,7 +39,7 @@ nnc_3a_bblock* nnc_3a_basic_blocks(const nnc_3a_quad_set* set) {
             }
             buf_add(block->quads, *quad);
     }
-    if (buf_len(block->quads) != 0) {
+    if (block != NULL && buf_len(block->quads) != 0) {
         //assert(buf_len(block->quads) == 0);
         buf_add(blocks, *block);
     }

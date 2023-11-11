@@ -1,33 +1,7 @@
-#include "nnc_3a.h"
-
-#define _NNC_ENABLE_PASS_LOGGING 0
-#define NNC_POW_OF_TWO(x) ((x != 0) && ((x & (x-1)) == 0))
+#include "nnc_3a_optimizer.h"
 
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
-
-extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
-
-typedef enum _nnc_3a_peep_pattern {
-    /* Redundant cross operator optimizations */
-    OPT_CROSS_REF,
-    OPT_CROSS_COPY,
-    OPT_CROSS_COPY3,
-
-    /* Contant folding optimizations */
-    OPT_INDEX_CONST_FOLD,
-    OPT_UNARY_CONST_FOLD,
-    OPT_BINARY_CONST_FOLD,
-
-    /* Algebraic optimizations */
-    OPT_ALG_MUL_ONE,
-    OPT_ALG_MUL_ZERO,
-    OPT_ALG_ADD_ZERO,
-    OPT_ALG_MUL_POW_TWO,
-
-    /* Other optimizations */
-    OPT_NONE,
-} nnc_3a_peep_pattern;
 
 nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
     /*
@@ -60,10 +34,12 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
         tX = x                   (OP_COPY)
 
     Following part:    
-        tY = tX         ||   [1] (OP_COPY)
-       *tY = tX         ||   [2] (OP_DEREF_COPY)
-        if tX goto L    ||   [3] (OP_CJUMPT)
-        if not tX goto L     [4] (OP_CJUMPF)
+        tY = tX          ||   [1] (OP_COPY)
+       *tY = tX          ||   [2] (OP_DEREF_COPY)
+        if tX goto L     ||   [3] (OP_CJUMPT)
+        if not tX goto L ||   [4] (OP_CJUMPF)
+        arg tX           ||   [5] (OP_ARG)
+        ret tX           ||   [6] (OP_RETF)
 
     Variable part (for cases [1] or [2])
         tZ = tX || (?)           (OP_COPY)
@@ -103,6 +79,8 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
                     }
                 }
             }
+            case OP_ARG:
+            case OP_RETF:
             case OP_CJUMPT:
             case OP_CJUMPF: {
                 /*
@@ -315,8 +293,8 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
                 return OPT_ALG_MUL_ONE;
             }
         }
-        if (NNC_POW_OF_TWO(quad1->arg1.exact.iconst.iconst) ||
-            NNC_POW_OF_TWO(quad2->arg1.exact.iconst.iconst)) {
+        if (nnc_pow2(quad1->arg1.exact.iconst.iconst) ||
+            nnc_pow2(quad2->arg1.exact.iconst.iconst)) {
             if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
                 (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
                 return OPT_ALG_MUL_POW_TWO;
@@ -350,19 +328,56 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     return OPT_NONE;
 }
 
-nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
-    switch (unopt[index].op) {
-        case OP_REF:  return nnc_3a_ref_pattern(index);
-        case OP_COPY: return nnc_3a_op_copy_pat(index);
-        default: break;
-    }
-    return OPT_NONE;
+nnc_static nnc_u64 nnc_3a_opt_cross_ref(nnc_u64 index) {
+    /*
+        tX = &x
+        *tX = Y
+        --------
+        x = Y
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    nnc_3a_quad opt_quad = {
+        .op = OP_COPY, .res = quad1->arg1, .arg1 = quad2->arg1
+    };
+    buf_add(opt, opt_quad);
+    return 2;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_none(nnc_u64 index) {
-    const nnc_3a_quad* quad = &unopt[index];
-    buf_add(opt, *quad);
-    return 1;
+nnc_static nnc_u64 nnc_3a_opt_cross_copy(nnc_u64 index) {
+    /*
+        tX = x
+        tY = tX
+        -------
+        tY = x
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    nnc_3a_quad opt_quad = *quad2;
+    opt_quad.arg1 = quad1->arg1;
+    buf_add(opt, opt_quad);
+    return 2;
+}
+
+nnc_static nnc_u64 nnc_3a_opt_cross_copy3(nnc_u64 index) {
+    /*
+        tX = x
+        tY = tX
+        tZ = tX
+        -------
+        tY = x
+        tZ = x
+    */
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    nnc_3a_quad* quad3 = &unopt[index+2];
+    nnc_3a_quad opt_quad2 = *quad2;
+    opt_quad2.arg1 = quad1->arg1;
+    nnc_3a_quad opt_quad3 = *quad3;
+    opt_quad3.arg1 = quad1->arg1;
+    buf_add(opt, opt_quad2);
+    *quad3 = opt_quad3;
+    return 2;
 }
 
 nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
@@ -543,58 +558,6 @@ nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
     return 2;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_ref(nnc_u64 index) {
-    /*
-        tX = &x
-        *tX = Y
-        --------
-        x = Y
-    */
-    const nnc_3a_quad* quad1 = &unopt[index];
-    const nnc_3a_quad* quad2 = &unopt[index+1];
-    nnc_3a_quad opt_quad = {
-        .op = OP_COPY, .res = quad1->arg1, .arg1 = quad2->arg1
-    };
-    buf_add(opt, opt_quad);
-    return 2;
-}
-
-nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy(nnc_u64 index) {
-    /*
-        tX = x
-        tY = tX
-        -------
-        tY = x
-    */
-    const nnc_3a_quad* quad1 = &unopt[index];
-    const nnc_3a_quad* quad2 = &unopt[index+1];
-    nnc_3a_quad opt_quad = *quad2;
-    opt_quad.arg1 = quad1->arg1;
-    buf_add(opt, opt_quad);
-    return 2;
-}
-
-nnc_static nnc_u64 nnc_3a_opt_red_cross_temp_copy3(nnc_u64 index) {
-    /*
-        tX = x
-        tY = tX
-        tZ = tX
-        -------
-        tY = x
-        tZ = x
-    */
-    const nnc_3a_quad* quad1 = &unopt[index];
-    const nnc_3a_quad* quad2 = &unopt[index+1];
-    nnc_3a_quad* quad3 = &unopt[index+2];
-    nnc_3a_quad opt_quad2 = *quad2;
-    opt_quad2.arg1 = quad1->arg1;
-    nnc_3a_quad opt_quad3 = *quad3;
-    opt_quad3.arg1 = quad1->arg1;
-    buf_add(opt, opt_quad2);
-    *quad3 = opt_quad3;
-    return 2;
-}
-
 nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) {
     /*
     1) OPT_ALG_MUL_ZERO
@@ -664,21 +627,39 @@ nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) 
     return 3;
 }
 
+nnc_static nnc_u64 nnc_3a_opt_none(nnc_u64 index) {
+    const nnc_3a_quad* quad = &unopt[index];
+    buf_add(opt, *quad);
+    return 1;
+}
+
+nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
+    switch (unopt[index].op) {
+        case OP_REF:  return nnc_3a_ref_pattern(index);
+        case OP_COPY: return nnc_3a_op_copy_pat(index);
+        default: break;
+    }
+    return OPT_NONE;
+}
+
 nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     nnc_3a_peep_pattern pat = nnc_3a_search_peep_pattern(index);
     switch (pat) {
-        case OPT_NONE:                 return nnc_3a_opt_none(index);
+        /* Redundant cross operator optimizations */
+        case OPT_CROSS_REF:            return nnc_3a_opt_cross_ref(index);
+        case OPT_CROSS_COPY:           return nnc_3a_opt_cross_copy(index);
+        case OPT_CROSS_COPY3:          return nnc_3a_opt_cross_copy3(index);
+        /* Constant folding optimizations */
         case OPT_UNARY_CONST_FOLD:     return nnc_3a_opt_unary_const_fold(index);
         case OPT_BINARY_CONST_FOLD:    return nnc_3a_opt_binary_const_fold(index);
         case OPT_INDEX_CONST_FOLD:     return nnc_3a_opt_index_const_fold(index);
-        case OPT_CROSS_REF:            return nnc_3a_opt_red_cross_temp_ref(index);
-        case OPT_CROSS_COPY:           return nnc_3a_opt_red_cross_temp_copy(index);
-        case OPT_CROSS_COPY3:          return nnc_3a_opt_red_cross_temp_copy3(index);
-        case OPT_ALG_MUL_ONE:
-        case OPT_ALG_ADD_ZERO:
-        case OPT_ALG_MUL_ZERO:         
-        case OPT_ALG_MUL_POW_TWO:  
-            return nnc_3a_opt_algebraic(index, pat);
+        /* Algebraic optimizations */
+        case OPT_ALG_MUL_ONE:          return nnc_3a_opt_algebraic(index, pat);
+        case OPT_ALG_ADD_ZERO:         return nnc_3a_opt_algebraic(index, pat);
+        case OPT_ALG_MUL_ZERO:         return nnc_3a_opt_algebraic(index, pat);
+        case OPT_ALG_MUL_POW_TWO:      return nnc_3a_opt_algebraic(index, pat);
+        /* No optimization */
+        case OPT_NONE:                 return nnc_3a_opt_none(index);
         default: nnc_abort_no_ctx("nnc_3a_optimize_peep: unknown search pattern."); 
     }
     return 1;
@@ -689,7 +670,7 @@ nnc_static void nnc_3a_unused_cgts_iter(nnc_map_key key, nnc_map_val val) {
     unused_quad->op = OP_NONE;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
+nnc_static nnc_u64 nnc_3a_clean_cgts() {
     nnc_u64 size = buf_len(opt);
     _map_(nnc_i32, nnc_3a_quad*) unused = map_init_with(size);
     for (nnc_u64 i = 0; i < size; i++) {
@@ -714,7 +695,11 @@ nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
         switch (quad->op) {
             /* Ignored operators */
             case OP_REF:
-            case OP_NONE: {
+            case OP_NONE:
+            case OP_RETP:
+            case OP_FCALL:
+            case OP_PCALL:
+            case OP_UJUMP: {
                 break;
             }
             /* Other operators */
@@ -724,13 +709,24 @@ nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
                 break;
             }
             /* Jump operators */
-            /* todo: finish it */
             case OP_CJUMPT:
             case OP_CJUMPF: {
                 deps[0] = quad->arg1;
                 break;
             }
-            /* Unary operators + OP_COPY,OP_DEREF */
+            case OP_CJUMPE:
+            case OP_CJUMPNE:
+            case OP_CJUMPGT:
+            case OP_CJUMPLT:
+            case OP_CJUMPGTE:
+            case OP_CJUMPLTE: {
+                deps[0] = quad->arg1;
+                deps[1] = quad->arg2;
+                break;
+            }
+            /* Unary operators + OP_COPY, OP_DEREF, OP_ARG, OP_RETF */
+            case OP_ARG:
+            case OP_RETF:
             case OP_COPY:
             case OP_CAST:
             case OP_PLUS:
@@ -778,7 +774,7 @@ nnc_static nnc_u64 nnc_3a_opt_dead_cgts() {
             buf_add(used, opt[i]);
         }
     }
-    nnc_dispose(opt);
+    buf_free(opt);
     opt = used;
     map_fini(unused);
     return size - buf_len(used);
@@ -802,7 +798,7 @@ nnc_static void nnc_3a_show_pass(nnc_i32 pass, nnc_3a_quad* quads) {
 }
 
 _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat) {
-    opt = NULL;
+    opt = NULL, unopt = NULL;
     nnc_i32 pass = 0;
     nnc_u64 reduced = 0;
     nnc_u64 len = buf_len(quads);
@@ -822,7 +818,7 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
     if (unopt != NULL) {
         buf_free(unopt);
     }
-    reduced += nnc_3a_opt_dead_cgts();
+    reduced += nnc_3a_clean_cgts();
     if (stat != NULL) {
         *stat = (nnc_3a_opt_stat) {
             .passes = pass,
@@ -831,4 +827,26 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
         };
     }
     return opt;
+}
+
+nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code) {
+    for (nnc_u64 i = 0; i < buf_len(code); i++) {
+        nnc_3a_opt_stat stat = {0};
+        #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
+        code[i].quads = nnc_3a_optimize(code[i].quads, &stat);
+        code[i].stat = stat;
+        #endif
+        code[i].blocks = nnc_3a_basic_blocks(&code[i]);
+    }
+    return code;
+}
+
+nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data) {
+    nnc_3a_opt_stat stat = {0};
+    #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
+    data.quads = nnc_3a_optimize(data.quads, &stat);
+    data.stat = stat;
+    #endif
+    data.blocks = nnc_3a_basic_blocks(&data);
+    return data;
 }

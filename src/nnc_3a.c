@@ -167,7 +167,7 @@ nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     const char* ident_name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
-    const nnc_type* type = ident->type;
+    nnc_type* type = ident->type;
     if (op == OP_REF) {
         type = nnc_ptr_type_new(type);
     }
@@ -373,9 +373,10 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
         nnc_expr_to_3a(call->args[i], st);
-        nnc_3a_quad quad = nnc_3a_mkquad(
-            OP_ARG, *nnc_3a_quads_res()
-        );
+        nnc_3a_addr arg = *nnc_3a_quads_res();
+        nnc_3a_quad quad = {
+            .op = OP_ARG, .res.type = arg.type, .arg1 = arg 
+        };
         nnc_3a_quads_add(&quad);
     }
     nnc_3a_quad quad = nnc_3a_mkquad(
@@ -664,11 +665,11 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
     nnc_3a_quad_set set = {
-        .stat = (nnc_3a_opt_stat){0},
+        //.stat = (nnc_3a_opt_stat){0},
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
     };
-    set.quads = nnc_3a_optimize(set.quads, &set.stat);
+    //set.quads = nnc_3a_optimize(set.quads, &set.stat);
     //set.blocks = nnc_3a_basic_blocks(&set);
     quads = NULL;
     buf_add(code, set);
@@ -806,9 +807,9 @@ nnc_static void nnc_return_stmt_to_3a(const nnc_return_statement* return_stmt, c
     if (op == OP_RETF) {
         arg = *nnc_3a_quads_res();
     }
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        op, arg
-    );
+    nnc_3a_quad quad = {
+        .op = op, .res.type = arg.type, .arg1 = arg
+    };
     nnc_3a_quads_add(&quad);
 }
 
