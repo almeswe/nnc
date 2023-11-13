@@ -1,12 +1,31 @@
 #ifndef _NNC_THREE_ADDRESS_CODE_H
 #define _NNC_THREE_ADDRESS_CODE_H
 
-#include "nnc_symtable.h"
-#include "nnc_expression.h"
+#define _NNC_ENABLE_PASS_LOGGING 0
+#define _NNC_ENABLE_PEEP_OPTIMIZATIONS 1
+
 #include "nnc_typecheck.h"
 
 typedef nnc_u64 nnc_3a_cgt_cnt;
 typedef nnc_u32 nnc_3a_label_cnt;
+
+typedef enum _nnc_3a_peep_pattern {
+    /* Redundant cross operator optimizations */
+    OPT_CROSS_REF,
+    OPT_CROSS_COPY,
+    OPT_CROSS_COPY3,
+    /* Contant folding optimizations */
+    OPT_INDEX_CONST_FOLD,
+    OPT_UNARY_CONST_FOLD,
+    OPT_BINARY_CONST_FOLD,
+    /* Algebraic optimizations */
+    OPT_ALG_MUL_ONE,
+    OPT_ALG_MUL_ZERO,
+    OPT_ALG_ADD_ZERO,
+    OPT_ALG_MUL_POW_TWO,
+    /* No optimization */
+    OPT_NONE,
+} nnc_3a_peep_pattern;
 
 typedef enum _nnc_3a_op_kind {
     /* ***************** */
@@ -163,21 +182,35 @@ typedef struct _nnc_3a_quad {
     nnc_3a_addr arg2;
 } nnc_3a_quad;
 
-typedef struct _nnc_3a_basic {
-    nnc_u32 id;
-    nnc_3a_quad* quads;
-} nnc_3a_bblock;
-
 typedef struct _nnc_3a_opt_stat {
     nnc_i32 passes;
     nnc_u64 reduced;
     nnc_i32 percent;
 } nnc_3a_opt_stat;
 
+#define nnc_3a_mkblock(x) (nnc_3a_basic){\
+    .id = x, .quads = NULL               \
+}
+
+typedef struct _nnc_3a_basic {
+    nnc_u32 id;
+    nnc_3a_quad* quads;
+} nnc_3a_basic;
+
+typedef struct _nnc_3a_cfg_node {
+    nnc_u32 id: 30;
+    nnc_bool unreachable: 1;
+    nnc_bool conditioned: 1;
+    const nnc_3a_basic* block;
+    struct _nnc_3a_cfg_node* next;
+} nnc_3a_cfg_node;
+
+typedef nnc_3a_cfg_node nnc_3a_cfg;
+
 typedef struct _nnc_3a_quad_set {
     const char* name;
     nnc_3a_quad* quads;
-    nnc_3a_bblock* blocks;
+    nnc_3a_basic* blocks;
     nnc_3a_opt_stat stat;
 } nnc_3a_quad_set;
 
@@ -194,6 +227,12 @@ void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st);
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code);
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data);
 
-nnc_3a_bblock* nnc_3a_basic_blocks(const nnc_3a_quad_set* set);
+_vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat);
+nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code);
+nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data);
+
+nnc_3a_cfg nnc_3a_get_cfg(const _vec_(nnc_3a_basic) blocks);
+nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg);
+_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set);
 
 #endif

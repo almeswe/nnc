@@ -209,9 +209,11 @@ nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
-    if (quad->label > 0) {
+    if (quad->label != 0) {
         dump_3a(" @%u:\n", quad->label);
-        return;
+        if (quad->op == OP_NONE) {
+            return;
+        } 
     }
     nnc_dump_3a_quad_type(quad);
     switch (quad->op) {
@@ -257,14 +259,14 @@ void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads) {
 
 void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set) {
     stream = to;
-    dump_3a("@_%s: (%lu=%d%% after %d passes)\n", set->name,
+    dump_3a("\n@_%s: (%lu=%d%% after %d passes)\n", set->name,
         set->stat.reduced, set->stat.percent, set->stat.passes);
     //dump_3a("@_%s:\n", set->name);
-    nnc_dump_3a_quads(to, set->quads);
-    //for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
-    //    dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
-    //    nnc_dump_3a_quads(to, set->blocks[i].quads);
-    //}
+    //nnc_dump_3a_quads(to, set->quads);
+    for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
+        dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
+        nnc_dump_3a_quads(to, set->blocks[i].quads);
+    }
 }
 
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {

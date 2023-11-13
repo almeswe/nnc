@@ -1,7 +1,9 @@
-#include "nnc_3a_optimizer.h"
+#include "nnc_3a.h"
 
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
+
+extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
 
 nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
     /*
@@ -780,6 +782,24 @@ nnc_static nnc_u64 nnc_3a_clean_cgts() {
     return size - buf_len(used);
 }
 
+nnc_static nnc_u64 nnc_3a_merge_labels() {
+    nnc_u64 size = buf_len(opt);
+    _vec_(nnc_3a_quad) merged = NULL;
+    for (nnc_u64 i = 0; i < size; i++) {
+        const nnc_3a_quad* quad = &opt[i];
+        if (quad->op == OP_NONE && quad->label != 0) {
+            if (i+1 < size && opt[i+1].label == 0) {
+                opt[i+1].label = quad->label;
+                continue;
+            }
+        }
+        buf_add(merged, *quad);
+    }
+    buf_free(opt);
+    opt = merged;
+    return size - buf_len(merged);
+}
+
 nnc_static nnc_u64 nnc_3a_optimization_pass() {
     nnc_u64 i = 0;
     nnc_u64 len = buf_len(unopt);
@@ -819,6 +839,7 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
         buf_free(unopt);
     }
     reduced += nnc_3a_clean_cgts();
+    reduced += nnc_3a_merge_labels();
     if (stat != NULL) {
         *stat = (nnc_3a_opt_stat) {
             .passes = pass,
@@ -836,7 +857,7 @@ nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code) {
         code[i].quads = nnc_3a_optimize(code[i].quads, &stat);
         code[i].stat = stat;
         #endif
-        code[i].blocks = nnc_3a_basic_blocks(&code[i]);
+        code[i].blocks = nnc_3a_get_blocks(&code[i]);
     }
     return code;
 }
@@ -847,6 +868,6 @@ nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data) {
     data.quads = nnc_3a_optimize(data.quads, &stat);
     data.stat = stat;
     #endif
-    data.blocks = nnc_3a_basic_blocks(&data);
+    data.blocks = nnc_3a_get_blocks(&data);
     return data;
 }
