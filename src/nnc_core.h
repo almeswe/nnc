@@ -16,6 +16,5 @@
 #include "nnc_try_catch.h"
 
 #include "nnc_3a.h"
-#include "nnc_3a_optimizer.h"
 
 #endif
