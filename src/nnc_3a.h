@@ -197,20 +197,27 @@ typedef struct _nnc_3a_basic {
     nnc_3a_quad* quads;
 } nnc_3a_basic;
 
+#define nnc_3a_node_label(x) x->block->quads[0].label
+#define nnc_3a_jump_label(x) (nnc_u32)x->res.exact.iconst.iconst
+
 typedef struct _nnc_3a_cfg_node {
     nnc_u32 id: 30;
+    nnc_bool labeled: 1;
     nnc_bool unreachable: 1;
-    nnc_bool conditioned: 1;
     const nnc_3a_basic* block;
     struct _nnc_3a_cfg_node* next;
+    struct _nnc_3a_cfg_node* jump;
 } nnc_3a_cfg_node;
 
-typedef nnc_3a_cfg_node nnc_3a_cfg;
+typedef struct _nnc_3a_cfg {
+    nnc_3a_cfg_node* root;
+    _vec_(nnc_3a_cfg_node*) nodes;
+} nnc_3a_cfg;
 
 typedef struct _nnc_3a_quad_set {
     const char* name;
     nnc_3a_quad* quads;
-    nnc_3a_basic* blocks;
+    nnc_3a_cfg cfg;
     nnc_3a_opt_stat stat;
 } nnc_3a_quad_set;
 
@@ -226,13 +233,16 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st);
 void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st);
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code);
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data);
+void nnc_dump_3a_code_cfg(FILE* to, const nnc_3a_code code);
+void nnc_dump_3a_data_cfg(FILE* to, const nnc_3a_data data);
 
 _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat);
 nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code);
 nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data);
 
+_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set);
 nnc_3a_cfg nnc_3a_get_cfg(const _vec_(nnc_3a_basic) blocks);
 nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg);
-_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set);
+void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg);
 
 #endif

@@ -662,15 +662,36 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
     nnc_3a_quads_add(&b_next);
 }
 
+nnc_static _vec_(nnc_3a_quad) nnc_3a_zip_quads(_vec_(nnc_3a_quad) quads) {
+    nnc_u64 size = buf_len(quads);
+    _vec_(nnc_3a_quad) zipped = NULL;
+    for (nnc_u64 i = 0; i < size; i++) {
+        const nnc_3a_quad* quad = &quads[i];
+        if (quad->op == OP_NONE && quad->label != 0) {
+            if (i+1 < size && quads[i+1].label == 0) {
+                quads[i+1].label = quad->label;
+                continue;
+            }
+        }
+        buf_add(zipped, *quad);
+    }
+    buf_free(quads);
+    return zipped;
+}
+
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
     nnc_3a_quad_set set = {
-        //.stat = (nnc_3a_opt_stat){0},
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
     };
-    //set.quads = nnc_3a_optimize(set.quads, &set.stat);
-    //set.blocks = nnc_3a_basic_blocks(&set);
+    #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
+    set.quads = nnc_3a_optimize(set.quads, &set.stat);
+    #endif
+    set.quads = nnc_3a_zip_quads(set.quads);
+    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&set);
+    set.cfg = nnc_3a_get_cfg(blocks);
+    set.cfg = nnc_3a_cfg_optimize(set.cfg);
     quads = NULL;
     buf_add(code, set);
 }
