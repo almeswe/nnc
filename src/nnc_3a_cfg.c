@@ -51,3 +51,101 @@ _vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set) {
     }
     return blocks;
 }
+
+nnc_static nnc_3a_cfg_node* nnc_3a_mknode(const nnc_3a_basic* block) {
+    nnc_3a_cfg_node* node = anew(nnc_3a_cfg_node);
+    node->id = block->id;
+    node->block = block;
+    assert(buf_len(block->quads) > 0);
+    if (block->quads[0].label != 0) {
+        node->labeled = true;
+    }
+    return node;
+}
+
+nnc_static nnc_3a_cfg_node* nnc_3a_get_labeled_node(nnc_u32 label, _vec_(nnc_3a_cfg_node*) nodes) {
+    for (nnc_u64 i = 0; i < buf_len(nodes); i++) {
+        if (nnc_3a_node_label(nodes[i]) == label) {
+            return nodes[i];
+        }
+    }
+    assert(false);
+    return NULL;
+}
+
+nnc_static void nnc_3a_cfg_traverse_node(nnc_3a_cfg_node* node) {
+    if (!node->unreachable) {
+        return;
+    }
+    node->unreachable = false;
+    if (node->next != NULL) {
+        nnc_3a_cfg_traverse_node(node->next);
+    }
+    if (node->jump != NULL) {
+        nnc_3a_cfg_traverse_node(node->jump);
+    }
+}
+
+nnc_static nnc_3a_cfg* nnc_3a_cfg_traverse(nnc_3a_cfg* cfg) {
+    nnc_3a_cfg_traverse_node(cfg->root);
+    return cfg;
+}
+
+nnc_static nnc_3a_cfg* nnc_3a_cfg_restore(nnc_3a_cfg* cfg) {
+    cfg->root = NULL;
+    nnc_u64 cfg_nodes = buf_len(cfg->nodes);
+    if (cfg_nodes != 0) {
+        cfg->root = cfg->nodes[0];
+    }
+    for (nnc_u64 i = 0; i < cfg_nodes; i++) {
+        cfg->nodes[i]->unreachable = true;
+        cfg->nodes[i]->next = NULL;
+        cfg->nodes[i]->jump = NULL;
+        const nnc_3a_quad* last = NULL;
+        const nnc_3a_basic* block = cfg->nodes[i]->block;
+        nnc_bool last_node = i == cfg_nodes-1;
+        if (buf_len(block->quads) != 0) {
+            last = &buf_last(block->quads);
+        }
+        assert(last != NULL);
+        if (last->op == OP_RETF || last->op == OP_RETP) {
+            // `next` and `jump` pointers are already NULL
+            continue;
+        }
+        if (last->op == OP_UJUMP) {
+            // `next` pointer is already NULL
+            nnc_u32 target = nnc_3a_jump_label(last);
+            cfg->nodes[i]->jump = nnc_3a_get_labeled_node(target, cfg->nodes);
+            continue;
+        }
+        if (nnc_3a_jump_op(last->op)) {
+            cfg->nodes[i]->next = last_node ? NULL : cfg->nodes[i+1];
+            nnc_u32 target = nnc_3a_jump_label(last);
+            cfg->nodes[i]->jump = nnc_3a_get_labeled_node(target, cfg->nodes);
+            continue;
+        }
+        if (last->label != 0 && last->op == OP_NONE) {
+            // `jump` pointer is already NULL
+            cfg->nodes[i]->next = last_node ? NULL : cfg->nodes[i+1];
+            continue;
+        }
+    }
+    cfg = nnc_3a_cfg_traverse(cfg);
+    return cfg;
+}
+
+nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg) {
+    return cfg;
+}
+
+nnc_3a_cfg nnc_3a_get_cfg(const _vec_(nnc_3a_basic) blocks) {
+    nnc_3a_cfg cfg = {
+        .root = NULL,
+        .nodes = NULL
+    };
+    for (nnc_u64 i = 0; i < buf_len(blocks); i++) {
+        buf_add(cfg.nodes, nnc_3a_mknode(&blocks[i]));
+    }
+    nnc_3a_cfg_restore(&cfg);
+    return cfg;
+}

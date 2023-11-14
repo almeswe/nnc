@@ -63,7 +63,6 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
             nnc_print_used_mem();
         #endif
         data = nnc_3a_optimize_data(data);
-        code = nnc_3a_optimize_code(code);
         nnc_dump_3a_data(stderr, data);
         nnc_dump_3a_code(stderr, code);
         ETRY;

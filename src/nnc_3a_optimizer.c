@@ -782,24 +782,6 @@ nnc_static nnc_u64 nnc_3a_clean_cgts() {
     return size - buf_len(used);
 }
 
-nnc_static nnc_u64 nnc_3a_merge_labels() {
-    nnc_u64 size = buf_len(opt);
-    _vec_(nnc_3a_quad) merged = NULL;
-    for (nnc_u64 i = 0; i < size; i++) {
-        const nnc_3a_quad* quad = &opt[i];
-        if (quad->op == OP_NONE && quad->label != 0) {
-            if (i+1 < size && opt[i+1].label == 0) {
-                opt[i+1].label = quad->label;
-                continue;
-            }
-        }
-        buf_add(merged, *quad);
-    }
-    buf_free(opt);
-    opt = merged;
-    return size - buf_len(merged);
-}
-
 nnc_static nnc_u64 nnc_3a_optimization_pass() {
     nnc_u64 i = 0;
     nnc_u64 len = buf_len(unopt);
@@ -839,7 +821,6 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
         buf_free(unopt);
     }
     reduced += nnc_3a_clean_cgts();
-    reduced += nnc_3a_merge_labels();
     if (stat != NULL) {
         *stat = (nnc_3a_opt_stat) {
             .passes = pass,
@@ -850,24 +831,15 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
     return opt;
 }
 
-nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code) {
-    for (nnc_u64 i = 0; i < buf_len(code); i++) {
-        nnc_3a_opt_stat stat = {0};
-        #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
-        code[i].quads = nnc_3a_optimize(code[i].quads, &stat);
-        code[i].stat = stat;
-        #endif
-        code[i].blocks = nnc_3a_get_blocks(&code[i]);
-    }
-    return code;
-}
-
 nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data) {
     nnc_3a_opt_stat stat = {0};
+    if (buf_len(data.quads) != 0) {
     #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
-    data.quads = nnc_3a_optimize(data.quads, &stat);
-    data.stat = stat;
+        data.quads = nnc_3a_optimize(data.quads, &stat);
+        data.stat = stat;
     #endif
-    data.blocks = nnc_3a_get_blocks(&data);
+        _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&data);
+        data.cfg = nnc_3a_get_cfg(blocks);
+    }
     return data;
 }
