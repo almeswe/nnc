@@ -2,7 +2,7 @@
 #define _NNC_THREE_ADDRESS_CODE_H
 
 #define _NNC_ENABLE_PASS_LOGGING 0
-#define _NNC_ENABLE_PEEP_OPTIMIZATIONS 1
+#define _NNC_ENABLE_OPTIMIZATIONS 1
 
 #include "nnc_typecheck.h"
 
@@ -183,9 +183,9 @@ typedef struct _nnc_3a_quad {
 } nnc_3a_quad;
 
 typedef struct _nnc_3a_opt_stat {
-    nnc_i32 passes;
     nnc_u64 reduced;
-    nnc_i32 percent;
+    nnc_f32 percent;
+    nnc_u64 initial;
 } nnc_3a_opt_stat;
 
 #define nnc_3a_mkblock(x) (nnc_3a_basic){\
@@ -204,7 +204,7 @@ typedef struct _nnc_3a_cfg_node {
     nnc_u32 id: 30;
     nnc_bool labeled: 1;
     nnc_bool unreachable: 1;
-    const nnc_3a_basic* block;
+    nnc_3a_basic* block;
     struct _nnc_3a_cfg_node* next;
     struct _nnc_3a_cfg_node* jump;
 } nnc_3a_cfg_node;
@@ -241,8 +241,8 @@ nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code);
 nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data);
 
 _vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set);
-nnc_3a_cfg nnc_3a_get_cfg(const _vec_(nnc_3a_basic) blocks);
-nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg);
+nnc_3a_cfg nnc_3a_get_cfg(_vec_(nnc_3a_basic) blocks);
+nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg, nnc_3a_opt_stat* stat);
 void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg);
 
 #endif
