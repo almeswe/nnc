@@ -662,36 +662,21 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
     nnc_3a_quads_add(&b_next);
 }
 
-nnc_static _vec_(nnc_3a_quad) nnc_3a_zip_quads(_vec_(nnc_3a_quad) quads) {
-    nnc_u64 size = buf_len(quads);
-    _vec_(nnc_3a_quad) zipped = NULL;
-    for (nnc_u64 i = 0; i < size; i++) {
-        const nnc_3a_quad* quad = &quads[i];
-        if (quad->op == OP_NONE && quad->label != 0) {
-            if (i+1 < size && quads[i+1].label == 0) {
-                quads[i+1].label = quad->label;
-                continue;
-            }
-        }
-        buf_add(zipped, *quad);
-    }
-    buf_free(quads);
-    return zipped;
-}
-
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
     nnc_3a_quad_set set = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
     };
-    #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
+    set.stat.initial = buf_len(set.quads);
+    #if _NNC_ENABLE_OPTIMIZATIONS
     set.quads = nnc_3a_optimize(set.quads, &set.stat);
     #endif
-    set.quads = nnc_3a_zip_quads(set.quads);
     _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&set);
     set.cfg = nnc_3a_get_cfg(blocks);
-    set.cfg = nnc_3a_cfg_optimize(set.cfg);
+    #if _NNC_ENABLE_OPTIMIZATIONS
+    set.cfg = nnc_3a_cfg_optimize(set.cfg, &set.stat);
+    #endif
     quads = NULL;
     buf_add(code, set);
 }
@@ -769,15 +754,17 @@ nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_
     nnc_stmt_to_3a(for_stmt->init, st);
     nnc_3a_quads_add(&b_iter);
     nnc_stmt_to_3a(for_stmt->cond, st);
-    nnc_3a_addr cond = *nnc_3a_quads_res();
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
-    );
-    nnc_3a_quads_add(&quad);
+    if (for_stmt->cond->kind != STMT_EMPTY) {
+        nnc_3a_addr cond = *nnc_3a_quads_res();
+        nnc_3a_quad quad = nnc_3a_mkquad(
+            OP_CJUMPF, nnc_3a_mki3(b_next.label), cond
+        );
+        nnc_3a_quads_add(&quad);
+    }
     nnc_stmt_to_3a(for_stmt->body, st);
     nnc_3a_quads_add(&b_step);
     nnc_stmt_to_3a(for_stmt->step, st);
-    quad = nnc_3a_mkquad(
+    nnc_3a_quad quad = nnc_3a_mkquad(
         OP_UJUMP, nnc_3a_mki3(b_iter.label)
     );
     nnc_restore_loop_branches(&branches);

@@ -672,7 +672,7 @@ nnc_static void nnc_3a_unused_cgts_iter(nnc_map_key key, nnc_map_val val) {
     unused_quad->op = OP_NONE;
 }
 
-nnc_static nnc_u64 nnc_3a_clean_cgts() {
+nnc_static nnc_u64 nnc_3a_erase_dead_cgts() {
     nnc_u64 size = buf_len(opt);
     _map_(nnc_i32, nnc_3a_quad*) unused = map_init_with(size);
     for (nnc_u64 i = 0; i < size; i++) {
@@ -782,6 +782,24 @@ nnc_static nnc_u64 nnc_3a_clean_cgts() {
     return size - buf_len(used);
 }
 
+nnc_static nnc_u64 nnc_3a_zip_quads() {
+    nnc_u64 size = buf_len(opt);
+    _vec_(nnc_3a_quad) zipped = NULL;
+    for (nnc_u64 i = 0; i < size; i++) {
+        const nnc_3a_quad* quad = &opt[i];
+        if (quad->op == OP_NONE && quad->label != 0) {
+            if (i+1 < size && opt[i+1].label == 0) {
+                opt[i+1].label = quad->label;
+                continue;
+            }
+        }
+        buf_add(zipped, *quad);
+    }
+    buf_free(opt);
+    opt = zipped;
+    return size - buf_len(zipped);        
+}
+
 nnc_static nnc_u64 nnc_3a_optimization_pass() {
     nnc_u64 i = 0;
     nnc_u64 len = buf_len(unopt);
@@ -820,13 +838,14 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
     if (unopt != NULL) {
         buf_free(unopt);
     }
-    reduced += nnc_3a_clean_cgts();
+    reduced += nnc_3a_erase_dead_cgts();
+    reduced += nnc_3a_zip_quads();
     if (stat != NULL) {
-        *stat = (nnc_3a_opt_stat) {
-            .passes = pass,
-            .reduced = reduced,
-            .percent = (nnc_i32)(((len == 0 ? 0 : reduced / (nnc_f32)len)) * 100)
-        };
+        stat->reduced += reduced;
+        stat->percent = stat->reduced / (nnc_f32)stat->initial;
+        if (stat->initial == 0) {
+            stat->percent = 0.0;
+        }
     }
     return opt;
 }

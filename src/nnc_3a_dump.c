@@ -261,15 +261,16 @@ void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg) {
     dump_3a("%s:\n", name);
     for (nnc_u64 i = 0; i < buf_len(cfg->nodes); i++) {
         const nnc_3a_cfg_node* node = cfg->nodes[i]; 
-        if (node->unreachable) {
-            continue;
-        }
         dump_3a("   B%u", node->id);
+        if (node->unreachable) {
+            dump_3a("%s", "(u)");
+        }
+        dump_3a("%s", "\n");
         if (node->jump != NULL) {
-            dump_3a(" jump B%u\n", node->jump->id);
+            dump_3a("    \\_ jump B%u\n", node->jump->id);
         }
         if (node->next != NULL) {
-            dump_3a("   \\_ next B%u", node->next->id);
+            dump_3a("    \\_ next B%u", node->next->id);
         }
         dump_3a("%s", "\n");
     }
@@ -277,8 +278,8 @@ void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg) {
 
 void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set) {
     stream = to;
-    dump_3a("\n@_%s: (%lu=%d%% after %d passes)\n", set->name,
-        set->stat.reduced, set->stat.percent, set->stat.passes);
+    dump_3a("\n@_%s: (%lu=%d%%)\n", set->name, set->stat.reduced,
+        (nnc_i32)(set->stat.percent * 100));
     //dump_3a("@_%s:\n", set->name);
     //nnc_dump_3a_quads(to, set->quads);
     //for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
@@ -287,9 +288,6 @@ void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set) {
     //}
     for (nnc_u64 i = 0; i < buf_len(set->cfg.nodes); i++) {
         const nnc_3a_cfg_node* node = set->cfg.nodes[i];
-        if (node->unreachable) {
-            continue;
-        }
         dump_3a("=========BLOCK[%u]=========\n", node->id);
         nnc_dump_3a_quads(to, node->block->quads);
     }
