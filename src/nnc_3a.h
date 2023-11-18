@@ -6,15 +6,35 @@
 
 #include "nnc_typecheck.h"
 
+#define OP_UNARY    \
+         OP_PLUS:   \
+    case OP_MINUS:  \
+    case OP_BW_NOT
+
+#define OP_BINARY   \
+         OP_ADD:    \
+    case OP_SUB:    \
+    case OP_MUL:    \
+    case OP_DIV:    \
+    case OP_MOD:    \
+    case OP_SHR:    \
+    case OP_SHL:    \
+    case OP_BW_OR:  \
+    case OP_BW_AND: \
+    case OP_BW_XOR
+
 typedef nnc_u64 nnc_3a_cgt_cnt;
 typedef nnc_u32 nnc_3a_label_cnt;
 
 typedef enum _nnc_3a_peep_pattern {
-    /* Redundant cross operator optimizations */
-    OPT_CROSS_REF,
-    OPT_CROSS_COPY,
-    OPT_CROSS_COPY3,
-    /* Contant folding optimizations */
+    /* Substitution optimizations */
+    OPT_REF_SUBST,
+    OPT_COPY_UNARY_SUBST,
+    OPT_COPY_UNARY_EX_SUBST,
+    OPT_COPY_BINARY_SUBST,
+    OPT_COPY_BINARY_L_SUBST,
+    OPT_COPY_BINARY_R_SUBST,
+    /* Folding optimizations */
     OPT_INDEX_CONST_FOLD,
     OPT_UNARY_CONST_FOLD,
     OPT_BINARY_CONST_FOLD,
