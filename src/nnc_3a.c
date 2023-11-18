@@ -232,7 +232,7 @@ nnc_static void nnc_lval_index_to_3a_ex(const nnc_unary_expression* unary, const
     if (!first) {
         index = *nnc_3a_quads_res();
         quad = nnc_3a_mkquad1(
-            OP_ADD, nnc_3a_mkcgt(), &i64_type, base, index
+            OP_ADD, nnc_3a_mkcgt(), &i64_type, index, base
         );
         nnc_3a_quads_add(&quad);
     }
@@ -250,7 +250,7 @@ nnc_static void nnc_lval_index_to_3a_ex(const nnc_unary_expression* unary, const
         nnc_expr_to_3a(unary->expr, st);
         nnc_3a_addr address = *nnc_3a_quads_res();
         quad = nnc_3a_mkquad1(
-            OP_ADD, nnc_3a_mkcgt(), address.type, address, index
+            OP_ADD, nnc_3a_mkcgt(), address.type, index, address
         );
         nnc_3a_quads_add(&quad);
     }

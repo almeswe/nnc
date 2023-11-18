@@ -3,16 +3,30 @@
 nnc_static _vec_(nnc_3a_quad) opt = NULL;
 nnc_static _vec_(nnc_3a_quad) unopt = NULL;
 
+//todo: add pattern:
+/*
+    x)   goto L
+    x+1) L:
+    -----------
+    x)   L:
+*/
+
 extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
 
-nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
-    /*
-    Pattern's Trigger:
-        tX = &x            (OP_REF)
-
-    Following part:    
-       *tX = tZ            (OP_DEREF_COPY)
-    */
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  substitution pattern, triggered by `OP_REF` quad. (means first quad is `OP_REF`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  Pattern's Trigger:
+ *      tX = &x            (OP_REF)
+ *  Following part:    
+ *     *tX = tZ            (OP_DEREF_COPY)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_CROSS_REF` otherwise.
+ */
+nnc_static nnc_3a_peep_pattern nnc_3a_op_ref_pat(nnc_u64 index) {
     if (index >= buf_len(unopt)) {
         return OPT_NONE;
     }  
@@ -23,35 +37,39 @@ nnc_static nnc_3a_peep_pattern nnc_3a_ref_pattern(nnc_u64 index) {
             quad2->res.kind == ADDR_CGT) {
             if (quad1->res.exact.cgt ==
                 quad2->res.exact.cgt) {
-                return OPT_CROSS_REF;
+                return OPT_REF_SUBST;
             }
         }
     }
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  substitution pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  Pattern's Trigger:
+ *    tX = x                    (OP_COPY)
+ *  Following part:    
+ *    tY = tX ||                (OP_COPY)
+ *   *tY = tX ||                (OP_DEREF_COPY)
+ *    
+ *    tZ = tX ||                (OP_COPY)
+ *   *tZ = tX                   (OP_DEREF_COPY)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_EX_SUBST` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
-    /*
-    Pattern's Trigger:
-        tX = x                   (OP_COPY)
-
-    Following part:    
-        tY = tX          ||   [1] (OP_COPY)
-       *tY = tX          ||   [2] (OP_DEREF_COPY)
-        if tX goto L     ||   [3] (OP_CJUMPT)
-        if not tX goto L ||   [4] (OP_CJUMPF)
-        arg tX           ||   [5] (OP_ARG)
-        ret tX           ||   [6] (OP_RETF)
-
-    Variable part (for cases [1] or [2])
-        tZ = tX || (?)           (OP_COPY)
-       *tZ = tX    (?)           (OP_DEREF_COPY)
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
     if (index+2 < buf_len(unopt)) {
         quad3 = &unopt[index+2];
+    }
+    if (quad3 == NULL) {
+        return OPT_NONE;
     }
     /*
         Both quad1 and quad2 must be ADDR_CGTs
@@ -68,27 +86,16 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
                 /*
                     quad3 must be OP_COPY or OP_DEREF_COPY,
                     it's first argument must be ADDR_CGT which
-                    equals quad1's first argument.
-                    This is `Variable part` from pattern above.
+                    equals quad1's result.
                 */
-                if (quad3 != NULL &&
-                    quad3->arg1.kind == ADDR_CGT &&
+                if (quad3->arg1.kind == ADDR_CGT &&
                    (quad3->op == OP_COPY ||
                     quad3->op == OP_DEREF_COPY)) {
                     if (quad1->res.exact.cgt == 
                         quad3->arg1.exact.cgt) {
-                        return OPT_CROSS_COPY3;
+                        return OPT_COPY_UNARY_EX_SUBST;
                     }
                 }
-            }
-            case OP_ARG:
-            case OP_RETF:
-            case OP_CJUMPT:
-            case OP_CJUMPF: {
-                /*
-                    This is `Following part` from pattern above.
-                */
-                return OPT_CROSS_COPY;              
             }
             default: break;
         }
@@ -96,33 +103,35 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  folding pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  Note: Jump's condition can be easily folded too, this will help CFG to determine
+ *  unreachable basic blocks in future.
+ *  -------------------------------------
+ *  Pattern's Trigger:
+ *      tX = x                     (OP_COPY)
+ *  Following part: (where x = const)
+ *      tZ = unOp tX     ||        (Unary operator: +, -, ~)
+ *      tZ = (type) tX   ||        (OP_CAST)
+ *      if tZ goto L     ||        (OP_CJUMPT) 
+ *      if not tZ goto L ||        (OP_CJUMPF)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_CONST_FOLD` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part2(nnc_u64 index) {
-    /*
-    Pattern's Trigger:
-        tX = x                   (OP_COPY)
-
-    Following part: (where x = const)
-        tZ = unOp tX   ||        (Unary operator)
-        tZ = (type) tX           (OP_CAST)
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
-    /*
-        quad1's result must be CGT,
-        and it's first argument must be constant.
-    */
     if (quad1->res.kind == ADDR_CGT &&
        (quad1->arg1.kind == ADDR_ICONST || 
         quad1->arg1.kind == ADDR_FCONST)) {
-        /*
-            quad2 must be unary operator or OP_CAST
-            This is `Following part` of pattern above.
-        */
         switch (quad2->op) {
             case OP_CAST:
-            case OP_PLUS:
-            case OP_MINUS:
-            case OP_BW_NOT: {
+            case OP_CJUMPT:
+            case OP_CJUMPF:
+            case OP_UNARY: {
                 if (quad1->res.exact.cgt == 
                     quad2->arg1.exact.cgt) {
                     return OPT_UNARY_CONST_FOLD;
@@ -135,16 +144,31 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part2(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  folding pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  Note: Jump's condition can be easily folded too, this will help CFG to determine
+ *  unreachable basic blocks in future.
+ *  -------------------------------------
+ *  Pattern's Trigger:
+ *      tX = x                        (OP_COPY)
+ *  Following part: (where x = const)
+ *                  (where y = const)
+ *      tY = y                        (OP_COPY)
+ *      tZ = tX binOp tY        ||    (Binary operator: +,-,*,/,%,<<,>>,|,&,^)
+ *      tZ = if tX == tY goto L ||    (OP_CJUMPE)
+ *      tZ = if tX != tY goto L ||    (OP_CJUMPNE)
+ *      tZ = if tX < tY goto L  ||    (OP_CJUMPLT)
+ *      tZ = if tX > tY goto L  ||    (OP_CJUMPGT)
+ *      tZ = if tX <= tY goto L ||    (OP_CJUMPLTE)
+ *      tZ = if tX >= tY goto L       (OP_CJUMPGTE)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_BINARY_CONST_FOLD` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
-    /*
-    Pattern's Trigger:
-        tX = x                  (OP_COPY)
 
-    Following part: (where x = const)
-                    (where y = const)
-        tY = y                  (OP_COPY)
-        tZ = tX binOp tY        (Binary operator)
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
@@ -154,31 +178,20 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
     if (quad3 == NULL) {
         return OPT_NONE;
     }
-    /*
-        Both quad1 and quad2 results must be ADDR_CGTs
-        and their first arguments must be constant.
-    */
     if (quad1->res.kind == ADDR_CGT &&
         quad2->res.kind == ADDR_CGT &&
        (quad1->arg1.kind == ADDR_ICONST  || 
         quad1->arg1.kind == ADDR_FCONST) &&
        (quad2->arg1.kind == ADDR_ICONST  ||
         quad2->arg1.kind == ADDR_FCONST)) {
-        /*
-            quad3 must be binary operator
-            This is `Following part` of pattern above.
-        */
         switch (quad3->op) {
-            case OP_ADD: 
-            case OP_SUB:
-            case OP_MUL: 
-            case OP_DIV:
-            case OP_MOD: 
-            case OP_SHR:
-            case OP_SHL:
-            case OP_BW_OR:
-            case OP_BW_AND:
-            case OP_BW_XOR: {
+            case OP_CJUMPE:
+            case OP_CJUMPNE:
+            case OP_CJUMPGT:
+            case OP_CJUMPLT:
+            case OP_CJUMPGTE:
+            case OP_CJUMPLTE:
+            case OP_BINARY: {
                 nnc_3a_cgt q1_res = quad1->res.exact.cgt;
                 nnc_3a_cgt q2_res = quad2->res.exact.cgt;
                 if (quad3->arg1.exact.cgt == q1_res &&
@@ -192,15 +205,21 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  folding pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  This optimization targets array's index calculation.
+ *  Pattern's Trigger:
+ *      tX = x                  (OP_COPY)
+ *  Following part: (where x  = const)
+ *      tZ = tX binOp const     (Binary operator: +, *)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_INDEX_CONST_FOLD` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part4(nnc_u64 index) {
-    /*
-    This optimization targets index calculation.
-    Pattern's Trigger:
-        tX = x                  (OP_COPY)
-
-    Following part: (where x  = const)
-        tZ = tX binOp const     (Binary operator: OP_ADD, OP_MUL)
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     if ((quad1->res.kind  == ADDR_CGT    &&
@@ -221,17 +240,23 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part4(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  algebraic pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *   This optimization targets redundant algebraic operations.
+ *   Pattern's Trigger:
+ *       tX = 0  ||                (OP_COPY)
+ *       tX = x                    (OP_COPY)
+ *   Following part:
+ *       tY = tX binOp 0 ||        (Binary operator: *, +)
+ *       tY = 0  binOp tX 
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_ALG_MUL_ZERO` | `OPT_ALG_ADD_ZERO` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part5(nnc_u64 index) {
-    /*
-    This optimization targets redundant algebraic operations.
-    Pattern's Trigger:
-        tX = 0  ||                (OP_COPY)
-        tX = x                    (OP_COPY)
-
-    Following part:
-        tY = tX binOp 0 ||        (Binary operator: *, +)
-        tY = 0 binOp tX 
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
@@ -243,51 +268,51 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part5(nnc_u64 index) {
     }
     if (quad1->arg1.kind == ADDR_ICONST ||
         quad2->arg1.kind == ADDR_ICONST) {
-        switch (quad3->op) {
-            case OP_ADD:
-            case OP_MUL: {
-                if (quad1->arg1.exact.iconst.iconst == 0 ||
-                    quad2->arg1.exact.iconst.iconst == 0) {
-                    if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
-                        (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
-                        return quad3->op == OP_MUL ? 
-                            OPT_ALG_MUL_ZERO : OPT_ALG_ADD_ZERO;
-                    }
+        if (quad3->op == OP_ADD || quad3->op == OP_MUL) {
+            if (quad1->arg1.exact.iconst.iconst == 0 ||
+                quad2->arg1.exact.iconst.iconst == 0) {
+                if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
+                    (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
+                    return quad3->op == OP_MUL ? 
+                        OPT_ALG_MUL_ZERO : OPT_ALG_ADD_ZERO;
                 }
-                break;
             }
-            default: break;
         }
     }
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  algebraic pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  This optimization targets redundant algebraic operations.
+ *  Pattern's Trigger:
+ *      tX = 1  ||                (OP_COPY)
+ *      tX = 2^n                  (OP_COPY)
+ *      tX = x                    (OP_COPY)
+ *  Following part:
+ *      tY = tX * 1   ||          (Binary operator: *)
+ *      tY = 1 * tX   ||          (Binary operator: *)
+ *      tY = 2^n * tX ||          (Binary operator: *)
+ *      tY = tX * 2^n ||          (Binary operator: *)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_ALG_MUL_ONE` | `OPT_ALG_MUL_POW_TWO` otherwise.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
-    /*
-    This optimization targets redundant algebraic operations.
-    Pattern's Trigger:
-        tX = 1  ||                (OP_COPY)
-        tX = 2^n                  (OP_COPY)
-        tX = x                    (OP_COPY)
-
-    Following part:
-        tY = tX * 1   ||          (Binary operator: *)
-        tY = 1 * tX   ||          (Binary operator: *)
-        tY = 2^n * tX ||          (Binary operator: *)
-        tY = tX * 2^n ||          (Binary operator: *)
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
     if (index + 2 < buf_len(unopt)) {
         quad3 = &unopt[index+2];
     }
-    if (quad3 == NULL) {
+    if (quad3 == NULL || quad3->op != OP_MUL) {
         return OPT_NONE;
     }
-    if (quad3->op == OP_MUL &&
-       (quad1->arg1.kind == ADDR_ICONST ||
-        quad2->arg1.kind == ADDR_ICONST)) {
+    if ((quad1->arg1.kind == ADDR_ICONST ||
+         quad2->arg1.kind == ADDR_ICONST)) {
         if (quad1->arg1.exact.iconst.iconst == 1 ||
             quad2->arg1.exact.iconst.iconst == 1) {
             if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
@@ -306,15 +331,133 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  substitution pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  Pattern's Trigger: (addrX and addrY can be constant, name or CGT)
+ *      tX = addrX                      (OP_COPY)
+ *  Following part:
+ *      tY = addrY                      (OP_COPY)
+ *      tZ = tX binOp tY        ||      (Binary operator: +,-,*,/,%,<<,>>,|,&,^)
+ *      tZ = if tX == tY goto L ||      (OP_CJUMPE)
+ *      tZ = if tX != tY goto L ||      (OP_CJUMPNE)
+ *      tZ = if tX < tY goto L  ||      (OP_CJUMPLT)
+ *      tZ = if tX > tY goto L  ||      (OP_CJUMPGT)
+ *      tZ = if tX <= tY goto L ||      (OP_CJUMPLTE)
+ *      tZ = if tX >= tY goto L         (OP_CJUMPGTE)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_BINARYL_SUBSTITUTION` | 
+ *  `OPT_BINARYR_SUBSTITUTION` | `OPT_BINARY_SUBSTITUTION` otherwise.
+ */
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part7(nnc_u64 index) {
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    const nnc_3a_quad* quad3 = NULL;
+    if (index + 2 < buf_len(unopt)) {
+        quad3 = &unopt[index+2];
+    }
+    if (quad3 == NULL) {
+        return OPT_NONE;
+    }
+    nnc_3a_peep_pattern pat = OPT_NONE;
+    if (quad1->res.kind == ADDR_CGT &&
+        quad2->res.kind == ADDR_CGT) {
+        switch (quad3->op) {
+            case OP_CJUMPE:
+            case OP_CJUMPNE:
+            case OP_CJUMPGT:
+            case OP_CJUMPLT:
+            case OP_CJUMPGTE:
+            case OP_CJUMPLTE:
+            case OP_BINARY: {
+                nnc_3a_cgt q1_res = quad1->res.exact.cgt;
+                nnc_3a_cgt q2_res = quad2->res.exact.cgt;
+                if (quad3->arg1.kind == ADDR_CGT &&
+                    quad3->arg1.exact.cgt == q1_res) {
+                    pat = OPT_COPY_BINARY_L_SUBST;
+                }
+                if (quad3->arg2.kind == ADDR_CGT &&
+                    quad3->arg2.exact.cgt == q2_res) {
+                    pat = pat == OPT_COPY_BINARY_L_SUBST ?
+                        OPT_COPY_BINARY_SUBST : 
+                        OPT_COPY_BINARY_R_SUBST;
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+    return pat;
+}
+
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  substitution pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ *  --- This is part of function `nnc_3a_op_copy_pat` moved to separate function.
+ *  -------------------------------------
+ *  Pattern's Trigger: (addrX can be constant, name or CGT)
+ *      tX = addrX                  (OP_COPY)
+ *  Following part:
+ *      arg tX           ||        (OP_ARG)
+ *      tZ = tX          ||        (OP_COPY)
+ *      tZ = (type) tX   ||        (OP_CAST)
+ *      ret tX           ||        (OP_RETF)
+ *      tZ = *tX         ||        (OP_DEREF)
+ *      if tZ goto L     ||        (OP_CJUMPT) 
+ *      if not tZ goto L ||        (OP_CJUMPF)
+ *     *tZ = tX          ||        (OP_DEREF_COPY)
+ *      tZ = unOp tX     ||        (Unary operator: +, -, ~)
+ * 
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_SUBSTITUTION` otherwise.
+ */
+nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part8(nnc_u64 index) {
+    const nnc_3a_quad* quad1 = &unopt[index];
+    const nnc_3a_quad* quad2 = &unopt[index+1];
+    if (quad1->res.kind == ADDR_CGT) {
+        switch (quad2->op) {
+            case OP_ARG:
+            case OP_COPY:
+            case OP_CAST:
+            case OP_RETF:
+            case OP_DEREF:
+            case OP_CJUMPE:
+            case OP_CJUMPNE:
+            case OP_DEREF_COPY:
+            case OP_UNARY: {
+                nnc_3a_cgt q1_res = quad1->res.exact.cgt;
+                if (quad2->arg1.kind == ADDR_CGT &&
+                    quad2->arg1.exact.cgt == q1_res) {
+                    return OPT_COPY_UNARY_SUBST;
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+    return OPT_NONE;
+}
+
+/**
+ * @brief Checks if further quads starting from `index` matching
+ *  substitution pattern, triggered by `OP_COPY` quad. (means first quad is `OP_COPY`)
+ * @param index Index of first quad with `OP_COPY` (which triggered this function).
+ * @return `OPT_NONE` if pattern does not match, otherwise some patter is returned.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     typedef nnc_3a_peep_pattern (pat_fn)(nnc_u64);
     static pat_fn* pat_fns[] = {
-        nnc_3a_op_copy_pat_part1,
         nnc_3a_op_copy_pat_part2,
         nnc_3a_op_copy_pat_part3,
         nnc_3a_op_copy_pat_part4,
         nnc_3a_op_copy_pat_part5,
         nnc_3a_op_copy_pat_part6,
+        nnc_3a_op_copy_pat_part1,
+        nnc_3a_op_copy_pat_part7,
+        nnc_3a_op_copy_pat_part8,
     };
     if (index >= buf_len(unopt)) {
         return OPT_NONE;
@@ -330,7 +473,7 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     return OPT_NONE;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_cross_ref(nnc_u64 index) {
+nnc_static nnc_u64 nnc_3a_opt_ref_subst(nnc_u64 index) {
     /*
         tX = &x
         *tX = Y
@@ -361,7 +504,7 @@ nnc_static nnc_u64 nnc_3a_opt_cross_copy(nnc_u64 index) {
     return 2;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_cross_copy3(nnc_u64 index) {
+nnc_static nnc_u64 nnc_3a_opt_unary_ex_subst(nnc_u64 index) {
     /*
         tX = x
         tY = tX
@@ -380,6 +523,42 @@ nnc_static nnc_u64 nnc_3a_opt_cross_copy3(nnc_u64 index) {
     buf_add(opt, opt_quad2);
     *quad3 = opt_quad3;
     return 2;
+}
+
+nnc_static nnc_u64 nnc_3a_opt_unary_subst(nnc_u64 index, nnc_3a_peep_pattern pat) {
+    const nnc_3a_quad* op_quad = &unopt[index];
+    const nnc_3a_quad* res_quad = &unopt[index+1];
+    nnc_3a_quad opt_res_quad = *res_quad;
+    opt_res_quad.arg1 = op_quad->arg1;
+    buf_add(opt, opt_res_quad);
+    return 2;
+}
+
+nnc_static nnc_u64 nnc_3a_opt_binary_subst(nnc_u64 index, nnc_3a_peep_pattern pat) {
+    const nnc_3a_quad* lop_quad = &unopt[index];
+    const nnc_3a_quad* rop_quad = &unopt[index+1];
+    const nnc_3a_quad* res_quad = &unopt[index+2];
+    nnc_3a_quad opt_res_quad = *res_quad;
+    switch (pat) {
+        case OPT_COPY_BINARY_L_SUBST: {
+            opt_res_quad.arg1 = lop_quad->arg1;
+            buf_add(opt, *rop_quad);
+            break;
+        }
+        case OPT_COPY_BINARY_R_SUBST: {
+            opt_res_quad.arg2 = rop_quad->arg1;
+            buf_add(opt, *lop_quad);
+            break;
+        }
+        case OPT_COPY_BINARY_SUBST: {
+            opt_res_quad.arg1 = lop_quad->arg1;
+            opt_res_quad.arg2 = rop_quad->arg1;
+            break;
+        }
+        default: nnc_abort_no_ctx("nnc_3a_opt_binary_subst: unknown pattern kind."); 
+    }
+    buf_add(opt, opt_res_quad);
+    return 3;
 }
 
 nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
@@ -414,12 +593,36 @@ nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
     return 2;
 }
 
+nnc_static nnc_u64 nnc_3a_opt_unary_branch_fold(nnc_u64 index) {
+    const nnc_3a_quad* op_quad = &unopt[index];
+    const nnc_3a_quad* res_quad = &unopt[index+1];
+    nnc_u64 val = op_quad->arg1.exact.iconst.iconst;
+    nnc_3a_quad opt_quad = {
+        .op = OP_NONE, .res = res_quad->res
+    };
+    switch (res_quad->op) {
+        case OP_CJUMPT: val = val != 0; break;
+        case OP_CJUMPF: val = val == 0; break;
+        default: nnc_abort_no_ctx("nnc_3a_opt_unary_branch_fold: unknown res_quad->op."); 
+    }
+    // if constant value is 1, condition is true,
+    // and change conditional jump to unconditional. 
+    if (val == 1) {
+        opt_quad.op = OP_UJUMP;
+        buf_add(opt, opt_quad);
+    }
+    // if constant value is 0, just remove it,
+    // because flow of the program goes further, and
+    // will not depend on this condition.
+    return 2;
+} 
+
 nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
     const nnc_3a_quad* op_quad = &unopt[index];
-    const nnc_3a_quad* un_op_quad = &unopt[index+1];
-    const nnc_type* un_op_type = un_op_quad->res.type;
+    const nnc_3a_quad* res_quad = &unopt[index+1];
+    const nnc_type* res_type = res_quad->res.type;
     nnc_u64 val = op_quad->arg1.exact.iconst.iconst;
-    switch (un_op_quad->op) {
+    switch (res_quad->op) {
         case OP_PLUS:   break;
         case OP_MINUS:  val = -val; break;
         case OP_BW_NOT: val = ~val; break;
@@ -428,7 +631,7 @@ nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
             if (op_quad->arg1.kind == ADDR_ICONST) {
                 fval = op_quad->arg1.exact.iconst.iconst;
             }
-            switch (un_op_type->kind) {
+            switch (res_type->kind) {
                 case T_PRIMITIVE_I8:  val = (nnc_i8)fval;  break;
                 case T_PRIMITIVE_U8:  val = (nnc_u8)fval;  break;
                 case T_PRIMITIVE_U16: val = (nnc_u16)fval; break;
@@ -441,10 +644,14 @@ nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
             }
             break;
         }
+        case OP_CJUMPT:
+        case OP_CJUMPF: {
+            return nnc_3a_opt_unary_branch_fold(index);
+        }
         default: nnc_abort_no_ctx("nnc_3a_opt_unary_iconst_fold: unknown op.");
     }
     nnc_3a_quad opt_quad = {
-        .op = OP_COPY, .res = un_op_quad->res, .arg1 = nnc_3a_mki2(val, un_op_type)
+        .op = OP_COPY, .res = res_quad->res, .arg1 = nnc_3a_mki2(val, res_type) 
     };
     buf_add(opt, opt_quad);
     return 2;
@@ -461,6 +668,37 @@ nnc_static nnc_u64 nnc_3a_opt_unary_const_fold(nnc_u64 index) {
     }
     nnc_abort_no_ctx("nnc_3a_opt_unary_const_fold: unknown result type.\n");
     return 2;
+}
+
+nnc_static nnc_u64 nnc_3a_opt_binary_fconst_branch_fold(nnc_u64 index) {
+    const nnc_3a_quad* lop_quad = &unopt[index];
+    const nnc_3a_quad* rop_quad = &unopt[index+1];
+    const nnc_3a_quad* res_quad = &unopt[index+2];
+    nnc_f64 lval = lop_quad->arg1.exact.fconst.fconst;
+    if (lop_quad->arg1.kind == ADDR_ICONST) {
+        lval = lop_quad->arg1.exact.iconst.iconst;
+    }
+    nnc_f64 rval = rop_quad->arg1.exact.fconst.fconst;
+    if (rop_quad->arg1.kind == ADDR_ICONST) {
+        rval = rop_quad->arg1.exact.iconst.iconst;
+    }
+    nnc_3a_quad opt_quad = {
+        .op = OP_NONE, .res = res_quad->res
+    };
+    switch (res_quad->op) {
+        case OP_CJUMPE:     lval = lval == rval; break;
+        case OP_CJUMPNE:    lval = lval != rval; break;
+        case OP_CJUMPLT:    lval = lval < rval;  break;
+        case OP_CJUMPGT:    lval = lval > rval;  break;
+        case OP_CJUMPLTE:   lval = lval <= rval; break;
+        case OP_CJUMPGTE:   lval = lval >= rval; break;
+        default: nnc_abort_no_ctx("nnc_3a_opt_binary_fconst_branch_fold: unknown res_quad->op."); 
+    }
+    if (lval == 1) {
+        opt_quad.op = OP_UJUMP;
+        buf_add(opt, opt_quad);
+    }
+    return 3;
 }
 
 nnc_static nnc_u64 nnc_3a_opt_binary_fconst_fold(nnc_u64 index) {
@@ -481,12 +719,45 @@ nnc_static nnc_u64 nnc_3a_opt_binary_fconst_fold(nnc_u64 index) {
         case OP_SUB: lval -= rval; break;
         case OP_MUL: lval *= rval; break;
         case OP_DIV: lval /= rval; break;
+        case OP_CJUMPE:
+        case OP_CJUMPNE:
+        case OP_CJUMPLT:
+        case OP_CJUMPGT:
+        case OP_CJUMPLTE:
+        case OP_CJUMPGTE: {
+            return nnc_3a_opt_binary_fconst_branch_fold(index);
+        }
         default: nnc_abort_no_ctx("nnc_3a_opt_binary_fconst_fold: unknown op.");
     }
     nnc_3a_quad opt_quad = {
         .op = OP_COPY, .res = bin_op_quad->res, .arg1 = nnc_3a_mkf2(lval, bin_op_type)
     };
     buf_add(opt, opt_quad);
+    return 3;
+}
+
+nnc_static nnc_u64 nnc_3a_opt_binary_iconst_branch_fold(nnc_u64 index) {
+    const nnc_3a_quad* lop_quad = &unopt[index];
+    const nnc_3a_quad* rop_quad = &unopt[index+1];
+    const nnc_3a_quad* res_quad = &unopt[index+2];
+    nnc_u64 lval = lop_quad->arg1.exact.iconst.iconst;
+    nnc_u64 rval = rop_quad->arg1.exact.iconst.iconst;
+    nnc_3a_quad opt_quad = {
+        .op = OP_NONE, .res = res_quad->res
+    };
+    switch (res_quad->op) {
+        case OP_CJUMPE:     lval = lval == rval; break;
+        case OP_CJUMPNE:    lval = lval != rval; break;
+        case OP_CJUMPLT:    lval = lval < rval;  break;
+        case OP_CJUMPGT:    lval = lval > rval;  break;
+        case OP_CJUMPLTE:   lval = lval <= rval; break;
+        case OP_CJUMPGTE:   lval = lval >= rval; break;
+        default: nnc_abort_no_ctx("nnc_3a_opt_binary_iconst_branch_fold: unknown res_quad->op."); 
+    }
+    if (lval == 1) {
+        opt_quad.op = OP_UJUMP;
+        buf_add(opt, opt_quad);
+    }
     return 3;
 }
 
@@ -508,6 +779,14 @@ nnc_static nnc_u64 nnc_3a_opt_binary_iconst_fold(nnc_u64 index) {
         case OP_BW_OR:  lval |=  rval; break;
         case OP_BW_AND: lval &=  rval; break;
         case OP_BW_XOR: lval ^=  rval; break;
+        case OP_CJUMPE:
+        case OP_CJUMPNE:
+        case OP_CJUMPLT:
+        case OP_CJUMPGT:
+        case OP_CJUMPLTE:
+        case OP_CJUMPGTE: {
+            return nnc_3a_opt_binary_iconst_branch_fold(index);
+        }
         default: nnc_abort_no_ctx("nnc_3a_opt_binary_iconst_fold: unknown op.");
     }
     nnc_3a_quad opt_quad = {
@@ -637,7 +916,7 @@ nnc_static nnc_u64 nnc_3a_opt_none(nnc_u64 index) {
 
 nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
     switch (unopt[index].op) {
-        case OP_REF:  return nnc_3a_ref_pattern(index);
+        case OP_REF:  return nnc_3a_op_ref_pat(index);
         case OP_COPY: return nnc_3a_op_copy_pat(index);
         default: break;
     }
@@ -648,9 +927,12 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     nnc_3a_peep_pattern pat = nnc_3a_search_peep_pattern(index);
     switch (pat) {
         /* Redundant cross operator optimizations */
-        case OPT_CROSS_REF:            return nnc_3a_opt_cross_ref(index);
-        case OPT_CROSS_COPY:           return nnc_3a_opt_cross_copy(index);
-        case OPT_CROSS_COPY3:          return nnc_3a_opt_cross_copy3(index);
+        case OPT_REF_SUBST:            return nnc_3a_opt_ref_subst(index);
+        case OPT_COPY_UNARY_SUBST:     return nnc_3a_opt_unary_subst(index, pat);
+        case OPT_COPY_UNARY_EX_SUBST:  return nnc_3a_opt_unary_ex_subst(index);
+        case OPT_COPY_BINARY_SUBST:    return nnc_3a_opt_binary_subst(index, pat);
+        case OPT_COPY_BINARY_L_SUBST:  return nnc_3a_opt_binary_subst(index, pat);
+        case OPT_COPY_BINARY_R_SUBST:  return nnc_3a_opt_binary_subst(index, pat);
         /* Constant folding optimizations */
         case OPT_UNARY_CONST_FOLD:     return nnc_3a_opt_unary_const_fold(index);
         case OPT_BINARY_CONST_FOLD:    return nnc_3a_opt_binary_const_fold(index);
