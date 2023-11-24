@@ -276,34 +276,34 @@ void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg) {
     }
 }
 
-void nnc_dump_3a_set(FILE* to, const nnc_3a_quad_set* set) {
+void nnc_dump_3a_unit(FILE* to, const nnc_3a_unit* unit) {
     stream = to;
-    dump_3a("\n@_%s: (%lu=%d%%)\n", set->name, set->stat.reduced,
-        (nnc_i32)(set->stat.percent * 100));
+    dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
+        (nnc_i32)(unit->stat.percent * 100));
     //dump_3a("@_%s:\n", set->name);
     //nnc_dump_3a_quads(to, set->quads);
     //for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
     //    dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
     //    nnc_dump_3a_quads(to, set->blocks[i].quads);
     //}
-    for (nnc_u64 i = 0; i < buf_len(set->cfg.nodes); i++) {
-        const nnc_3a_cfg_node* node = set->cfg.nodes[i];
+    for (nnc_u64 i = 0; i < buf_len(unit->cfg.nodes); i++) {
+        const nnc_3a_cfg_node* node = unit->cfg.nodes[i];
         dump_3a("=========BLOCK[%u]=========\n", node->id);
         nnc_dump_3a_quads(to, node->block->quads);
     }
-    nnc_dump_3a_cfg(set->name, &set->cfg);
+    nnc_dump_3a_cfg(unit->name, &unit->cfg);
 }
 
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {
     stream = to;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
-        nnc_dump_3a_set(to, &code[i]);
+        nnc_dump_3a_unit(to, &code[i]);
     }
 }
 
 void nnc_dump_3a_data(FILE* to, const nnc_3a_data data) {
     stream = to;
     if (buf_len(data.quads) != 0) {
-        nnc_dump_3a_set(to, &data);
+        nnc_dump_3a_unit(to, &data);
     }
 }

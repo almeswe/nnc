@@ -14,13 +14,13 @@ nnc_static nnc_bool nnc_3a_jump_op(nnc_3a_op_kind op) {
     return false;
 }
 
-_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_quad_set* set) {
+_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_unit* unit) {
     nnc_u32 block_id = 0;
-    nnc_u64 size = buf_len(set->quads);
+    nnc_u64 size = buf_len(unit->quads);
     nnc_3a_basic block = {0};
     _vec_(nnc_3a_basic) blocks = NULL;
     for (nnc_u64 i = 0; i < size; i++) {
-        const nnc_3a_quad* quad = &set->quads[i];
+        const nnc_3a_quad* quad = &unit->quads[i];
         /*
             First quad is leader by default.
         */

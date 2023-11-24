@@ -664,21 +664,21 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
 
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
-    nnc_3a_quad_set set = {
+    nnc_3a_unit unit = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
     };
-    set.stat.initial = buf_len(set.quads);
+    unit.stat.initial = buf_len(unit.quads);
     #if _NNC_ENABLE_OPTIMIZATIONS
-    set.quads = nnc_3a_optimize(set.quads, &set.stat);
+    unit.quads = nnc_3a_optimize(unit.quads, &unit.stat);
     #endif
-    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&set);
-    set.cfg = nnc_3a_get_cfg(blocks);
+    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&unit);
+    unit.cfg = nnc_3a_get_cfg(blocks);
     #if _NNC_ENABLE_OPTIMIZATIONS
-    set.cfg = nnc_3a_cfg_optimize(set.cfg, &set.stat);
+    unit.cfg = nnc_3a_cfg_optimize(unit.cfg, &unit.stat);
     #endif
     quads = NULL;
-    buf_add(code, set);
+    buf_add(code, unit);
 }
 
 nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 
