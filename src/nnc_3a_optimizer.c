@@ -1,17 +1,14 @@
 #include "nnc_3a.h"
 
-nnc_static _vec_(nnc_3a_quad) opt = NULL;
-nnc_static _vec_(nnc_3a_quad) unopt = NULL;
-
-//todo: add pattern:
-/*
-    x)   goto L
-    x+1) L:
-    -----------
-    x)   L:
+/**
+ * @brief Optimized quad set.
 */
+nnc_static _vec_(nnc_3a_quad) opt = NULL;
 
-extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
+/**
+ * @brief Non-optimized quad set.
+*/
+nnc_static _vec_(nnc_3a_quad) unopt = NULL;
 
 /**
  * @brief Checks if further quads starting from `index` matching
@@ -24,7 +21,7 @@ extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
  *     *tX = tZ            (OP_DEREF_COPY)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
- * @return `OPT_NONE` if pattern does not match, `OPT_CROSS_REF` otherwise.
+ * @return `OPT_NONE` if pattern does not match, `OPT_REF_SUBST` otherwise.
  */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_ref_pat(nnc_u64 index) {
     if (index >= buf_len(unopt)) {
@@ -59,7 +56,7 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_ref_pat(nnc_u64 index) {
  *   *tZ = tX                   (OP_DEREF_COPY)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
- * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_EX_SUBST` otherwise.
+ * @return `OPT_NONE` if pattern does not match, `OPT_COPY_UNARY_EX_SUBST` otherwise.
  */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
     const nnc_3a_quad* quad1 = &unopt[index];
@@ -115,8 +112,8 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part1(nnc_u64 index) {
  *  Following part: (where x = const)
  *      tZ = unOp tX     ||        (Unary operator: +, -, ~)
  *      tZ = (type) tX   ||        (OP_CAST)
- *      if tZ goto L     ||        (OP_CJUMPT) 
- *      if not tZ goto L ||        (OP_CJUMPF)
+ *      if tX goto L     ||        (OP_CJUMPT) 
+ *      if not tX goto L ||        (OP_CJUMPF)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
  * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_CONST_FOLD` otherwise.
@@ -349,8 +346,8 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
  *      tZ = if tX >= tY goto L         (OP_CJUMPGTE)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
- * @return `OPT_NONE` if pattern does not match, `OPT_BINARYL_SUBSTITUTION` | 
- *  `OPT_BINARYR_SUBSTITUTION` | `OPT_BINARY_SUBSTITUTION` otherwise.
+ * @return `OPT_NONE` if pattern does not match, `OPT_COPY_BINARY_L_SUBST` | 
+ *  `OPT_COPY_BINARY_R_SUBST` | `OPT_COPY_BINARY_SUBST` otherwise.
  */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part7(nnc_u64 index) {
     const nnc_3a_quad* quad1 = &unopt[index];
@@ -358,6 +355,10 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part7(nnc_u64 index) {
     const nnc_3a_quad* quad3 = NULL;
     if (index + 2 < buf_len(unopt)) {
         quad3 = &unopt[index+2];
+    }
+    if (quad1->op != OP_COPY &&
+        quad2->op != OP_COPY) {
+        return OPT_NONE;
     }
     if (quad3 == NULL) {
         return OPT_NONE;
@@ -375,15 +376,17 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part7(nnc_u64 index) {
             case OP_BINARY: {
                 nnc_3a_cgt q1_res = quad1->res.exact.cgt;
                 nnc_3a_cgt q2_res = quad2->res.exact.cgt;
-                if (quad3->arg1.kind == ADDR_CGT &&
+                if (quad1->op == OP_COPY &&
+                    quad3->arg1.kind == ADDR_CGT &&
                     quad3->arg1.exact.cgt == q1_res) {
                     pat = OPT_COPY_BINARY_L_SUBST;
                 }
-                if (quad3->arg2.kind == ADDR_CGT &&
+                if (quad2->op == OP_COPY &&
+                    quad3->arg2.kind == ADDR_CGT &&
                     quad3->arg2.exact.cgt == q2_res) {
-                    pat = pat == OPT_COPY_BINARY_L_SUBST ?
+                    pat = (pat == OPT_COPY_BINARY_L_SUBST ?
                         OPT_COPY_BINARY_SUBST : 
-                        OPT_COPY_BINARY_R_SUBST;
+                        OPT_COPY_BINARY_R_SUBST);
                 }
                 break;
             }
@@ -412,11 +415,14 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part7(nnc_u64 index) {
  *      tZ = unOp tX     ||        (Unary operator: +, -, ~)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
- * @return `OPT_NONE` if pattern does not match, `OPT_UNARY_SUBSTITUTION` otherwise.
+ * @return `OPT_NONE` if pattern does not match, `OPT_COPY_UNARY_SUBST` otherwise.
  */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part8(nnc_u64 index) {
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
+    if (quad1->op != OP_COPY) {
+        return OPT_NONE;
+    }
     if (quad1->res.kind == ADDR_CGT) {
         switch (quad2->op) {
             case OP_ARG:
@@ -473,13 +479,18 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Optimizes `OPT_REF_SUBST` pattern.
+ *  Accepts:
+ *       tX = &x
+ *      *tX = y
+ *  Optimization:
+ *       x = y
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_ref_subst(nnc_u64 index) {
-    /*
-        tX = &x
-        *tX = Y
-        --------
-        x = Y
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_3a_quad opt_quad = {
@@ -489,30 +500,56 @@ nnc_static nnc_u64 nnc_3a_opt_ref_subst(nnc_u64 index) {
     return 2;
 }
 
-nnc_static nnc_u64 nnc_3a_opt_cross_copy(nnc_u64 index) {
-    /*
-        tX = x
-        tY = tX
-        -------
-        tY = x
-    */
-    const nnc_3a_quad* quad1 = &unopt[index];
-    const nnc_3a_quad* quad2 = &unopt[index+1];
-    nnc_3a_quad opt_quad = *quad2;
-    opt_quad.arg1 = quad1->arg1;
-    buf_add(opt, opt_quad);
+/**
+ * @brief Optimizes `OPT_COPY_UNARY_SUBST` pattern.
+ *  Accepts:
+ *      tX = addrX
+ *      arg tX           ||
+ *      tZ = tX          ||
+ *      tZ = (type) tX   ||
+ *      ret tX           ||
+ *      tZ = *tX         ||
+ *      if tZ goto L     ||
+ *      if not tZ goto L ||
+ *     *tZ = tX          ||
+ *      tZ = unOp tX     ||
+ *  Optimization:
+ *      arg addrX           ||
+ *      tZ = addrX          ||
+ *      tZ = (type) addrX   ||
+ *      ret addrX           ||
+ *      tZ = *addrX         ||
+ *      if addrX goto L     ||
+ *      if not addrX goto L ||
+ *     *tZ = addrX          ||
+ *      tZ = unOp addrX     ||
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
+nnc_static nnc_u64 nnc_3a_opt_unary_subst(nnc_u64 index) {
+    const nnc_3a_quad* op_quad = &unopt[index];
+    const nnc_3a_quad* res_quad = &unopt[index+1];
+    nnc_3a_quad opt_res_quad = *res_quad;
+    opt_res_quad.arg1 = op_quad->arg1;
+    buf_add(opt, opt_res_quad);
     return 2;
 }
 
+/**
+ * @brief Optimizes `OPT_COPY_UNARY_EX_SUBST` pattern.
+ *  Accepts:
+ *      tX = x
+ *      tY = tX
+ *      tZ = tX
+ *  Optimization:
+ *      tY = x
+ *      tZ = x
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_unary_ex_subst(nnc_u64 index) {
-    /*
-        tX = x
-        tY = tX
-        tZ = tX
-        -------
-        tY = x
-        tZ = x
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_3a_quad* quad3 = &unopt[index+2];
@@ -524,16 +561,41 @@ nnc_static nnc_u64 nnc_3a_opt_unary_ex_subst(nnc_u64 index) {
     *quad3 = opt_quad3;
     return 2;
 }
-
-nnc_static nnc_u64 nnc_3a_opt_unary_subst(nnc_u64 index, nnc_3a_peep_pattern pat) {
-    const nnc_3a_quad* op_quad = &unopt[index];
-    const nnc_3a_quad* res_quad = &unopt[index+1];
-    nnc_3a_quad opt_res_quad = *res_quad;
-    opt_res_quad.arg1 = op_quad->arg1;
-    buf_add(opt, opt_res_quad);
-    return 2;
-}
-
+/**
+ * @brief Optimizes `OPT_COPY_BINARY_L_SUBST`, `OPT_COPY_BINARY_R_SUBST` or `OPT_COPY_BINARY_SUBST` pattern.
+ *  Accepts (for OPT_COPY_BINARY_L_SUBST):
+ *      tX = addrX
+ *      tY = ... (not OP_COPY)
+ *      tZ = tX (binOp) tY              ||
+ *      tZ = if tX (jmpBinOp) tY goto L
+ *  Optimization (for OPT_COPY_BINARY_L_SUBST)
+ *      tY = ... (not OP_COPY)
+ *      tZ = addrX (binOp) tY ||
+ *      tZ = if addrX (jmpBinOp) tY goto L
+ * 
+ *  Accepts (for OPT_COPY_BINARY_R_SUBST):
+ *      tX = ... (not OP_COPY)
+ *      tY = addrY
+ *      tZ = tX (binOp) tY              ||
+ *      tZ = if tX (jmpBinOp) tY goto L
+ *  Optimization (for OPT_COPY_BINARY_R_SUBST)
+ *      tX = ... (not OP_COPY)
+ *      tZ = tX (binOp) addrY ||
+ *      tZ = if tX (jmpBinOp) addrY goto L
+ * 
+ *  Accepts (for OPT_COPY_BINARY_SUBST):
+ *      tX = addrX
+ *      tY = addrY
+ *      tZ = tX (binOp) tY              ||
+ *      tZ = if tX (jmpBinOp) tY goto L
+ *  Optimization (for OPT_COPY_BINARY_SUBST)
+ *      tZ = addrX (binOp) addrY              ||
+ *      tZ = if addrX (jmpBinOp) addrY goto L
+ *
+ * @param index Index of first quad that triggered pattern routine. 
+ * @param pat Concrete pattern.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_subst(nnc_u64 index, nnc_3a_peep_pattern pat) {
     const nnc_3a_quad* lop_quad = &unopt[index];
     const nnc_3a_quad* rop_quad = &unopt[index+1];
@@ -561,6 +623,19 @@ nnc_static nnc_u64 nnc_3a_opt_binary_subst(nnc_u64 index, nnc_3a_peep_pattern pa
     return 3;
 }
 
+/**
+ * @brief Optimizes `OPT_UNARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has float type.
+ *  Accepts:
+ *      tX = x
+ *      tZ = unOp tX     ||
+ *      tZ = (type) tX   ||
+ *  Optimization:
+ *      tZ = const
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
     const nnc_3a_quad* op_quad = &unopt[index];
     const nnc_3a_quad* un_op_quad = &unopt[index+1];
@@ -593,6 +668,21 @@ nnc_static nnc_u64 nnc_3a_opt_unary_fconst_fold(nnc_u64 index) {
     return 2;
 }
 
+/**
+ * @brief Optimizes `OPT_UNARY_CONST_FOLD` pattern.
+ * This routine is used for case of branch operators.
+ *  Accepts:
+ *      tX = x
+ *      if tX goto L     || 
+ *      if not tX goto L ||
+ * 
+ *  Optimization:
+ *      goto L || (OP_UJUMP) (in case when constant condition is true)
+ *      ...       (OP_NONE)  (sets as OP_NONE in case when constant condition is true)
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_unary_branch_fold(nnc_u64 index) {
     const nnc_3a_quad* op_quad = &unopt[index];
     const nnc_3a_quad* res_quad = &unopt[index+1];
@@ -617,6 +707,20 @@ nnc_static nnc_u64 nnc_3a_opt_unary_branch_fold(nnc_u64 index) {
     return 2;
 } 
 
+/**
+ * @brief Optimizes `OPT_UNARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has integral type.
+ * It also handles jump operators by calling `nnc_3a_opt_unary_branch_fold`.  
+ * Accepts:
+ *      tX = x
+ *      tZ = unOp tX     ||
+ *      tZ = (type) tX   ||
+ * Optimization:
+ *      tZ = const
+ * 
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
     const nnc_3a_quad* op_quad = &unopt[index];
     const nnc_3a_quad* res_quad = &unopt[index+1];
@@ -657,6 +761,13 @@ nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
     return 2;
 }
 
+/**
+ * @brief Optimizes `OPT_UNARY_CONST_FOLD` pattern for both integral and float expression types.
+ *  For more information about optimization see `nnc_3a_opt_unary_fconst_fold` and
+ *  `nnc_3a_opt_unary_iconst_fold` functions.
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_unary_const_fold(nnc_u64 index) {
     const nnc_3a_quad* un_op_quad = &unopt[index+1];
     const nnc_type* un_op_type = un_op_quad->res.type;
@@ -670,6 +781,25 @@ nnc_static nnc_u64 nnc_3a_opt_unary_const_fold(nnc_u64 index) {
     return 2;
 }
 
+/**
+ * @brief Optimizes `OPT_BINARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has float type and jump opetators.
+ * Accepts:
+ *      tX = x                        (OP_COPY)
+ *      tY = y                        (OP_COPY)
+ *      tZ = if tX == tY goto L ||    (OP_CJUMPE)
+ *      tZ = if tX != tY goto L ||    (OP_CJUMPNE)
+ *      tZ = if tX < tY goto L  ||    (OP_CJUMPLT)
+ *      tZ = if tX > tY goto L  ||    (OP_CJUMPGT)
+ *      tZ = if tX <= tY goto L ||    (OP_CJUMPLTE)
+ *      tZ = if tX >= tY goto L       (OP_CJUMPGTE)
+ *  Optimization:
+ *      goto L || (OP_UJUMP) (in case when constant condition is true)
+ *      ...       (OP_NONE)  (sets as OP_NONE in case when constant condition is true)
+ * 
+ * @param index Index of first quad that triggered pattern routine.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_fconst_branch_fold(nnc_u64 index) {
     const nnc_3a_quad* lop_quad = &unopt[index];
     const nnc_3a_quad* rop_quad = &unopt[index+1];
@@ -701,6 +831,20 @@ nnc_static nnc_u64 nnc_3a_opt_binary_fconst_branch_fold(nnc_u64 index) {
     return 3;
 }
 
+/**
+ * @brief Optimizes `OPT_BINARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has float type.
+ * It also handles jump operators by calling `nnc_3a_opt_binary_fconst_branch_fold`.
+ * Accepts:
+ *      tX = x                        
+ *      tY = y                        
+ *      tZ = tX binOp tY
+ *  Optimization:
+ *      tZ = const
+ * 
+ * @param index Index of first quad that triggered pattern routine.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_fconst_fold(nnc_u64 index) {
     const nnc_3a_quad* lop_quad = &unopt[index];
     const nnc_3a_quad* rop_quad = &unopt[index+1];
@@ -736,6 +880,25 @@ nnc_static nnc_u64 nnc_3a_opt_binary_fconst_fold(nnc_u64 index) {
     return 3;
 }
 
+/**
+ * @brief Optimizes `OPT_BINARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has integral type and jump opetators.
+ * Accepts:
+ *      tX = x                        (OP_COPY)
+ *      tY = y                        (OP_COPY)
+ *      tZ = if tX == tY goto L ||    (OP_CJUMPE)
+ *      tZ = if tX != tY goto L ||    (OP_CJUMPNE)
+ *      tZ = if tX < tY goto L  ||    (OP_CJUMPLT)
+ *      tZ = if tX > tY goto L  ||    (OP_CJUMPGT)
+ *      tZ = if tX <= tY goto L ||    (OP_CJUMPLTE)
+ *      tZ = if tX >= tY goto L       (OP_CJUMPGTE)
+ *  Optimization:
+ *      goto L || (OP_UJUMP) (in case when constant condition is true)
+ *      ...       (OP_NONE)  (sets as OP_NONE in case when constant condition is true)
+ * 
+ * @param index Index of first quad that triggered pattern routine.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_iconst_branch_fold(nnc_u64 index) {
     const nnc_3a_quad* lop_quad = &unopt[index];
     const nnc_3a_quad* rop_quad = &unopt[index+1];
@@ -761,6 +924,20 @@ nnc_static nnc_u64 nnc_3a_opt_binary_iconst_branch_fold(nnc_u64 index) {
     return 3;
 }
 
+/**
+ * @brief Optimizes `OPT_BINARY_CONST_FOLD` pattern.
+ * This routine is used for case when expression has integral type.
+ * It also handles jump operators by calling `nnc_3a_opt_binary_iconst_branch_fold`.
+ * Accepts:
+ *      tX = x                        
+ *      tY = y                        
+ *      tZ = tX binOp tY
+ *  Optimization:
+ *      tZ = const
+ * 
+ * @param index Index of first quad that triggered pattern routine.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_iconst_fold(nnc_u64 index) {
     const nnc_3a_quad* lop_quad = &unopt[index];
     const nnc_3a_quad* rop_quad = &unopt[index+1];
@@ -796,14 +973,14 @@ nnc_static nnc_u64 nnc_3a_opt_binary_iconst_fold(nnc_u64 index) {
     return 3;
 }
 
+/**
+ * @brief Optimizes `OPT_BINARY_CONST_FOLD` pattern for both integral and float expression types.
+ *  For more information about optimization see `nnc_3a_opt_binary_fconst_fold` and
+ *  `nnc_3a_opt_binary_iconst_fold` functions.
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_binary_const_fold(nnc_u64 index) {
-    /*
-        tX = const1
-        tY = const2
-        tZ = tX binOp tY
-        ----------------
-        tZ = const3
-    */
     const nnc_3a_quad* bin_op_quad = &unopt[index+2];
     const nnc_type* bin_op_type = bin_op_quad->res.type;
     if (nnc_real_type(bin_op_type)) {
@@ -816,13 +993,17 @@ nnc_static nnc_u64 nnc_3a_opt_binary_const_fold(nnc_u64 index) {
     return 1;
 }
 
+/**
+ * @brief Optimizes `OPT_INDEX_CONST_FOLD` pattern.
+ * Accepts:
+ *      tX = const1
+ *      tZ = tX binOp const2
+ * Optimization:
+ *      tZ = const3
+ * @param index Index of first quad that triggered pattern routine. 
+ * @return Number of quads (2) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
-    /*
-        tX = const1
-        tZ = tX binOp const2
-        --------------------
-        tZ = const3
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     nnc_u64 lval = quad1->arg1.exact.iconst.iconst;
@@ -839,36 +1020,41 @@ nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
     return 2;
 }
 
+/**
+ * @brief Optimizes `OPT_ALG_MUL_ZERO`, `OPT_ALG_ADD_ZERO`, `OPT_ALG_MUL_ONE` or `OPT_ALG_MUL_POW_TWO` pattern.
+ * @param index Index of first quad that triggered pattern routine.
+ * Accepts (for OPT_ALG_MUL_ZERO):
+ *      tX = x (or 0)
+ *      tY = 0 (or x)
+ *      tZ = tX * tY
+ * Optimization:
+ *      tZ = 0
+ * 
+ * Accepts (for OPT_ALG_ADD_ZERO):
+ *      tX = x (or 0)
+ *      tY = 0 (or x)
+ *      tZ = tX + tY
+ * Optimization:
+ *      tZ = tX (or tY)
+ * 
+ * Accepts (for OPT_ALG_MUL_ONE):
+ *      tX = x (or 1)
+ *      tY = 1 (or x)
+ *      tZ = tX * tY
+ * Optimization:
+ *      tZ = tX (or tY)     
+ * 
+ * Accepts (for OPT_ALG_MUL_POW_TWO):
+ *      tX = x (or 2^n)
+ *      tY = 2^n (or x)
+ *      tZ = tX * tY
+ * Optimization:
+ *      tZ = tX (or tY) << n
+ * 
+ * @param pat Concrete pattern.
+ * @return Number of quads (3) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) {
-    /*
-    1) OPT_ALG_MUL_ZERO
-        tX = x (or 0)
-        tY = 0 (or x)
-        tZ = tX * tY
-        -------------
-        tZ = 0
-
-    2) OPT_ALG_ADD_ZERO
-        tX = x (or 0)
-        tY = 0 (or x)
-        tZ = tX + tY
-        -------------
-        tZ = tX (or tY)
-
-    3) OPT_ALG_MUL_ONE
-        tX = x (or 1)
-        tY = 1 (or x)
-        tZ = tX * tY
-        -------------
-        tZ = tX (or tY)
-
-    4) OPT_ALG_MUL_POW_TWO
-        tX = x (or 2^n)
-        tY = 2^n (or x)
-        tZ = tX * tY
-        -------------
-        tZ = tX (or tY) << n
-    */
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1]; 
     const nnc_3a_quad* quad3 = &unopt[index+2];
@@ -908,12 +1094,22 @@ nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) 
     return 3;
 }
 
+/**
+ * @brief Performs no optimization.
+ * @param index Index of first quad that triggered pattern routine.
+ * @return Number of quads (1) skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_opt_none(nnc_u64 index) {
     const nnc_3a_quad* quad = &unopt[index];
     buf_add(opt, *quad);
     return 1;
 }
 
+/**
+ * @brief Checks for different pattern triggers.
+ * @param index Index of the current quad.
+ * @return `OPT_NONE` or some other optimization pattern.
+ */
 nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
     switch (unopt[index].op) {
         case OP_REF:  return nnc_3a_op_ref_pat(index);
@@ -923,12 +1119,17 @@ nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
     return OPT_NONE;
 }
 
+/**
+ * @brief Optimizes pattern found at `index` quad.
+ * @param index Index of the current quad.
+ * @return Number of quads skipped by this optimizing function in initial quad set.
+ */
 nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     nnc_3a_peep_pattern pat = nnc_3a_search_peep_pattern(index);
     switch (pat) {
         /* Redundant cross operator optimizations */
         case OPT_REF_SUBST:            return nnc_3a_opt_ref_subst(index);
-        case OPT_COPY_UNARY_SUBST:     return nnc_3a_opt_unary_subst(index, pat);
+        case OPT_COPY_UNARY_SUBST:     return nnc_3a_opt_unary_subst(index);
         case OPT_COPY_UNARY_EX_SUBST:  return nnc_3a_opt_unary_ex_subst(index);
         case OPT_COPY_BINARY_SUBST:    return nnc_3a_opt_binary_subst(index, pat);
         case OPT_COPY_BINARY_L_SUBST:  return nnc_3a_opt_binary_subst(index, pat);
@@ -949,11 +1150,18 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     return 1;
 }
 
+/**
+ * @brief Iterator for `nnc_map_iter` function.
+ */
 nnc_static void nnc_3a_unused_cgts_iter(nnc_map_key key, nnc_map_val val) {
     nnc_3a_quad* unused_quad = val;
     unused_quad->op = OP_NONE;
 }
 
+/**
+ * @brief Erases unused CGTs from optimized quad set.
+ * @return Amount of quads removed.
+ */
 nnc_static nnc_u64 nnc_3a_erase_dead_cgts() {
     nnc_u64 size = buf_len(opt);
     _map_(nnc_i32, nnc_3a_quad*) unused = map_init_with(size);
@@ -1064,6 +1272,10 @@ nnc_static nnc_u64 nnc_3a_erase_dead_cgts() {
     return size - buf_len(used);
 }
 
+/**
+ * @brief Zips label quads with next non-label quad.
+ * @return Amount of quads zipped.
+ */
 nnc_static nnc_u64 nnc_3a_zip_quads() {
     nnc_u64 size = buf_len(opt);
     _vec_(nnc_3a_quad) zipped = NULL;
@@ -1082,6 +1294,10 @@ nnc_static nnc_u64 nnc_3a_zip_quads() {
     return size - buf_len(zipped);        
 }
 
+/**
+ * @brief Represents single peep optimizer pass.
+ * @return Amount of quads removed.
+ */
 nnc_static nnc_u64 nnc_3a_optimization_pass() {
     nnc_u64 i = 0;
     nnc_u64 len = buf_len(unopt);
@@ -1091,14 +1307,26 @@ nnc_static nnc_u64 nnc_3a_optimization_pass() {
     return len - buf_len(opt);
 }
 
+extern void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads);
+
+/**
+ * @brief Shows quad set at some optimization pass.
+ * @param pass Pass' number.
+ * @param quads Quad set at this pass.
+ */
 nnc_static void nnc_3a_show_pass(nnc_i32 pass, nnc_3a_quad* quads) {
     #if _NNC_ENABLE_PASS_LOGGING
         printf("\n################PASS%d################\n", pass);
         nnc_dump_3a_quads(stderr, quads);
-        //printf("pass %d reduced %lu\n", pass, reduced);
     #endif
 }
 
+/**
+ * @brief Performs peephole optimization over specified quad set.
+ * @param quads Quad set that must be optimized.
+ * @param stat Out statistics of this optimization routine.
+ * @return Optimized quad set.
+ */
 _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat) {
     opt = NULL, unopt = NULL;
     nnc_i32 pass = 0;
@@ -1132,10 +1360,15 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
     return opt;
 }
 
+/**
+ * @brief Performs peephole optimization over data segment quad set.
+ * @param data Data segment that must be optimized.
+ * @return Optimized data segment.
+ */
 nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data) {
     nnc_3a_opt_stat stat = {0};
     if (buf_len(data.quads) != 0) {
-    #if _NNC_ENABLE_PEEP_OPTIMIZATIONS
+    #if _NNC_ENABLE_OPTIMIZATIONS
         data.quads = nnc_3a_optimize(data.quads, &stat);
         data.stat = stat;
     #endif
