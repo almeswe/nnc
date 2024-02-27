@@ -286,14 +286,15 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part5(nnc_u64 index) {
  *  -------------------------------------
  *  This optimization targets redundant algebraic operations.
  *  Pattern's Trigger:
- *      tX = 1  ||                (OP_COPY)
- *      tX = 2^n                  (OP_COPY)
+ *      tX = 1    ||              (OP_COPY)
+ *      tX = 2^n  ||              (OP_COPY)
  *      tX = x                    (OP_COPY)
  *  Following part:
  *      tY = tX * 1   ||          (Binary operator: *)
  *      tY = 1 * tX   ||          (Binary operator: *)
  *      tY = 2^n * tX ||          (Binary operator: *)
  *      tY = tX * 2^n ||          (Binary operator: *)
+ *      tY = tX % 2^n             (Binary operator: *)
  * 
  * @param index Index of first quad with `OP_COPY` (which triggered this function).
  * @return `OPT_NONE` if pattern does not match, `OPT_ALG_MUL_ONE` | `OPT_ALG_MUL_POW_TWO` otherwise.
@@ -305,7 +306,7 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
     if (index + 2 < buf_len(unopt)) {
         quad3 = &unopt[index+2];
     }
-    if (quad3 == NULL || quad3->op != OP_MUL) {
+    if (quad3 == NULL || (quad3->op != OP_MUL && quad3->op != OP_MOD)) {
         return OPT_NONE;
     }
     if ((quad1->arg1.kind == ADDR_ICONST ||
@@ -314,14 +315,23 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part6(nnc_u64 index) {
             quad2->arg1.exact.iconst.iconst == 1) {
             if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
                 (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
-                return OPT_ALG_MUL_ONE;
+                if (quad3->op == OP_MUL) {
+                    return OPT_ALG_MUL_ONE;
+                }
             }
         }
         if (nnc_pow2(quad1->arg1.exact.iconst.iconst) ||
             nnc_pow2(quad2->arg1.exact.iconst.iconst)) {
             if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
                 (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
-                return OPT_ALG_MUL_POW_TWO;
+                if (!nnc_signed_type(quad3->res.type)) {
+                    if (quad3->op == OP_MUL) {
+                        return OPT_ALG_MUL_POW_TWO;   
+                    }
+                    if (quad2->arg1.kind == ADDR_ICONST && quad3->op == OP_MOD) {
+                        return OPT_ALG_MOD_POW_TWO;   
+                    }
+                }
             }
         }
     }
@@ -1051,6 +1061,13 @@ nnc_static nnc_u64 nnc_3a_opt_index_const_fold(nnc_u64 index) {
  * Optimization:
  *      tZ = tX (or tY) << n
  * 
+ * Accepts (for OPT_ALG_MOD_POW_TWO):
+ *      tX = x
+ *      tY = 2^n
+ *      tZ = tX % tY
+ * Optimization:
+ *      tZ = tX & (tY-1)
+ *
  * @param pat Concrete pattern.
  * @return Number of quads (3) skipped by this optimizing function in initial quad set.
  */
@@ -1078,17 +1095,24 @@ nnc_static nnc_u64 nnc_3a_opt_algebraic(nnc_u64 index, nnc_3a_peep_pattern pat) 
             break;
         }
         case OPT_ALG_MUL_POW_TWO: {
-            nnc_i32 pow = 0;
+            nnc_u32 pow = 0;
             nnc_u64 val = opt_const_arg.exact.iconst.iconst;
             for (; val != 0; pow++) {
                 val /= 2;
             }
             opt_quad.op = OP_SHL;
             opt_quad.arg1 = opt_non_const_arg;
-            opt_quad.arg2 = nnc_3a_mki3(pow-1);
+            opt_quad.arg2 = nnc_3a_mki3(pow - 1);
             break;
         }
-        default: nnc_abort_no_ctx("nnc_3a_opt_red_alg: unknown search pattern."); 
+        case OPT_ALG_MOD_POW_TWO: {
+            nnc_u64 val = opt_const_arg.exact.iconst.iconst;
+            opt_quad.op = OP_BW_AND;
+            opt_quad.arg1 = opt_non_const_arg;
+            opt_quad.arg2 = nnc_3a_mki3(val - 1);
+            break;
+        }
+        default: nnc_abort_no_ctx("nnc_3a_opt_algebraic: unknown search pattern."); 
     }
     buf_add(opt, opt_quad);
     return 3;
@@ -1143,6 +1167,7 @@ nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
         case OPT_ALG_ADD_ZERO:         return nnc_3a_opt_algebraic(index, pat);
         case OPT_ALG_MUL_ZERO:         return nnc_3a_opt_algebraic(index, pat);
         case OPT_ALG_MUL_POW_TWO:      return nnc_3a_opt_algebraic(index, pat);
+        case OPT_ALG_MOD_POW_TWO:      return nnc_3a_opt_algebraic(index, pat);
         /* No optimization */
         case OPT_NONE:                 return nnc_3a_opt_none(index);
         default: nnc_abort_no_ctx("nnc_3a_optimize_peep: unknown search pattern."); 

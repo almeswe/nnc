@@ -43,6 +43,7 @@ typedef enum _nnc_3a_peep_pattern {
     OPT_ALG_MUL_ZERO,
     OPT_ALG_ADD_ZERO,
     OPT_ALG_MUL_POW_TWO,
+    OPT_ALG_MOD_POW_TWO,
     /* No optimization */
     OPT_NONE,
 } nnc_3a_peep_pattern;
