@@ -1,8 +1,8 @@
-#ifndef _NNC_THREE_ADDRESS_CODE_H
-#define _NNC_THREE_ADDRESS_CODE_H
+#ifndef __NNC_THREE_ADDRESS_CODE_H__
+#define __NNC_THREE_ADDRESS_CODE_H__
 
 #define _NNC_ENABLE_PASS_LOGGING 0
-#define _NNC_ENABLE_OPTIMIZATIONS 1
+#define _NNC_ENABLE_OPTIMIZATIONS 0
 
 #include "nnc_typecheck.h"
 
@@ -10,6 +10,10 @@
          OP_PLUS:   \
     case OP_MINUS:  \
     case OP_BW_NOT
+
+#define OP_UNARY_JUMP \
+         OP_CJUMPF:   \
+    case OP_CJUMPT
 
 #define OP_BINARY   \
          OP_ADD:    \
@@ -22,6 +26,14 @@
     case OP_BW_OR:  \
     case OP_BW_AND: \
     case OP_BW_XOR
+
+#define OP_BINARY_JUMP   \
+         OP_CJUMPLT:     \
+    case OP_CJUMPGT:     \
+    case OP_CJUMPLTE:    \
+    case OP_CJUMPGTE:    \
+    case OP_CJUMPE:      \
+    case OP_CJUMPNE
 
 typedef nnc_u64 nnc_3a_cgt_cnt;
 typedef nnc_u32 nnc_3a_label_cnt;
@@ -168,11 +180,21 @@ typedef struct _nnc_3a_name {
     const nnc_nesting* nesting;
 } nnc_3a_name;
 
+typedef enum _nnc_3a_storage_kind {
+    STORAGE_NONE,
+    STORAGE_REG,
+    STORAGE_MEM
+} nnc_3a_storage_kind;
+
 #pragma pack(push)
 #pragma pack(1)
 typedef struct _nnc_3a_addr {
     const nnc_type* type;
-    nnc_3a_addr_kind kind: 8;
+    nnc_3a_addr_kind kind: 6;
+    nnc_3a_storage_kind skind: 2; 
+    union _nnc_3a_storage {
+        nnc_u16 mem, reg;
+    } storage;
     union _nnc_3a_addr_exact {
         nnc_3a_cgt cgt;
         nnc_3a_name name;
@@ -210,8 +232,13 @@ typedef struct _nnc_3a_opt_stat {
 } nnc_3a_opt_stat;
 
 #define nnc_3a_mkblock(x) (nnc_3a_basic){\
-    .id = x, .quads = NULL               \
+    .id = x, .quads = NULL \
 }
+
+typedef struct _nnc_3a_live_range {
+    nnc_u32 starts;
+    nnc_u32 ends;
+} nnc_3a_live_range, nnc_3a_lr;
 
 typedef struct _nnc_3a_basic {
     nnc_u32 id;
@@ -241,6 +268,8 @@ typedef struct _nnc_3a_unit {
     nnc_3a_quad* quads;
     nnc_3a_cfg cfg;
     nnc_3a_opt_stat stat;
+    _map_(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
+    _map_(const char*, nnc_3a_lr*) lr_var;
 } nnc_3a_unit;
 
 typedef nnc_3a_unit* nnc_3a_code;
@@ -250,21 +279,70 @@ extern nnc_3a_code code;
 extern nnc_3a_data data;
 extern nnc_3a_cgt_cnt cgt_cnt;
 
-void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st);
-void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st);
-void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st);
-void nnc_dump_3a_code(FILE* to, const nnc_3a_code code);
-void nnc_dump_3a_data(FILE* to, const nnc_3a_data data);
-void nnc_dump_3a_code_cfg(FILE* to, const nnc_3a_code code);
-void nnc_dump_3a_data_cfg(FILE* to, const nnc_3a_data data);
+void nnc_expr_to_3a(
+    const nnc_expression* expr,
+    const nnc_st* st
+);
 
-_vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat);
-nnc_3a_code nnc_3a_optimize_code(nnc_3a_code code);
-nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data);
+void nnc_stmt_to_3a(
+    const nnc_statement* stmt,
+    const nnc_st* st
+);
 
-_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_unit* unit);
-nnc_3a_cfg nnc_3a_get_cfg(_vec_(nnc_3a_basic) blocks);
-nnc_3a_cfg nnc_3a_cfg_optimize(nnc_3a_cfg cfg, nnc_3a_opt_stat* stat);
-void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg);
+void nnc_ast_to_3a(
+    const nnc_ast* ast,
+    const nnc_st* st
+);
+
+void nnc_dump_3a_code(
+    FILE* to,
+    const nnc_3a_code code
+);
+
+void nnc_dump_3a_data(
+    FILE* to,
+    const nnc_3a_data data
+);
+
+void nnc_dump_3a_code_cfg(
+    FILE* to,
+    const nnc_3a_code code
+);
+
+void nnc_dump_3a_data_cfg(
+    FILE* to,
+    const nnc_3a_data data
+);
+
+_vec_(nnc_3a_quad) nnc_3a_optimize(
+    _vec_(nnc_3a_quad) quads,
+    nnc_3a_opt_stat* stat
+);
+
+nnc_3a_code nnc_3a_optimize_code(
+    nnc_3a_code code
+);
+
+nnc_3a_data nnc_3a_optimize_data(
+    nnc_3a_data data
+);
+
+_vec_(nnc_3a_basic) nnc_3a_get_blocks(
+    const nnc_3a_unit* unit
+);
+
+nnc_3a_cfg nnc_3a_get_cfg(
+    _vec_(nnc_3a_basic) blocks
+);
+
+nnc_3a_cfg nnc_3a_cfg_optimize(
+    nnc_3a_cfg cfg,
+    nnc_3a_opt_stat* stat
+);
+
+void nnc_dump_3a_cfg(
+    const char* name,
+    const nnc_3a_cfg* cfg
+);
 
 #endif

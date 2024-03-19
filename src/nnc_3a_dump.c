@@ -251,8 +251,10 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
 }
 
 void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads) {
+    static nnc_u32 quad_counter = 0; 
     stream = to;
     for (nnc_u64 i = 0; i < buf_len(quads); i++) {
+        fprintf(stream, "%3lu) ", ++quad_counter);
         nnc_dump_3a_quad(&quads[i]);
     }
 }
@@ -276,6 +278,16 @@ void nnc_dump_3a_cfg(const char* name, const nnc_3a_cfg* cfg) {
     }
 }
 
+nnc_static void nnc_dump_3a_lr_cgt(nnc_map_key key, nnc_map_val val) {
+    const nnc_3a_lr* lr = (nnc_3a_lr*)val;
+    fprintf(stream, "[t%u] lives at (%u:%u)\n", (nnc_u32)key, lr->starts+1, lr->ends+1);
+}
+
+nnc_static void nnc_dump_3a_lr_var(nnc_map_key key, nnc_map_val val) {
+    const nnc_3a_lr* lr = (nnc_3a_lr*)val;
+    fprintf(stream, "[_%s] lives at (%u:%u)\n", (char*)key, lr->starts+1, lr->ends+1);
+}
+
 void nnc_dump_3a_unit(FILE* to, const nnc_3a_unit* unit) {
     stream = to;
     dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
@@ -291,7 +303,9 @@ void nnc_dump_3a_unit(FILE* to, const nnc_3a_unit* unit) {
         dump_3a("=========BLOCK[%u]=========\n", node->id);
         nnc_dump_3a_quads(to, node->block->quads);
     }
-    nnc_dump_3a_cfg(unit->name, &unit->cfg);
+    nnc_map_iter(unit->lr_cgt, nnc_dump_3a_lr_cgt);
+    nnc_map_iter(unit->lr_var, nnc_dump_3a_lr_var);
+    //nnc_dump_3a_cfg(unit->name, &unit->cfg);
 }
 
 void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {

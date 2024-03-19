@@ -1,5 +1,8 @@
 #include "nnc_3a.h"
 
+//todo: change data structure for quads to linked list
+//todo: reduce code size for peephole optimizer.
+
 nnc_3a_code code = NULL;
 nnc_3a_data data = {
     .name = ".data",
@@ -662,11 +665,15 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
     nnc_3a_quads_add(&b_next);
 }
 
+extern void nnc_3a_make_lr_for_unit(nnc_3a_unit* unit);
+
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
     nnc_3a_unit unit = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
+        .lr_var = map_init_with(8),
+        .lr_cgt = map_init_with(32)
     };
     unit.stat.initial = buf_len(unit.quads);
     #if _NNC_ENABLE_OPTIMIZATIONS
@@ -677,6 +684,7 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
     #if _NNC_ENABLE_OPTIMIZATIONS
     unit.cfg = nnc_3a_cfg_optimize(unit.cfg, &unit.stat);
     #endif
+    nnc_3a_make_lr_for_unit(&unit);
     quads = NULL;
     buf_add(code, unit);
 }
