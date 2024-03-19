@@ -18,13 +18,21 @@ nnc_map_hash nncmap_hash(nnc_map_key key) {
  * @param key String key to be hashed.
  * @return Hash of the key.
  */
-nnc_map_hash nncmap_hash_str(const char* key) {
+nnc_map_hash nncmap_hash_str(nnc_map_key key) {
     nnc_i32 c = 0;
     nnc_u64 hash = 5481;
-    while ((c = *(key++))) {
+    char* str_key = (char*)key;
+    while ((c = *(str_key++))) {
         hash = ((hash << 5) + hash) + c;
     }
     return (nnc_map_hash)hash;
+}
+
+nnc_static nnc_bool nncmap_keys_cmp(nnc_map_key key1, nnc_map_key key2, map_hash_fn* hash) {
+    if (hash == nncmap_hash_str) {
+        return strcmp((const char*)key1, (const char*)key2) == 0;
+    }
+    return key1 == key2;
 }
 
 /**
@@ -85,8 +93,9 @@ nnc_static nnc_bool nncmap_needs_rehash(nnc_map* map) {
 /**
  * @brief Performs rehashing of the map.
  * @param map Pointer to map instance to rehash.
+ * @param hash Hash function.
  */
-nnc_static void nncmap_rehash(nnc_map* map) {
+nnc_static void nncmap_rehash(nnc_map* map, map_hash_fn* hash) {
     // copy initial map
     nnc_map copy = *map;
     // and then change the original map instance
@@ -101,7 +110,7 @@ nnc_static void nncmap_rehash(nnc_map* map) {
                 break;
             }
             // put bucket from initial buckets to newly allocated
-            nncmap_put(map, bucket->key, bucket->val);
+            nncmap_put(map, bucket->key, bucket->val, hash);
         }
     }
     // dispose old buckets
@@ -126,14 +135,15 @@ nnc_map* nncmap_init(nnc_u64 inicap) {
  * @brief Gets values from map by key.
  * @param map Pointer to map instance.
  * @param key Key by which search is performed.
+ * @param hash Hash function.
  * @return Value mapped by specified key, 
  *  `Assertion failed` if there are no value by this key.
  */
-nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key) {
-    nnc_map_idx idx = nncmap_hash(key) % map->cap;
+nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key, map_hash_fn* hash) {
+    nnc_map_idx idx = hash(key) % map->cap;
     nnc_map_bucket* bucket = &map->buckets[idx];
     for (; bucket != NULL; bucket = bucket->next) {
-        if (bucket->key == key) {
+        if (nncmap_keys_cmp(bucket->key, key, hash)) {
             break;
         }
     }
@@ -145,17 +155,18 @@ nnc_map_val nncmap_get(nnc_map* map, nnc_map_key key) {
  * @brief Pops out the value pointer
  * @param map Pointer to map instance.
  * @param key Key by which to search.
+ * @param hash Hash function.
  */
-void nncmap_pop(nnc_map* map, nnc_map_key key) {
-    nnc_map_idx idx = nncmap_hash(key) % map->cap;
-    if (!nncmap_has(map, key)) {
+void nncmap_pop(nnc_map* map, nnc_map_key key, map_hash_fn* hash) {
+    nnc_map_idx idx = hash(key) % map->cap;
+    if (!nncmap_has(map, key, hash)) {
         return;
     }
     nnc_map_bucket* prev = &map->buckets[idx];
     nnc_map_bucket* curr = prev->next;
     // check if bucket (head of linked list)
     // is bucket which must be deleted.
-    if (prev->key == key) {
+    if (nncmap_keys_cmp(prev->key, key, hash)) {
         // if so, make shallow copy from
         // next child, and dispose it.
         map->len--;
@@ -170,7 +181,7 @@ void nncmap_pop(nnc_map* map, nnc_map_key key) {
     // otherwise search needed bucket in it's children.
     else {
         for (; prev != NULL; prev = curr, curr = curr->next) {
-            if (curr->key == key) {
+            if (nncmap_keys_cmp(curr->key, key, hash)) {
                 map->len--;
                 prev->next = curr->next;
                 nnc_dispose(curr);
@@ -185,15 +196,16 @@ void nncmap_pop(nnc_map* map, nnc_map_key key) {
  * @param map Pointer to map instance.
  * @param key Key with which value to be added.
  * @param val Value to be added by specified key.
+ * @param hash Hash function.
  */
-void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val) {
+void nncmap_put(nnc_map* map, nnc_map_key key, nnc_map_val val, map_hash_fn* hash) {
     if (nncmap_needs_rehash(map)) {
-        nncmap_rehash(map);
+        nncmap_rehash(map, hash);
     }
-    nnc_map_idx idx = nncmap_hash(key) % map->cap;
+    nnc_map_idx idx = hash(key) % map->cap;
     nnc_map_bucket* bucket = &map->buckets[idx];
     for (;; bucket = bucket->next) {
-        if (!bucket->has_key || bucket->key == key) {
+        if (!bucket->has_key || nncmap_keys_cmp(bucket->key, key, hash)) {
             // increase length only in case
             // when bucket without any key is filled.
             // otherwise rewriting the same bucket
@@ -237,16 +249,17 @@ void nnc_map_iter(nnc_map* map, map_iter_fn* iter) {
  * @brief Determines if value by key is stored in map.
  * @param map Pointer to map instance.
  * @param key Key with which to check.
+ * @param hash Hash function.
  * @return `true` if map has value with this key, otherwise `false`.
  */
-nnc_bool nncmap_has(nnc_map* map, nnc_map_key key) {
-    nnc_map_idx idx = nncmap_hash(key) % map->cap;
+nnc_bool nncmap_has(nnc_map* map, nnc_map_key key, map_hash_fn* hash) {
+    nnc_map_idx idx = hash(key) % map->cap;
     nnc_map_bucket* bucket = &map->buckets[idx];
     if (!bucket->has_key) {
         return false;
     }
     for (; bucket != NULL; bucket = bucket->next) {
-        if (bucket->key == key) {
+        if (nncmap_keys_cmp(bucket->key, key, hash)) {
             return true;
         }
     }
