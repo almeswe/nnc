@@ -153,7 +153,7 @@ typedef struct _nnc_3a_fconst {
 } nnc_3a_fconst;
 
 #define nnc_3a_mks1(x) (nnc_3a_addr){ \
-    .kind = ADDR_SCONST,               \
+    .kind = ADDR_SCONST,              \
     .type = x->type,                  \
     .exact.sconst.sconst = x->exact   \
 }
@@ -183,18 +183,15 @@ typedef struct _nnc_3a_name {
 typedef enum _nnc_3a_storage_kind {
     STORAGE_NONE,
     STORAGE_REG,
-    STORAGE_MEM
-} nnc_3a_storage_kind;
+    STORAGE_DATA_SEG,
+    STORAGE_STACK_SEG,
+} nnc_3a_storage_type;
 
 #pragma pack(push)
 #pragma pack(1)
 typedef struct _nnc_3a_addr {
     const nnc_type* type;
-    nnc_3a_addr_kind kind: 6;
-    nnc_3a_storage_kind skind: 2; 
-    union _nnc_3a_storage {
-        nnc_u16 mem, reg;
-    } storage;
+    nnc_3a_addr_kind kind: 8;
     union _nnc_3a_addr_exact {
         nnc_3a_cgt cgt;
         nnc_3a_name name;
@@ -235,9 +232,15 @@ typedef struct _nnc_3a_opt_stat {
     .id = x, .quads = NULL \
 }
 
+typedef struct _nnc_3a_storage {
+    nnc_u32 reg;
+    nnc_u32 mem_offset;
+    nnc_3a_storage_type where;
+} nnc_3a_storage;
+
 typedef struct _nnc_3a_live_range {
-    nnc_u32 starts;
-    nnc_u32 ends;
+    nnc_u32 starts, ends;
+    nnc_3a_storage storage;
 } nnc_3a_live_range, nnc_3a_lr;
 
 typedef struct _nnc_3a_basic {
@@ -262,7 +265,6 @@ typedef struct _nnc_3a_cfg {
     _vec_(nnc_3a_cfg_node*) nodes;
 } nnc_3a_cfg;
 
-//todo: add frame info (number of parameters and their types)
 typedef struct _nnc_3a_unit {
     const char* name;
     nnc_3a_quad* quads;
