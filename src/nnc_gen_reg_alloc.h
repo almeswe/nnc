@@ -3,8 +3,8 @@
 
 #include "nnc_arena.h"
 
-#define NNC_ALLOC_REG()     nnc_alloc_reg(false)
-#define NNC_ALLOC_XMM_REG() nnc_alloc_reg(true)
+extern nnc_u32 nnc_glob_stack_offset;
+extern nnc_u32 nnc_glob_param_stack_offset;
 
 typedef enum _nnc_x86_64_asm_reg {
     /* General purpose x86_64 (used) registers */
@@ -15,11 +15,22 @@ typedef enum _nnc_x86_64_asm_reg {
     R_XMM4, R_XMM5, R_XMM6, R_XMM7
 } nnc_asm_reg;
 
-typedef nnc_u8 nnc_asm_reg_state;
-
-extern nnc_asm_reg_state nnc_asm_regs[];
 extern const char* nnc_asm_reg_str[];
 
-nnc_asm_reg nnc_alloc_reg(nnc_bool simd);
+typedef struct _nnc_asm_reg_lr_rec {
+    const nnc_3a_lr* lr;
+} nnc_asm_reg_lr_rec;
+
+typedef enum _nnc_store_mode {
+    STORE_LOCAL,
+    STORE_PARAM,
+    STORE_GLOBAL // todo: ??
+} nnc_store_mode;
+
+const nnc_3a_storage* nnc_store_generic(
+    nnc_3a_unit* unit,
+    const nnc_3a_addr* generic,
+    nnc_store_mode mode
+);
 
 #endif
