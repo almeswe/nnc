@@ -208,7 +208,10 @@ nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
     dump_3a("%*s", pad, repr);
 }
 
-nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
+void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
+    if (stream == NULL) {
+        stream = stderr;
+    }
     if (quad->label != 0) {
         dump_3a(" @%u:\n", quad->label);
         if (quad->op == OP_NONE) {
@@ -251,7 +254,7 @@ nnc_static void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
 }
 
 void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads) {
-    static nnc_u32 quad_counter = 0; 
+    static nnc_u32 quad_counter = 0;
     stream = to;
     for (nnc_u64 i = 0; i < buf_len(quads); i++) {
         fprintf(stream, "%3lu) ", ++quad_counter);

@@ -421,7 +421,7 @@ nnc_static void nnc_unary_to_3a(const nnc_unary_expression* unary, const nnc_st*
                 arg = *nnc_3a_quads_res();
             }
             nnc_3a_quad quad = nnc_3a_mkquad1(
-                un_op_map[unary->kind], nnc_3a_mkcgt(), unary->type, arg
+                un_op_map[unary->kind], arg, unary->type, arg
             );
             nnc_3a_quads_add(&quad);
         }
@@ -595,7 +595,7 @@ nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_
             nnc_expr_to_3a(binary->rexpr, st);
             arg2 = *nnc_3a_quads_res();
             nnc_3a_quad quad = nnc_3a_mkquad1(
-                op, nnc_3a_mkcgt(), binary->type, arg1, arg2
+                op, arg1, binary->type, arg1, arg2
             );
             nnc_3a_quads_add(&quad);
         }
