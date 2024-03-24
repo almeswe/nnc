@@ -64,13 +64,8 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
         #endif
         //data = nnc_3a_optimize_data(data);
         //nnc_dump_3a_data(stderr, data);
-        nnc_dump_3a_code(stderr, code);
-        for (nnc_u64 i = 0; i < buf_len(code[0].quads); i++) {
-            nnc_3a_quad* quad = &code[0].quads[i];
-            const nnc_3a_storage* storage = nnc_store_generic(&code[0], &quad->res, STORE_LOCAL);
-            if (storage->where == STORAGE_REG)
-                printf("%lu) %s\n", i + 1, nnc_asm_reg_str[storage->reg]);
-        }
+        //nnc_dump_3a_code(stderr, code);
+        nnc_gen_unit(code);
         ETRY;
     }
     CATCHALL {

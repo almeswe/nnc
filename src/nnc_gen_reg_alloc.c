@@ -1,8 +1,5 @@
 #include "nnc_gen.h"
 
-nnc_u32 nnc_glob_stack_offset = 0;
-nnc_u32 nnc_glob_param_stack_offset = 0;
-
 const char* nnc_asm_reg_str[] = {
     [R_RAX]  = "rax", 
     [R_RBX]  = "rbx",
@@ -177,6 +174,9 @@ typedef struct _nnc_store_params {
 } nnc_store_params;
 
 nnc_static const nnc_3a_storage* nnc_perform_store(nnc_store_params* params, nnc_store_in_mem_fn spill) {
+    if (params->generic->kind == ADDR_NAME) {
+        return spill(params->lr, params->generic);
+    }
     for (nnc_u64 i = 0; i < params->priority_size; i++) {
         // get mapping record (register => live range associated with it)
         nnc_asm_reg_lr_rec* rec = &nnc_reg_lr_map[params->priority[i]];
@@ -216,7 +216,7 @@ nnc_static const nnc_3a_storage* nnc_store_local(nnc_3a_lr* lr, const nnc_3a_add
     return nnc_perform_store(&params, nnc_store_local_in_mem);
 }
 
-nnc_static const nnc_3a_storage* nnc_store_param(const nnc_3a_lr* lr, const nnc_3a_addr* param) {
+nnc_static const nnc_3a_storage* nnc_store_param(nnc_3a_lr* lr, const nnc_3a_addr* param) {
     // initialize priority lists
     const nnc_asm_reg gen_p[] = {
         R_RDI, R_RSI, R_RDX, R_RCX, R_R8, R_R9
