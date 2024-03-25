@@ -33,4 +33,9 @@ const nnc_3a_storage* nnc_store_generic(
     nnc_store_mode mode
 );
 
+nnc_bool nnc_reg_in_use(
+    nnc_3a_unit* unit,
+    nnc_asm_reg reg
+);
+
 #endif

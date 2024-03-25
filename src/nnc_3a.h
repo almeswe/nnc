@@ -272,6 +272,7 @@ typedef struct _nnc_3a_unit {
     nnc_3a_opt_stat stat;
     _map_(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
     _map_(const char*, nnc_3a_lr*) lr_var;
+    nnc_u64 quad_pointer;
 } nnc_3a_unit;
 
 typedef nnc_3a_unit* nnc_3a_code;

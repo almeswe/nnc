@@ -1,5 +1,10 @@
 #include "nnc_gen.h"
 
+nnc_static nnc_3a_lr nnc_inf_lr = {
+    .starts = 0,
+    .ends   = UINT32_MAX
+};
+
 const char* nnc_asm_reg_str[] = {
     [R_RAX]  = "rax", 
     [R_RBX]  = "rbx",
@@ -110,7 +115,7 @@ nnc_static nnc_3a_lr* nnc_get_lr(nnc_3a_unit* unit, const nnc_3a_addr* addr) {
     switch (addr->kind) {
         case ADDR_CGT:  return (nnc_3a_lr*)map_get(unit->lr_cgt, addr->exact.cgt); 
         case ADDR_NAME: return (nnc_3a_lr*)map_get_s(unit->lr_var, addr->exact.name.name);
-        default: nnc_abort_no_ctx("bad addr kind");
+        default: nnc_abort_no_ctx("bad addr kind\n");
     }
     return NULL;
 }
@@ -132,7 +137,7 @@ nnc_static nnc_bool nnc_3a_addr_cmp(const nnc_3a_addr* addr, const nnc_3a_addr* 
     switch (addr->kind) {
         case ADDR_CGT:  return addr->exact.cgt == with->exact.cgt;
         case ADDR_NAME: return strcmp(addr->exact.name.name, with->exact.name.name) == 0;
-        default: nnc_abort_no_ctx("bad addr kind");
+        default: nnc_abort_no_ctx("bad addr kind\n");
     }
     return false;
 }
@@ -196,7 +201,7 @@ nnc_static const nnc_3a_storage* nnc_perform_store(nnc_store_params* params, nnc
 nnc_static const nnc_3a_storage* nnc_store_local(nnc_3a_lr* lr, const nnc_3a_addr* local) {
     // initialize priority lists
     const nnc_asm_reg gen_p[] = {
-        R_RAX, R_RBX, R_R10, R_R11, R_R12, 
+        R_RBX, R_R10, R_R11, R_R12, R_RAX, 
         R_R13, R_R14, R_R15, R_R9,  R_R8, 
         R_RCX, R_RDX, R_RDI, R_RSI 
     };
@@ -240,7 +245,7 @@ nnc_static const nnc_3a_storage* nnc_store_param(nnc_3a_lr* lr, const nnc_3a_add
 const nnc_3a_storage* nnc_store_generic(nnc_3a_unit* unit,
     const nnc_3a_addr* generic, nnc_store_mode mode) {
     if (generic->kind != ADDR_CGT && generic->kind != ADDR_NAME) {
-        nnc_abort_no_ctx("bug detected at `nnc_store_local`");
+        nnc_abort_no_ctx("bug detected at `nnc_store_generic`\n");
     }   
     nnc_3a_lr* lr = nnc_get_lr(unit, generic);
     if (lr->storage.where != STORAGE_NONE) {
@@ -250,8 +255,16 @@ const nnc_3a_storage* nnc_store_generic(nnc_3a_unit* unit,
         case STORE_LOCAL: return nnc_store_local(lr, generic);
         case STORE_PARAM: return nnc_store_param(lr, generic);
         case STORE_GLOBAL: nnc_abort_no_ctx("nnc_store_generic:"
-            " STORE_GLOBAL mode is not implemented.");
-        default: nnc_abort_no_ctx("nnc_store_generic: unknown mode.");
+            " STORE_GLOBAL mode is not implemented.\n");
+        default: nnc_abort_no_ctx("nnc_store_generic: unknown mode.\n");
     }
     return NULL;
+}
+
+nnc_bool nnc_reg_in_use(nnc_3a_unit* unit, nnc_asm_reg reg) {
+    nnc_3a_lr lr = {
+        .starts = unit->quad_pointer,
+        .ends   = UINT32_MAX
+    };
+    return nnc_3a_lr_intersects(&lr, &nnc_reg_lr_map[reg]);
 }
