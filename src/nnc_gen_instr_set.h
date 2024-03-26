@@ -93,6 +93,31 @@ typedef enum _nnc_x86_64_asm_instr {
     I_POP,
 } nnc_asm_instr;
 
+#define A_ANY       (A_ANY_MEM | A_ANY_REG | A_ANY_IMM)
+#define A_NOT_IMM   (A_ANY_MEM | A_ANY_REG)
+#define A_ANY_MEM   (A_MEM8 | A_MEM16 | A_MEM32 | A_MEM64)
+#define A_ANY_REG   (A_REG8 | A_REG16 | A_REG32 | A_REG64)
+#define A_ANY_IMM   (A_IMM8 | A_IMM16 | A_IMM32 | A_IMM64)
+#define A_NOT_IMM64 (A_IMM8 | A_IMM16 | A_IMM32)
+
+#define A_ANY_LOCATABLE     (A_ANY_REG | A_ANY_MEM)
+#define A_ANY_BUT_NOT_IMM64 (A_ANY_REG | A_ANY_MEM | A_NOT_IMM64)
+
+typedef enum _nnc_x86_64_asm_operand {
+    A_IMM8  = 0b000000000001,
+    A_IMM16 = 0b000000000010,
+    A_IMM32 = 0b000000000100,
+    A_IMM64 = 0b000000001000,
+    A_MEM8  = 0b000000010000,
+    A_MEM16 = 0b000000100000,
+    A_MEM32 = 0b000001000000,
+    A_MEM64 = 0b000010000000,
+    A_REG8  = 0b000100000000,
+    A_REG16 = 0b001000000000,
+    A_REG32 = 0b010000000000,
+    A_REG64 = 0b100000000000
+} nnc_asm_operand;
+
 extern const char* nnc_asm_instr_str[];
 
 #endif
