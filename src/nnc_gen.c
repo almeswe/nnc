@@ -4,6 +4,7 @@
 //todo: add ability to allocate registers for immediates
 
 nnc_static nnc_3a_unit* nnc_glob_unit = NULL;
+nnc_static nnc_u32 nnc_glob_units = 0;
 nnc_u32 nnc_glob_stack_offset = 8;
 nnc_u32 nnc_glob_param_stack_offset = 0;
 
@@ -14,9 +15,8 @@ nnc_u32 nnc_glob_param_stack_offset = 0;
 #define gen_comma()  gen_t0(", ")
 #define gen_crlf()   fprintf(stderr, "\r\n")
 
-typedef enum _nnc_instr_operand {
-    A_IMM = 0b001, A_MEM = 0b010, A_REG = 0b100
-} nnc_instr_operand;
+#define NNC_LABEL_PREFIX     "label_"
+#define NNC_RET_LABEL_PREFIX "label_ret_"
 
 nnc_static nnc_bool nnc_forced_reg_preserve(const nnc_3a_addr* generic, nnc_asm_reg reg) {
     //todo: make change in live range, not just push.
@@ -39,18 +39,18 @@ nnc_static void nnc_reg_return(const nnc_3a_addr* generic, nnc_asm_reg reg) {
  * @param allowed Allowed operand modes. (immediate, register, memory)
  * @return 
  */
-nnc_static nnc_bool nnc_able_to_inline_addr(const nnc_3a_addr* addr, nnc_u8 allowed) {
-    switch (addr->kind) {
-        case ADDR_FCONST:
-        case ADDR_ICONST: {
-            return (allowed & A_IMM) != 0;
-        }
-        case ADDR_NAME: {
-            return (allowed & A_MEM) != 0;
-        }
-        default: return false;
-    }
-}
+//nnc_static nnc_bool nnc_able_to_inline_addr(const nnc_3a_addr* addr, nnc_u8 allowed) {
+//    switch (addr->kind) {
+//        case ADDR_FCONST:
+//        case ADDR_ICONST: {
+//            return (allowed & A_IMM) != 0;
+//        }
+//        case ADDR_NAME: {
+//            return (allowed & A_MEM) != 0;
+//        }
+//        default: return false;
+//    }
+//}
 
 nnc_static const char* nnc_get_ptr_size(const nnc_type* type) {
     switch (type->size) {
@@ -104,6 +104,7 @@ nnc_static const char* nnc_get_reg_of_size(nnc_asm_reg reg, const nnc_type* type
             }
         }
     }
+    return NULL;
 }
 
 nnc_static nnc_3a_lr* nnc_get_lr(nnc_3a_unit* unit, const nnc_3a_addr* addr) {
@@ -120,6 +121,59 @@ nnc_static nnc_3a_lr* nnc_get_lr(nnc_3a_unit* unit, const nnc_3a_addr* addr) {
 nnc_static const nnc_3a_storage* nnc_get_storage(const nnc_3a_addr* addr) {
     const nnc_3a_lr* lr = nnc_get_lr(nnc_glob_unit, addr);
     return &lr->storage;
+}
+
+nnc_static nnc_asm_operand nnc_get_operand_type(const nnc_3a_addr* addr) {
+    nnc_asm_operand op_type = 0;
+    switch (addr->kind) {
+        case ADDR_CGT:
+        case ADDR_NAME: {
+            const nnc_3a_storage* storage = nnc_get_storage(addr);
+            assert(storage != NULL);
+            assert(
+                storage->where == STORAGE_REG      ||
+                storage->where == STORAGE_DATA_SEG || 
+                storage->where == STORAGE_STACK_SEG
+            );
+            switch (storage->where) {
+                case STORAGE_REG:        op_type = A_REG8; break;
+                case STORAGE_DATA_SEG:   op_type = A_MEM8; break;
+                case STORAGE_STACK_SEG:  op_type = A_MEM8; break;
+                default: {
+                    nnc_abort_no_ctx("nnc_get_operand_type: unknown storage.\n");
+                }
+            }
+            switch (addr->type->size) {
+                case 1: return op_type;
+                case 2: return op_type << 1;
+                case 4: return op_type << 2;
+                case 8: return op_type << 3;
+                default: {
+                    nnc_abort_no_ctx("nnc_get_operand_type: unsupported size.\n");
+                }
+            }
+            break;
+        }
+        case ADDR_ICONST: {
+            op_type = A_IMM8;
+            nnc_u64 imm = addr->exact.iconst.iconst;
+            if (imm > UINT8_MAX) {
+                op_type = A_IMM16;
+            }
+            if (imm > UINT16_MAX) {
+                op_type = A_IMM32;
+            }
+            if (imm > UINT32_MAX) {
+                op_type = A_IMM64;
+            }
+            break;
+        }
+        //case ADDR_FCONST: nnc_gen_addr_fconst(addr); break;
+        default: {
+            nnc_abort_no_ctx("nnc_get_operand_type: unknown addr kind.\n");
+        }
+    }
+    return op_type;
 }
 
 nnc_static nnc_bool nnc_3a_addr_in_reg(const nnc_3a_addr* addr, nnc_asm_reg reg) {
@@ -232,10 +286,16 @@ nnc_static void nnc_gen_op_copy(const nnc_3a_quad* quad) {
             i_mov = I_MOVSD;
         }        
     }
+    //todo: handle case with memory to memory copy
     gen_instr(i_mov);
     nnc_gen_operand(&quad->res, quad->res.type);
     gen_comma();
     nnc_gen_operand(&quad->arg1, quad->res.type);
+}
+
+nnc_static void nnc_gen_label_decl(const nnc_3a_quad* quad) {
+    assert(quad->label != 0);
+    gen_t0("@"NNC_LABEL_PREFIX"%u:", quad->label);
 }
 
 nnc_static void nnc_gen_op_ref(const nnc_3a_quad* quad) {
@@ -322,11 +382,21 @@ nnc_static void nnc_gen_op_sub(const nnc_3a_quad* quad) {
  *  See more at: https://www.felixcloutier.com/x86/imul#description
  * @param quad 
  * @param mul 
+ * @param res_in_rdx When remainder is needed as a result, set it to true.
  * @return 
  */
-nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
+nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad,
+    nnc_asm_instr mul, nnc_bool res_in_rdx) {
     nnc_bool rax_pushed = false;
+    nnc_bool rdx_pushed = false;
     nnc_bool rax_contains_arg = false;
+    nnc_bool rdx_contains_arg = false;
+    // checks if first argument of multiplication inside RDX
+    rdx_contains_arg = nnc_3a_addr_in_reg(&quad->arg1, R_RDX);
+    if (!rdx_contains_arg) {
+        // if RDX is currently used, it will be pushed to the stack
+        rdx_pushed = nnc_forced_reg_preserve(NULL, R_RDX);
+    }
     // checks if first argument of multiplication inside RAX
     rax_contains_arg = nnc_3a_addr_in_reg(&quad->arg1, R_RAX);
     if (!rax_contains_arg) {
@@ -339,13 +409,24 @@ nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
     gen_instr(mul);
     nnc_gen_operand(&quad->arg2, quad->res.type);
     gen_crlf();
-    if (!rax_contains_arg) {
-        // copy result of multiplication from RAX
-        nnc_gen_mov_reg_to_operand(R_RAX, &quad->arg1, quad->res.type);
+    if (res_in_rdx) {
+        if (!rdx_contains_arg) {
+            // copy result of multiplication from RDX
+            nnc_gen_mov_reg_to_operand(R_RDX, &quad->arg1, quad->res.type);
+        }
+    }
+    else {
+        if (!rax_contains_arg) {
+            // copy result of multiplication from RAX
+            nnc_gen_mov_reg_to_operand(R_RAX, &quad->arg1, quad->res.type);
+        }
     }
     if (rax_pushed) {
         // restore RAX if it was pushed
         nnc_reg_return(&quad->arg1, R_RAX);
+    }
+    if (rdx_pushed) {
+        nnc_reg_return(NULL, R_RDX);
     }
 }
 
@@ -357,14 +438,29 @@ nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
  * @return 
  */
 nnc_static void nnc_gen_two_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
-    gen_instr(mul);
-    nnc_gen_operand(&quad->arg1, quad->res.type);
-    gen_comma();
-    nnc_gen_operand(&quad->arg2, quad->res.type);
+    nnc_gen_op_binary(quad, mul);
 }
 
 /**
- * @brief Check if multiplication is two operand mode.
+ * @brief Generates three operand multiplication instruction.
+ *  See more at: https://www.felixcloutier.com/x86/imul#description
+ * @param quad 
+ * @param mul 
+ * @return 
+ */
+nnc_static void nnc_gen_three_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
+    //todo: test this
+    gen_instr(mul);
+    nnc_gen_operand(&quad->arg1, quad->res.type);
+    gen_comma();
+    nnc_gen_operand(&quad->arg1, quad->res.type);
+    gen_comma();
+    assert(quad->arg2.kind == ADDR_ICONST);
+    nnc_gen_3a_addr(NULL, &quad->arg2);
+}
+
+/**
+ * @brief Checks if multiplication is in two operand form.
  * @param quad 
  * @return 
  */
@@ -381,9 +477,25 @@ nnc_static nnc_bool nnc_is_two_op_mul(const nnc_3a_quad* quad) {
     return false;
 }
 
+/**
+ * @brief Checks if multiplication is in three operand form.
+ * @param quad 
+ * @return 
+ */
+nnc_static nnc_bool nnc_is_three_op_mul(const nnc_3a_quad* quad) {
+    const nnc_3a_storage* arg1_storage = nnc_get_storage(&quad->arg1);
+    if (arg1_storage->where == STORAGE_REG) {
+        //todo: check that const is not IMM64
+        if (quad->arg2.kind == ADDR_ICONST) {
+            return true;
+        }
+    }
+    return false;
+} 
+
 // https://www.felixcloutier.com/x86/mul
 nnc_static void nnc_gen_instr_mul(const nnc_3a_quad* quad) {
-    nnc_gen_one_op_mul(quad, I_MUL);
+    nnc_gen_one_op_mul(quad, I_MUL, false);
 }
 
 // https://www.felixcloutier.com/x86/imul
@@ -391,8 +503,11 @@ nnc_static void nnc_gen_instr_imul(const nnc_3a_quad* quad) {
     if (nnc_is_two_op_mul(quad)) {
         nnc_gen_two_op_mul(quad, I_IMUL);
     }
+    else if (nnc_is_three_op_mul(quad)) {
+        nnc_gen_three_op_mul(quad, I_IMUL);
+    }
     else {
-        nnc_gen_one_op_mul(quad, I_IMUL);
+        nnc_gen_one_op_mul(quad, I_IMUL, false);
     }
 }
 
@@ -410,28 +525,144 @@ nnc_static void nnc_gen_op_mul(const nnc_3a_quad* quad) {
             nnc_abort_no_ctx("nnc_gen_op_mul: unsupported mul instruction.\n");
         }
     }
+}
+
+// https://www.felixcloutier.com/x86/div
+nnc_static void nnc_gen_instr_div(const nnc_3a_quad* quad, nnc_bool is_mod_instr) {
+    nnc_gen_one_op_mul(quad, I_DIV, is_mod_instr);
+}
+
+// https://www.felixcloutier.com/x86/idiv
+nnc_static void nnc_gen_instr_idiv(const nnc_3a_quad* quad, nnc_bool is_mod_instr) {
+    nnc_gen_one_op_mul(quad, I_IDIV, is_mod_instr);
+}
+
+nnc_static void nnc_gen_op_div(const nnc_3a_quad* quad) {
+    //todo: float type extension
+    assert(!nnc_real_type(quad->res.type));
+    nnc_asm_instr i_div = I_DIV;
+    if (nnc_signed_type(quad->res.type)) {
+        i_div = I_IDIV;
+    }
+    switch (i_div) {
+        case I_DIV:  nnc_gen_instr_div(quad, false);  break;
+        case I_IDIV: nnc_gen_instr_idiv(quad, false); break;
+        default: {
+            nnc_abort_no_ctx("nnc_gen_op_div: unsupported div instruction.\n");
+        }
+    }
+}
+
+nnc_static void nnc_gen_op_mod(const nnc_3a_quad* quad) {
+    assert(!nnc_real_type(quad->res.type));
+    nnc_asm_instr i_div = I_DIV;
+    if (nnc_signed_type(quad->res.type)) {
+        i_div = I_IDIV;
+    }
+    switch (i_div) {
+        case I_DIV:  nnc_gen_instr_div(quad, true);  break;
+        case I_IDIV: nnc_gen_instr_idiv(quad, true); break;
+        default: {
+            nnc_abort_no_ctx("nnc_gen_op_mod: unsupported div instruction.\n");
+        }
+    }
+}
+
+nnc_static void nnc_gen_instr_shift(const nnc_3a_quad* quad, nnc_asm_instr shift) {
+    nnc_abort_no_ctx("nnc_gen_instr_shift: shifts are not implemented.");
     //if (nnc_get_storage(&quad->arg1)->where != STORAGE_REG) {
     //    goto one_operand_form;
     //}
 }
 
-nnc_static void nnc_gen_op(const nnc_3a_quad* quad) {
-    switch (quad->op) {
-        case OP_REF:        nnc_gen_op_ref(quad);  break;
-        case OP_COPY:       nnc_gen_op_copy(quad); break;
-        case OP_DEREF_COPY: nnc_gen_op_deref_copy(quad); break;
-        
-        /* Unary operators */
-        case OP_PLUS:   nnc_gen_op_plus(quad);  break;
-        case OP_MINUS:  nnc_gen_op_minus(quad); break;
-        case OP_BW_NOT: nnc_gen_op_not(quad);   break;
+nnc_static void nnc_gen_op_shr(const nnc_3a_quad* quad) {
+    nnc_gen_instr_shift(quad, I_SHR);
+}
 
-        /* Binary operators */
-        case OP_ADD: nnc_gen_op_add(quad); break;
-        case OP_SUB: nnc_gen_op_sub(quad); break;
-        case OP_MUL: nnc_gen_op_mul(quad); break;
-        default: {
-            nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
+nnc_static void nnc_gen_op_shl(const nnc_3a_quad* quad) {
+    nnc_gen_instr_shift(quad, I_SHL);
+}
+
+// https://www.felixcloutier.com/x86/or
+nnc_static void nnc_gen_op_or(const nnc_3a_quad* quad) {
+    assert(!nnc_real_type(quad->res.type));
+    nnc_gen_op_binary(quad, I_OR);
+}
+
+// https://www.felixcloutier.com/x86/and
+nnc_static void nnc_gen_op_and(const nnc_3a_quad* quad) {
+    assert(!nnc_real_type(quad->res.type));
+    nnc_gen_op_binary(quad, I_AND);
+}
+
+// https://www.felixcloutier.com/x86/xor
+nnc_static void nnc_gen_op_xor(const nnc_3a_quad* quad) {
+    assert(!nnc_real_type(quad->res.type));
+    nnc_gen_op_binary(quad, I_XOR);
+}
+
+// https://www.felixcloutier.com/x86/ret
+nnc_static void nnc_gen_op_retp(const nnc_3a_quad* quad) {
+    gen_instr(I_JMP);
+    gen_t1(NNC_RET_LABEL_PREFIX"%u", nnc_glob_units);
+}
+
+// https://www.felixcloutier.com/x86/ret
+nnc_static void nnc_gen_op_retf(const nnc_3a_quad* quad) {
+    //todo: float type extension
+    assert(!nnc_real_type(quad->arg1.type));
+    if (!nnc_3a_addr_in_reg(&quad->arg1, R_RAX)) {
+        gen_t1("mov %s", nnc_get_reg_of_size(R_RAX, quad->arg1.type));
+        nnc_gen_operand(&quad->arg1, quad->arg1.type);     
+        gen_crlf();
+    }
+    gen_instr(I_JMP);
+    gen_t0(NNC_RET_LABEL_PREFIX"%s", nnc_glob_unit->name);
+}
+
+nnc_static void nnc_gen_op_ujump(const nnc_3a_quad* quad) {
+    gen_instr(I_JMP);
+    gen_t1("%u", quad->label);
+}
+
+nnc_static void nnc_gen_op(const nnc_3a_quad* quad) {
+    if (quad->label != 0) {
+        nnc_gen_label_decl(quad);
+    }
+    else {
+        switch (quad->op) {
+            case OP_REF:        nnc_gen_op_ref(quad);  break;
+            case OP_COPY:       nnc_gen_op_copy(quad); break;
+            case OP_DEREF_COPY: nnc_gen_op_deref_copy(quad); break;
+            
+            /* Unary operators */
+            case OP_PLUS:   nnc_gen_op_plus(quad);  break;
+            case OP_MINUS:  nnc_gen_op_minus(quad); break;
+            case OP_BW_NOT: nnc_gen_op_not(quad);   break;
+
+            /* Binary operators */
+            case OP_ADD: nnc_gen_op_add(quad); break;
+            case OP_SUB: nnc_gen_op_sub(quad); break;
+            case OP_MUL: nnc_gen_op_mul(quad); break;
+            case OP_DIV: nnc_gen_op_div(quad); break;
+            case OP_MOD: nnc_gen_op_mod(quad); break;
+
+            case OP_SHR: nnc_gen_op_shr(quad); break;
+            case OP_SHL: nnc_gen_op_shl(quad); break;
+
+            case OP_BW_OR:  nnc_gen_op_or(quad);  break;
+            case OP_BW_AND: nnc_gen_op_and(quad); break;
+            case OP_BW_XOR: nnc_gen_op_xor(quad); break;
+
+            /* Other operators */
+            case OP_RETP: nnc_gen_op_retp(quad); break;
+            case OP_RETF: nnc_gen_op_retf(quad); break;
+
+            /* Logical operators */
+            case OP_UJUMP: nnc_gen_op_ujump(quad); break;
+            default: {
+                nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
+            }
         }
     }
 }
@@ -440,10 +671,12 @@ extern void nnc_dump_3a_quad(const nnc_3a_quad* quad);
 
 void nnc_gen_unit(nnc_3a_unit* unit) {
     nnc_glob_unit = unit;
+    nnc_glob_units++;
     nnc_glob_unit->quad_pointer = 0;
     gen_t0("_%s:\n", unit->name);
     gen_t1("push rbp\n");
     gen_t1("mov rbp, rsp\n");
+    //todo: allocate exact amount of memory
     gen_t1("sub rsp, 32\n");
     gen_t0("# -----CODE-----\n");
     for (nnc_u64 i = 0; i < buf_len(unit->quads); i++) {
@@ -457,6 +690,7 @@ void nnc_gen_unit(nnc_3a_unit* unit) {
         nnc_glob_unit->quad_pointer++;
     }
     gen_t0("# -----CODE-----\n");
+    gen_t0("@"NNC_RET_LABEL_PREFIX"%s:\n", nnc_glob_unit->name);
     gen_t1("mov rsp, rbp\n");
     gen_t1("pop rbp\n");
     gen_t1("ret\n\n");
