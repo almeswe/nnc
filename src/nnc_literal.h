@@ -1,5 +1,5 @@
-#ifndef _NNC_AST_LITERALS_H
-#define _NNC_AST_LITERALS_H
+#ifndef __NNC_AST_LITERALS_H__
+#define __NNC_AST_LITERALS_H__
 
 #include "nnc_type.h"
 #include "nnc_try_catch.h"
@@ -65,14 +65,81 @@ typedef struct _nnc_bounds {
     } max;
 } nnc_bounds;
 
-nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx);
-nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx);
-nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx);
-nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx);
+/**
+ * @brief Allocates & initializes new instance of `nnc_dbl_literal`.
+ * @param repr String representation of the float number which will be parsed.
+ * @param ctx Context of the double literal.
+ * @return Allocated & initialized instance of `nnc_dbl_literal`.
+ */
+nnc_dbl_literal* nnc_dbl_new(
+    const char* repr,
+    const nnc_ctx* ctx
+);
 
-void nnc_dbl_free(nnc_dbl_literal* literal);
-void nnc_int_free(nnc_int_literal* literal);
-void nnc_chr_free(nnc_chr_literal* literal);
-void nnc_str_free(nnc_str_literal* literal);
+/**
+ * @brief Allocates & initializes new instance of `nnc_int_literal`.
+ * @param repr String representation of the float number which will be parsed.
+ * @param ctx Context of int literal.
+ * @return Allocated & initialized instance of `nnc_int_literal`.
+ * @throw NNC_OVERFLOW in case of `errno == ENOENT` after call to `strtoll` or `strtoull`.
+ */
+nnc_int_literal* nnc_int_new(
+    const char* repr,
+    const nnc_ctx* ctx
+);
+
+/**
+ * @brief Allocates & initializes new instance of `nnc_chr_literal`.
+ * @param repr String representation of char literal which will be parsed.
+ * @param ctx Context of the character literal.
+ * @return Allocated & initialized instance of `nnc_chr_literal`.
+ */
+nnc_chr_literal* nnc_chr_new(
+    const char* repr,
+    const nnc_ctx* ctx
+);
+
+/**
+ * @brief Allocates & initializes new instance of `nnc_str_literal`.
+ * @param repr String representation of string literal which will be parsed.
+ * @param ctx Context of the string literal.
+ * @return Allocated & initialized instance of `nnc_str_literal`.
+ */
+nnc_str_literal* nnc_str_new(
+    const char* repr,
+    const nnc_ctx* ctx
+);
+
+/**
+ * @brief Disposes float literal instance.
+ * @param literal Float literal instance to be disposed.
+ */
+void nnc_dbl_free(
+    nnc_dbl_literal* literal
+);
+
+/**
+ * @brief Disposes integral literal instance.
+ * @param literal Integral literal instance to be disposed.
+ */
+void nnc_int_free(
+    nnc_int_literal* literal
+);
+
+/**
+ * @brief Disposes character literal instance.
+ * @param literal Character literal instance to be disposed.
+ */
+void nnc_chr_free(
+    nnc_chr_literal* literal
+);
+
+/**
+ * @brief Disposes string literal instance.
+ * @param literal String literal instance to be disposed.
+ */
+void nnc_str_free(
+    nnc_str_literal* literal
+);
 
 #endif

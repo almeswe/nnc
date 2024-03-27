@@ -1,5 +1,5 @@
-#ifndef _NNC_TYPE_H
-#define _NNC_TYPE_H
+#ifndef __NNC_TYPE_H__
+#define __NNC_TYPE_H__
 
 #include "nnc_ctx.h"
 #include "nnc_arena.h"

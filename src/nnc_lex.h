@@ -1,5 +1,5 @@
-#ifndef _NNC_LEX_H
-#define _NNC_LEX_H
+#ifndef __NNC_LEX_H__
+#define __NNC_LEX_H__
 
 #include "nnc_ctx.h"
 
@@ -7,22 +7,6 @@
 #include "nnc_try_catch.h"
 
 #define NNC_TOK_BUF_MAX 512
-
-#define NNC_LEX_MATCH(c)     (lex->cc == c)
-#define NNC_LEX_NOT_MATCH(c) (lex->cc != c)
-
-#define NNC_TOK_PUT_C(c) (lex->ctok.lexeme[lex->ctok.size] = c, lex->ctok.size++)
-#define NNC_TOK_PUT_CC() (NNC_TOK_PUT_C(lex->cc))
-
-#define NNC_IS_KEYWORD()            map_has_s(nnc_keywods_map, lex->ctok.lexeme)
-#define NNC_GET_KEYWORD_KIND()      (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme);
-
-#define NNC_LEX_ADJUST(c)       nnc_lex_adjust(lex, c)
-#define NNC_LEX_SET_TERN(k)     (nnc_lex_commit(lex, k), 0)
-#define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
-#define NNC_LEX_COMMIT(k)       nnc_lex_commit(lex, k); break
-
-#define NNC_LEX_SKIP_LINE()     nnc_lex_skip_line(lex)
 
 typedef enum _nnc_tok_kind {
     TOK_AMPERSAND,  TOK_AND,        TOK_ASSIGN,
@@ -71,12 +55,67 @@ typedef struct _nnc_lex {
     const char* fpath;      // path to file
 } nnc_lex;
 
-nnc_tok_kind nnc_lex_next(nnc_lex* lex);
-const char* nnc_tok_str(nnc_tok_kind kind);
-void nnc_lex_init(nnc_lex* out_lex, const char* fpath);
-void nnc_lex_init_with_fp(nnc_lex* out_lex, FILE* fp);
-void nnc_lex_recover(nnc_lex* lex);
-void nnc_lex_fini(nnc_lex* lex);
+/**
+ * @brief Grabs next token from sequence of characters.
+ *  This function is recovers from error automatically.
+ * @param lex Pointer to `nnc_lex` instance.
+ * @return Kind of token grabbed. 
+ */
+nnc_tok_kind nnc_lex_next(
+    nnc_lex* lex
+);
+
+/**
+ * @brief Gets string representation of specified token kind.
+ * @param kind Token kind for which string representation will be retrieved.
+ * @return String representation of a token kind.
+ */
+const char* nnc_tok_str(
+    nnc_tok_kind kind
+);
+
+/**
+ * @brief Initializes preallocated instance of `nnc_lex`.
+ *  Also initializes hash map of keywords, if it is not already initialized.
+ * @param out_lex Pointer to preallocated instance of `nnc_lex`.
+ * @param fpath Path to target file for lexical analysis.
+ * @throw NNC_LEX_BAD_FILE if file cannot be opened for reading.
+ */
+void nnc_lex_init(
+    nnc_lex* out_lex,
+    const char* fpath
+);
+
+/**
+ * @brief Initializes preallocated instance of `nnc_lex`.
+ *  with file pointer instead of file path.
+ * @param out_lex Pointer to preallocated instance of `nnc_lex`.
+ * @param fp Pointer to non-null instance of `FILE`.
+ */
+void nnc_lex_init_with_fp(
+    nnc_lex* out_lex,
+    FILE* fp
+);
+
+/**
+ * @brief Performs error-recovery, by skipping whole line of characters.
+ * @param lex Pointer to `nnc_lex` instance.
+ */
+void nnc_lex_recover(
+    nnc_lex* lex
+);
+
+/**
+ * @brief Finalizes instance of `nnc_lex`.
+ * @param lex Pointer to instance of `nnc_lex` to be finalized.
+ */
+void nnc_lex_fini(
+    nnc_lex* lex
+);
+
+/**
+ * @brief Finalizes hash map of keywords. 
+ */
 void nnc_lex_keywords_map_fini();
 
 #endif

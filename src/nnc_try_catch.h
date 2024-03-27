@@ -1,5 +1,5 @@
-#ifndef _NNC_TRY_CATCH_STACK_H
-#define _NNC_TRY_CATCH_STACK_H
+#ifndef __NNC_TRY_CATCH_STACK_H__
+#define __NNC_TRY_CATCH_STACK_H__
 
 #include <setjmp.h>
 #include "nnc_error.h"
@@ -97,9 +97,37 @@ typedef struct _nnc_exception_stack {
 
 extern nnc_exception_stack glob_exception_stack;
 
-nnc_bool nnc_try(nnc_i64 state);
+/**
+ * @brief Performs behaviour as `try` statement has. 
+ * @param state Returned value from `setjmp` call. If 0, try statement was executed first time,
+ *  otherwise this state represents type of exception which was thrown
+ * @return `true` if try statement was executed first time, otherwise `false` 
+ *  (means when it called after `longjmp` call) 
+ */
+nnc_bool nnc_try(
+    nnc_i64 state
+);
+
+/**
+ * @brief Performs releasing data after try-catch closure.
+ */
 void nnc_try_free();
-void nnc_throw(nnc_exception exception);
-nnc_bool nnc_catch(nnc_i64 exception);
+
+/**
+ * @brief Performs behaviour as `throw` statement has.
+ * @param exception Exception object to be thrown.
+ */
+void nnc_throw(
+    nnc_exception exception
+);
+
+/**
+ * @brief Performs behaviour as `catch` statement has.
+ * @param exception Type of exception to be checked for.
+ * @return `true` if thrown exception has specified type, otherwise `false` is returned.
+ */
+nnc_bool nnc_catch(
+    nnc_i64 exception
+);
 
 #endif

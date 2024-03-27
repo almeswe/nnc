@@ -1,10 +1,10 @@
 #include "nnc_ast.h"
 
 nnc_ident* nnc_ident_new(const nnc_byte* from) {
-    nnc_ident* ptr = anew(nnc_ident);
+    nnc_ident* ptr = nnc_new(nnc_ident);
     ptr->type = &unknown_type;
     ptr->size = strlen(from);
-    ptr->name = cnew(nnc_byte, ptr->size + 1);
+    ptr->name = nnc_cnew(nnc_byte, ptr->size + 1);
     ptr->ictx = IDENT_DEFAULT;
     strcpy(ptr->name, from);
     return ptr;
@@ -29,41 +29,41 @@ nnc_ctx* nnc_expr_get_ctx(const nnc_expression* expr) {
 }
 
 nnc_unary_expression* nnc_unary_expr_new(nnc_unary_expression_kind kind) {
-    nnc_unary_expression* ptr = anew(nnc_unary_expression);
+    nnc_unary_expression* ptr = nnc_new(nnc_unary_expression);
     ptr->type = &unknown_type;
     ptr->kind = kind;
     return ptr;
 }
 
 nnc_binary_expression* nnc_binary_expr_new(nnc_binary_expression_kind kind) {
-    nnc_binary_expression* ptr = anew(nnc_binary_expression);
+    nnc_binary_expression* ptr = nnc_new(nnc_binary_expression);
     ptr->type = &unknown_type;
     ptr->kind = kind;
     return ptr;
 }
 
 nnc_ternary_expression* nnc_ternary_expr_new() {
-    nnc_ternary_expression* ptr = anew(nnc_ternary_expression);
+    nnc_ternary_expression* ptr = nnc_new(nnc_ternary_expression);
     ptr->type = &unknown_type;
     return ptr;
 }
 
 nnc_expression* nnc_expr_new(nnc_expression_kind kind, nnc_heap_ptr exact) {
-    nnc_expression* ptr = anew(nnc_expression);
+    nnc_expression* ptr = nnc_new(nnc_expression);
     ptr->kind = kind;
     ptr->exact = exact;
     return ptr;
 }
 
 nnc_statement* nnc_stmt_new(nnc_statement_kind kind, nnc_heap_ptr exact) {
-    nnc_statement* ptr = anew(nnc_statement);
+    nnc_statement* ptr = nnc_new(nnc_statement);
     ptr->kind = kind;
     ptr->exact = exact;
     return ptr;
 }
 
 nnc_ast* nnc_ast_new(const char* file) {
-    nnc_ast* ptr = anew(nnc_ast);
+    nnc_ast* ptr = nnc_new(nnc_ast);
     ptr->file = file;
     return ptr;
 }

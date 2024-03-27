@@ -1,5 +1,5 @@
-#ifndef _NNC_MISCELLANEOUS_H
-#define _NNC_MISCELLANEOUS_H
+#ifndef __NNC_MISCELLANEOUS_H__
+#define __NNC_MISCELLANEOUS_H__
 
 #define _c(c, ...) c __VA_ARGS__ RESET
 

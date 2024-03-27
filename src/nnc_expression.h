@@ -1,5 +1,5 @@
-#ifndef _NNC_AST_EXPRESSION_H
-#define _NNC_AST_EXPRESSION_H
+#ifndef __NNC_AST_EXPRESSION_H__
+#define __NNC_AST_EXPRESSION_H__
 
 #include "nnc_buf.h"
 #include "nnc_type.h"

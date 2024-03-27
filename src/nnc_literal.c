@@ -98,7 +98,7 @@ nnc_static nnc_dbl_literal* nnc_dbl_check_overflow(nnc_dbl_literal* literal) {
 nnc_dbl_literal* nnc_dbl_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
     nnc_u64 repr_size = strlen(repr);
-    nnc_dbl_literal* ptr = anew(nnc_dbl_literal);
+    nnc_dbl_literal* ptr = nnc_new(nnc_dbl_literal);
     if (ctx != NULL) {
         ptr->ctx = *ctx;
     }
@@ -227,7 +227,7 @@ nnc_static nnc_int_literal* nnc_int_check_overflow(nnc_int_literal* literal) {
  */
 nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
     nnc_byte repr_buf[512] = { 0 };
-    nnc_int_literal* ptr = anew(nnc_int_literal);
+    nnc_int_literal* ptr = nnc_new(nnc_int_literal);
     if (ctx != NULL) {
         ptr->ctx = *ctx;
     }
@@ -295,7 +295,7 @@ nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
  * @return Allocated & initialized instance of `nnc_chr_literal`.
  */
 nnc_chr_literal* nnc_chr_new(const char* repr, const nnc_ctx* ctx) {
-    nnc_chr_literal* ptr = anew(nnc_chr_literal);
+    nnc_chr_literal* ptr = nnc_new(nnc_chr_literal);
     if (ctx != NULL) {
         ptr->ctx = *ctx;
     }
@@ -338,12 +338,12 @@ nnc_static void nnc_str_zip(nnc_str_literal* literal, const char* repr) {
  * @return Allocated & initialized instance of `nnc_str_literal`.
  */
 nnc_str_literal* nnc_str_new(const char* repr, const nnc_ctx* ctx) {
-    nnc_str_literal* ptr = anew(nnc_str_literal);
+    nnc_str_literal* ptr = nnc_new(nnc_str_literal);
     if (ctx != NULL) {
         ptr->ctx = *ctx;
     }
     ptr->type = &unknown_type;
-    ptr->exact = cnew(nnc_byte, strlen(repr) + 1);
+    ptr->exact = nnc_cnew(nnc_byte, strlen(repr) + 1);
     nnc_str_zip(ptr, repr);
     ptr->bytes = strlen(ptr->exact);
     return ptr;

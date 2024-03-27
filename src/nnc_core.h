@@ -1,5 +1,5 @@
-#ifndef _NNC_CORE_H
-#define _NNC_CORE_H
+#ifndef __NNC_CORE_H__
+#define __NNC_CORE_H__
 
 #include "nnc_static.h"
 #include "nnc_buf.h"

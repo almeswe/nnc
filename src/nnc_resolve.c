@@ -181,7 +181,7 @@ nnc_static nnc_bool nnc_struct_has_circular_dep(const nnc_str inside, const nnc_
         // if type is alias, we can compare it's name with `inside` criteria.
         if (m_ref->kind == T_ALIAS) {
             // if same type detected, circular dependency met 
-            if (nnc_sequal(inside, m_ref->repr)) {
+            if (nnc_strcmp(inside, m_ref->repr)) {
                 return true;
             }
             // check circular dependency for next member,
@@ -603,11 +603,11 @@ nnc_static nnc_nesting* nnc_get_imp_nesting(nnc_st* st) {
     nnc_nesting* nesting = NULL;
     for (nnc_i64 i = (nnc_i64)buf_len(path) - 1; i >= 0; i--) {
         if (nesting == NULL) {
-            nesting = anew(nnc_nesting);
+            nesting = nnc_new(nnc_nesting);
             root = nesting;    
         }
         else {
-            nesting->next = anew(nnc_nesting);
+            nesting->next = nnc_new(nnc_nesting);
             nesting = nesting->next;
         }
         nesting->nest = path[i]->ref.np->var;
@@ -823,7 +823,7 @@ nnc_static void nnc_resolve_dot_expr(nnc_unary_expression* unary, nnc_st* st) {
     nnc_ident* m = unary->exact.dot.member->exact;
     for (nnc_u64 i = 0; i < t_expr->exact.struct_or_union.memberc; i++) {
         nnc_struct_member* s_m = t_expr->exact.struct_or_union.members[i];
-        if (nnc_sequal(s_m->var->name, m->name)) {
+        if (nnc_strcmp(s_m->var->name, m->name)) {
             unary->type = s_m->texpr->type;
             m->type = unary->type;
             return;

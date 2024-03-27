@@ -1,5 +1,5 @@
-#ifndef _NNC_AST_PARSE_H
-#define _NNC_AST_PARSE_H
+#ifndef __NNC_AST_PARSE_H__
+#define __NNC_AST_PARSE_H__
 
 #include "nnc_ast.h"
 #include "nnc_lex.h"

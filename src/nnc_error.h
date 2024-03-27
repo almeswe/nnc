@@ -1,5 +1,5 @@
-#ifndef _NNC_ERROR_H
-#define _NNC_ERROR_H
+#ifndef __NNC_ERROR_H__
+#define __NNC_ERROR_H__
 
 #include <errno.h> 
 #include "nnc_ctx.h"

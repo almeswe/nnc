@@ -1,5 +1,21 @@
 #include "nnc_lex.h"
 
+#define NNC_LEX_MATCH(c)     (lex->cc == c)
+#define NNC_LEX_NOT_MATCH(c) (lex->cc != c)
+
+#define NNC_TOK_PUT_C(c) (lex->ctok.lexeme[lex->ctok.size] = c, lex->ctok.size++)
+#define NNC_TOK_PUT_CC() (NNC_TOK_PUT_C(lex->cc))
+
+#define NNC_IS_KEYWORD()            map_has_s(nnc_keywods_map, lex->ctok.lexeme)
+#define NNC_GET_KEYWORD_KIND()      (nnc_tok_kind)map_get_s(nnc_keywods_map, lex->ctok.lexeme);
+
+#define NNC_LEX_ADJUST(c)       nnc_lex_adjust(lex, c)
+#define NNC_LEX_SET_TERN(k)     (nnc_lex_commit(lex, k), 0)
+#define NNC_LEX_SET_TERNB(k)    NNC_LEX_SET_TERN(k); break
+#define NNC_LEX_COMMIT(k)       nnc_lex_commit(lex, k); break
+
+#define NNC_LEX_SKIP_LINE()     nnc_lex_skip_line(lex)
+
 /**
  * @brief Stores string representation of each nnc_tok_kind.
  */
@@ -764,7 +780,7 @@ void nnc_lex_init_with_fp(nnc_lex* out_lex, FILE* fp) {
     out_lex->fp = fp;
     if (nnc_keywods_map == NULL) {
         // initialize map of keywords, for fast identifier check
-        const nnc_u64 nnc_keywords_size = sizeof(nnc_keywords)/sizeof(*nnc_keywords);
+        const nnc_u64 nnc_keywords_size = nnc_arr_size(nnc_keywords);
         const nnc_u64 nnc_keywords_map_cap = (nnc_u64)(nnc_keywords_size * NNC_MAP_REHASH_SCALAR);
         nnc_keywods_map = map_init_with(nnc_keywords_map_cap);
         for (nnc_u64 i = 0ull; i < nnc_keywords_size; i++) {

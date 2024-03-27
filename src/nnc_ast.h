@@ -1,5 +1,5 @@
-#ifndef _NNC_AST_H
-#define _NNC_AST_H
+#ifndef __NNC_AST_H__
+#define __NNC_AST_H__
 
 #include "nnc_symtable.h"
 #include "nnc_statement.h"

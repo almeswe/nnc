@@ -1,5 +1,5 @@
-#ifndef _NNC_STATIC_H
-#define _NNC_STATIC_H
+#ifndef __NNC_STATIC_H__
+#define __NNC_STATIC_H__
 
 #ifdef _NNC_CORE_TESTING_NOW
     // all static functions now accessible
