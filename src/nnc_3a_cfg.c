@@ -77,7 +77,7 @@ _vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_unit* unit) {
 }
 
 nnc_static nnc_3a_cfg_node* nnc_3a_mknode(nnc_3a_basic* block) {
-    nnc_3a_cfg_node* node = anew(nnc_3a_cfg_node);
+    nnc_3a_cfg_node* node = nnc_new(nnc_3a_cfg_node);
     node->id = block->id;
     node->block = block;
     assert(buf_len(block->quads) > 0);

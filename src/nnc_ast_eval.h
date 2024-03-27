@@ -1,5 +1,5 @@
-#ifndef _NNC_AST_EVAL_H
-#define _NNC_AST_EVAL_H
+#ifndef __NNC_AST_EVAL_H__
+#define __NNC_AST_EVAL_H__
 
 #include "nnc_literal.h"
 #include "nnc_symtable.h"

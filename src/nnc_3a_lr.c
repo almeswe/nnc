@@ -1,7 +1,7 @@
 #include "nnc_3a.h"
 
 nnc_static nnc_3a_lr* nnc_3a_mklr(nnc_u32 starts, nnc_u32 ends) {
-    nnc_3a_lr* lr = anew(nnc_3a_lr);
+    nnc_3a_lr* lr = nnc_new(nnc_3a_lr);
     lr->starts = starts;
     lr->ends = ends;
     lr->storage.where = STORAGE_NONE;

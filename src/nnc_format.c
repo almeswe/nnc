@@ -1,5 +1,7 @@
 #include "nnc_format.h"
 
+#define FORMAT_BUF_SIZE 2048
+
 /**
  * @brief Formats `format` string with passed arguments.
  * @param format String to be formatted.
@@ -20,16 +22,27 @@ char* nnc_sformat(const char* format, ...) {
 	return formatstr;
 }
 
-nnc_bool nnc_sequal(const char* s1, const char* s2) {
+/**
+ * @brief Compares two zero terminated strings.
+ * @param s1 First string.
+ * @param s2 Second string.
+ * @return `true` if they are equal and non NULL, otherwise `false` is returned. 
+ */
+nnc_bool nnc_strcmp(const char* s1, const char* s2) {
 	if (s1 == NULL || s2 == NULL) {
 		return false;
 	}
 	return strcmp(s1, s2) == 0;
 }
 
-char* nnc_sdup(const char* s) {
+/**
+ * @brief Makes duplicate of a string on heap.
+ * @param s String to be duplicated.
+ * @return Pointer to heap allocated string.
+ */
+char* nnc_strdup(const char* s) {
 	nnc_u64 size = strlen(s);
-	char* dup = (char*)cnew(char, size+1);
+	char* dup = (char*)nnc_cnew(char, size+1);
 	strcpy(dup, s);
 	return dup;
 }

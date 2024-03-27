@@ -1,5 +1,5 @@
-#ifndef _NNC_STATEMENT_H
-#define _NNC_STATEMENT_H
+#ifndef __NNC_STATEMENT_H__
+#define __NNC_STATEMENT_H__
 
 #include "nnc_expression.h"
 

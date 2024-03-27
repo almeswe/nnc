@@ -1,5 +1,5 @@
-#ifndef _NNC_HEAP_ARENA_H
-#define _NNC_HEAP_ARENA_H
+#ifndef __NNC_HEAP_ARENA_H__
+#define __NNC_HEAP_ARENA_H__
 
 #include <assert.h>
 #include "nnc_alloc.h"
@@ -11,6 +11,8 @@
 #define nnc_min(a, b) ((a) <= (b) ? (a) : (b))
 #define nnc_pow2(x) ((x != 0) && ((x & (x-1)) == 0))
 #define nnc_arr_size(x) (sizeof(x) / sizeof(*(x)))
+
+//todo: add section to each arena entry, to dispose certain data
 
 typedef struct _nnc_arena_entry {
     nnc_u64 bytes;

@@ -139,7 +139,7 @@ nnc_static const char* nnc_mk_nested_name(const nnc_ident* ident, const nnc_st* 
     if (size == 0) {
         return ident->name;
     }
-    char* nested_name = cnew(char, size + 1);
+    char* nested_name = nnc_cnew(char, size + 1);
     for (current = ident->nesting; current != NULL; current = current->next) {
         nested_name = strcat(nested_name, current->nest->name);
         nested_name = strcat(nested_name, "_");

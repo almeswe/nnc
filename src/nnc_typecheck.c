@@ -21,7 +21,7 @@
  * @param type Pointer to `nnc_type` to be checked.
  * @return `true` if type fits at least one specifier, otherwise `false`. 
  */
-nnc_bool nnc_type_is(const nnc_type* type, ...) {
+nnc_static nnc_bool nnc_type_is(const nnc_type* type, ...) {
     va_list list = {0};
     va_start(list, type);
     for (;;) {

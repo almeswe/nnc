@@ -1,5 +1,5 @@
-#ifndef _NNC_BUF_H
-#define _NNC_BUF_H
+#ifndef __NNC_BUF_H__
+#define __NNC_BUF_H__
 
 #include <stddef.h>
 #include "nnc_arena.h"
