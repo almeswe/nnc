@@ -483,7 +483,9 @@ nnc_static nnc_type* nnc_int_infer_type(nnc_int_literal* literal) {
         case SUFFIX_U32: return literal->type = &u32_type;
         case SUFFIX_I64: return literal->type = &i64_type;
         case SUFFIX_U64: return literal->type = &u64_type;
-        default: nnc_abort("nnc_int_infer_type: unknown suffix.\n", &literal->ctx);
+        default: {
+            nnc_abort("nnc_int_infer_type: unknown suffix.\n", &literal->ctx);
+        }
     }
     return &unknown_type;
 }
@@ -497,7 +499,9 @@ nnc_static nnc_type* nnc_dbl_infer_type(nnc_dbl_literal* literal) {
     switch (literal->suffix) {
         case SUFFIX_F32: return literal->type = &f32_type;
         case SUFFIX_F64: return literal->type = &f64_type;
-        default: nnc_abort("nnc_dbl_infer_type: unknown suffix.\n", &literal->ctx);
+        default: {
+            nnc_abort("nnc_dbl_infer_type: unknown suffix.\n", &literal->ctx);
+        }
     }
     return &unknown_type;
 }
@@ -599,7 +603,9 @@ nnc_type* nnc_expr_infer_type(nnc_expression* expr, nnc_st* st) {
         case EXPR_IDENT:       return nnc_ident_infer_type(expr->exact);
         case EXPR_UNARY:       return nnc_unary_expr_infer_type(expr->exact, st);
         case EXPR_BINARY:      return nnc_binary_expr_infer_type(expr->exact, st);
-        default: nnc_abort("nnc_expr_infer_type: unknown kind.\n", nnc_expr_get_ctx(expr));
+        default: {
+            nnc_abort("nnc_expr_infer_type: unknown kind.\n", nnc_expr_get_ctx(expr));
+        }
     }
     return &unknown_type;
 }
@@ -621,7 +627,9 @@ nnc_type* nnc_expr_get_type(const nnc_expression* expr) {
         case EXPR_UNARY:       t_expr = ((nnc_unary_expression*)expr->exact)->type;   break;
         case EXPR_BINARY:      t_expr = ((nnc_binary_expression*)expr->exact)->type;  break;
         case EXPR_TERNARY:     t_expr = ((nnc_ternary_expression*)expr->exact)->type; break;
-        default: nnc_abort("nnc_expr_get_type: unknown kind.\n", nnc_expr_get_ctx(expr));
+        default: {
+            nnc_abort("nnc_expr_get_type: unknown kind.\n", nnc_expr_get_ctx(expr));
+        }
     }
     return t_expr == NULL ? &unknown_type : nnc_unalias(t_expr); 
 }

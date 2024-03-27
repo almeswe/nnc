@@ -1,5 +1,5 @@
-#ifndef _NNC_CONTEXT_H
-#define _NNC_CONTEXT_H
+#ifndef __NNC_CONTEXT_H__
+#define __NNC_CONTEXT_H__
 
 #include <libgen.h>
 #include "nnc_format.h"

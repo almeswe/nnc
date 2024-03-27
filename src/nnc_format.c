@@ -1,7 +1,5 @@
 #include "nnc_format.h"
 
-#define FORMAT_BUF_SIZE 2048
-
 /**
  * @brief Formats `format` string with passed arguments.
  * @param format String to be formatted.

@@ -82,7 +82,9 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
             nnc_3a_lr_put_addr(unit, &quad->arg2, pos);
             break;
         }
-        default: nnc_abort_no_ctx("nnc_3a_lr_process_quad: unknown `block->quads[pos].op`");
+        default: {
+            nnc_abort_no_ctx("nnc_3a_lr_process_quad: unknown `block->quads[pos].op`\n");
+        }
     }
 }
 

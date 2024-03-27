@@ -18,8 +18,10 @@ nnc_static nnc_byte nnc_get_esc_chr(nnc_byte c) {
         case '\\':  return '\\';
         case '\'':  return '\'';
         case '\"':  return '\"';
+        default: {
+            nnc_abort_no_ctx("nnc_get_esc_chr: used incorrectly.\n");
+        }
     }
-    nnc_abort_no_ctx("nnc_get_esc_chr: used incorrectly.");
     return '\0';
 }
 
@@ -238,7 +240,9 @@ nnc_int_literal* nnc_int_new(const char* repr, const nnc_ctx* ctx) {
         case 'x': ptr->base = 16; break;
         case 'o': ptr->base = 8;  break;
         case 'b': ptr->base = 2;  break;
-        default:  ptr->base = 10; break;
+        default:  {
+            ptr->base = 10;
+        }
     }
     // if base is not 10, it means that 
     // representation has 'b', 'x' or 'o' at the beginning

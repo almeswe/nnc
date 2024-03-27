@@ -40,7 +40,9 @@ nnc_static nnc_i64 nnc_evald_binary(const nnc_binary_expression* binary, const n
         case BINARY_BW_OR:  return nnc_evald(binary->lexpr, st) | nnc_evald(binary->rexpr, st);
         case BINARY_BW_AND: return nnc_evald(binary->lexpr, st) & nnc_evald(binary->rexpr, st);
         case BINARY_BW_XOR: return nnc_evald(binary->lexpr, st) ^ nnc_evald(binary->rexpr, st);
-        default: nnc_abort_no_ctx("nnc_evald_binary: cannot evaluate this kind of expression.");
+        default: {
+            nnc_abort_no_ctx("nnc_evald_binary: cannot evaluate this kind of expression.\n");
+        }
     }
     return 0;
 }
@@ -60,7 +62,9 @@ nnc_i64 nnc_evald(const nnc_expression* expr, const nnc_st* st) {
         case EXPR_DBL_LITERAL: return (nnc_i64)nnc_evald_dbl_literal(expr->exact);
         case EXPR_BINARY:      return nnc_evald_binary(expr->exact, st);
         case EXPR_TERNARY:     return nnc_evald_ternary(expr->exact, st);
-        default: nnc_abort_no_ctx("nnc_evald: cannot evaluate this kind of expression.");
+        default: {
+            nnc_abort_no_ctx("nnc_evald: cannot evaluate this kind of expression.\n");
+        }
     }
     return 0;
 }

@@ -136,6 +136,8 @@ nnc_str nnc_type_tostr(const nnc_type* type) {
         case T_FUNCTION:  return nnc_fn_type_tostr(type);
         case T_ARRAY:     return sformat("%s[]", nnc_type_tostr(type->base));
         case T_POINTER:   return sformat("%s*",  nnc_type_tostr(type->base));
-        default:             return type->repr;
+        default: {
+            return type->repr;
+        }
     }
 }
