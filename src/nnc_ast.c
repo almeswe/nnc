@@ -23,7 +23,9 @@ nnc_ctx* nnc_expr_get_ctx(const nnc_expression* expr) {
         case EXPR_UNARY:       return &((nnc_unary_expression*)expr->exact)->ctx;   break;
         case EXPR_BINARY:      return &((nnc_binary_expression*)expr->exact)->ctx;  break;
         case EXPR_TERNARY:     return &((nnc_ternary_expression*)expr->exact)->ctx; break;
-        default: nnc_abort_no_ctx("nnc_expr_get_ctx: unknown kind.\n");
+        default: {
+            nnc_abort_no_ctx("nnc_expr_get_ctx: unknown kind.\n");
+        }
     }
     return NULL;
 }

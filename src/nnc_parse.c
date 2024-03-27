@@ -124,7 +124,7 @@ nnc_static void nnc_parser_enter_scope(nnc_parser* parser) {
 
 nnc_static void nnc_parser_leave_scope(nnc_parser* parser) {
     if (parser->st->root == NULL) {
-        nnc_abort_no_ctx("nnc_parser_leave_scope: root st is NULL.");
+        nnc_abort_no_ctx("nnc_parser_leave_scope: root st is NULL.\n");
     }
     parser->st = parser->st->root;
 }
@@ -558,7 +558,9 @@ nnc_static nnc_expression* nnc_parse_postfix_expr(nnc_parser* parser) {
             case TOK_DOT:       postfix = nnc_parse_dot_expr(parser, prefix);    break;
             case TOK_OPAREN:    postfix = nnc_parse_call_expr(parser, prefix);   break;
             case TOK_OBRACKET:  postfix = nnc_parse_index_expr(parser, prefix);  break;
-            default: nnc_abort_no_ctx("nnc_parse_postfix_expr: unknown kind.\n");
+            default: {
+                nnc_abort_no_ctx("nnc_parse_postfix_expr: unknown kind.\n");
+            }
         }
     }
     return postfix ? postfix : primary;
@@ -599,7 +601,9 @@ nnc_static nnc_expression* nnc_parse_arith_multiplication_expr(nnc_parser* parse
             case TOK_SLASH:    kind = BINARY_DIV; break;
             case TOK_PERCENT:  kind = BINARY_MOD; break;
             case TOK_ASTERISK: kind = BINARY_MUL; break;
-            default: nnc_abort_no_ctx("nnc_parse_arith_multiplication_expr: unknown kind.\n");
+            default: {
+                nnc_abort_no_ctx("nnc_parse_arith_multiplication_expr: unknown kind.\n");
+            }
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);
@@ -687,7 +691,9 @@ nnc_static nnc_expression* nnc_parse_relation_expr(nnc_parser* parser) {
             case TOK_GT:  kind = BINARY_GT;  break;
             case TOK_LTE: kind = BINARY_LTE; break;
             case TOK_GTE: kind = BINARY_GTE; break;
-            default: nnc_abort_no_ctx("nnc_parse_relation_expr: unknown kind.\n");
+            default: {
+                nnc_abort_no_ctx("nnc_parse_relation_expr: unknown kind.\n");
+            }
         }
         nnc_parser_next(parser);
         temp = nnc_binary_expr_new(kind);

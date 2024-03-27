@@ -59,7 +59,9 @@ nnc_static nnc_3a_lr* nnc_get_lr(nnc_3a_unit* unit, const nnc_3a_addr* addr) {
     switch (addr->kind) {
         case ADDR_CGT:  return (nnc_3a_lr*)map_get(unit->lr_cgt, addr->exact.cgt); 
         case ADDR_NAME: return (nnc_3a_lr*)map_get_s(unit->lr_var, addr->exact.name.name);
-        default: nnc_abort_no_ctx("bad addr kind\n");
+        default: {
+            nnc_abort_no_ctx("bad addr kind\n");
+        }
     }
     return NULL;
 }
@@ -81,7 +83,9 @@ nnc_static nnc_bool nnc_3a_addr_cmp(const nnc_3a_addr* addr, const nnc_3a_addr* 
     switch (addr->kind) {
         case ADDR_CGT:  return addr->exact.cgt == with->exact.cgt;
         case ADDR_NAME: return strcmp(addr->exact.name.name, with->exact.name.name) == 0;
-        default: nnc_abort_no_ctx("bad addr kind\n");
+        default: {
+            nnc_abort_no_ctx("bad addr kind\n");
+        }
     }
     return false;
 }
@@ -200,7 +204,9 @@ const nnc_3a_storage* nnc_store_generic(nnc_3a_unit* unit,
         case STORE_PARAM: return nnc_store_param(lr, generic);
         case STORE_GLOBAL: nnc_abort_no_ctx("nnc_store_generic:"
             " STORE_GLOBAL mode is not implemented.\n");
-        default: nnc_abort_no_ctx("nnc_store_generic: unknown mode.\n");
+        default: {
+            nnc_abort_no_ctx("nnc_store_generic: unknown mode.\n");
+        }
     }
     return NULL;
 }

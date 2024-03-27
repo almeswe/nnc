@@ -201,7 +201,7 @@ nnc_static void nnc_lval_dot_to_3a(const nnc_unary_expression* unary, const nnc_
     //in few other cases this may lead to wrong member mappings
     for (nnc_u64 i = 0; i < exact->memberc && t_expr->kind != T_UNION; i++) {
         const nnc_struct_member* m = exact->members[i];
-        if (nnc_sequal(m->var->name, member->name)) {
+        if (nnc_strcmp(m->var->name, member->name)) {
             break;
         }
         offset += m->texpr->type->size;
@@ -276,7 +276,9 @@ nnc_static void nnc_lval_unary_to_3a(const nnc_unary_expression* unary, const nn
         case UNARY_DEREF:         nnc_lval_deref_to_3a(unary, st); break;
         case UNARY_POSTFIX_DOT:   nnc_lval_dot_to_3a(unary, st);   break;
         case UNARY_POSTFIX_INDEX: nnc_lval_index_to_3a(unary, st); break;
-        default: nnc_abort("nnc_lval_unary_to_3a: unknown kind.\n", &unary->ctx);
+        default: {
+            nnc_abort("nnc_lval_unary_to_3a: unknown kind.\n", &unary->ctx);
+        }
     }
 }
 
@@ -284,7 +286,9 @@ nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st
     switch (expr->kind) {
         case EXPR_IDENT: nnc_lval_ident_to_3a(expr->exact, st); break;
         case EXPR_UNARY: nnc_lval_unary_to_3a(expr->exact, st); break;
-        default: nnc_abort("nnc_lval_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
+        default: {
+            nnc_abort("nnc_lval_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
+        }
     }
 }
 
@@ -640,7 +644,9 @@ void nnc_expr_to_3a(const nnc_expression* expr, const nnc_st* st) {
         case EXPR_CHR_LITERAL: nnc_cconst_to_3a(expr->exact, st);  break;
         case EXPR_INT_LITERAL: nnc_iconst_to_3a(expr->exact, st);  break;
         case EXPR_DBL_LITERAL: nnc_fconst_to_3a(expr->exact, st);  break;
-        default: nnc_abort("nnc_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
+        default: {
+            nnc_abort("nnc_expr_to_3a: unknown kind.\n", nnc_expr_get_ctx(expr));
+        }
     }
 }
 

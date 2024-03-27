@@ -5,6 +5,8 @@
 #include <stdarg.h>
 #include "nnc_arena.h"
 
+#define FORMAT_BUF_SIZE 2048
+
 /**
  * @brief Macro over `nnc_sformat`.
  *  See `nnc_sformat` for more details.

@@ -17,6 +17,8 @@ static const char* op_str[] = {
     [OP_MOD]    = "%", 
     [OP_SHR]    = ">>",
     [OP_SHL]    = "<<",
+    [OP_SAL]    = "sal",
+    [OP_SAR]    = "sar",
     [OP_BW_AND] = "&",
     [OP_BW_XOR] = "^",
     [OP_BW_OR]  = "|",
@@ -220,16 +222,8 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     }
     nnc_dump_3a_quad_type(quad);
     switch (quad->op) {
-        case OP_ADD:    
-        case OP_SUB:    case OP_MUL:
-        case OP_DIV:    case OP_MOD:    
-        case OP_SHR:    case OP_SHL:    
-        case OP_BW_AND: case OP_BW_XOR: case OP_BW_OR:
-            nnc_dump_3a_binary(quad); break;
-        case OP_PLUS:
-        case OP_MINUS:
-        case OP_BW_NOT:
-            nnc_dump_3a_unary(quad); break;
+        case OP_UNARY:      nnc_dump_3a_unary(quad);      break;
+        case OP_BINARY:     nnc_dump_3a_binary(quad);     break;
         case OP_ARG:        nnc_dump_3a_arg(quad);        break;
         case OP_REF:        nnc_dump_3a_ref(quad);        break;
         case OP_COPY:       nnc_dump_3a_copy(quad);       break;
@@ -249,7 +243,9 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_CJUMPLTE:   nnc_dump_3a_cjumplte(quad);   break;
         case OP_CJUMPGTE:   nnc_dump_3a_cjumpgte(quad);   break;
         case OP_DEREF_COPY: nnc_dump_3a_deref_copy(quad); break;
-        default: nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.");
+        default: { 
+            nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.\n");
+        }
     }
 }
 

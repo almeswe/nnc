@@ -48,7 +48,9 @@ nnc_bool nnc_st_has(const nnc_st* st, const char* key, nnc_st_sym_kind kind) {
         switch (kind) {
             case ST_SYM_TYPE:  has_in_map |= map_has_s(st->types, key); break; 
             case ST_SYM_IDENT: has_in_map |= map_has_s(st->syms, key);  break; 
-            default: nnc_abort_no_ctx("nnc_st_has: unknown sym kind.");
+            default: {
+                nnc_abort_no_ctx("nnc_st_has: unknown sym kind.\n");
+            }
         }
         // stop from searching if current `st` is namespace
         // this is done for the purpose of isolating scope of namespace.
@@ -73,7 +75,9 @@ nnc_heap_ptr nnc_st_get(const nnc_st* st, const char* key, nnc_st_sym_kind kind)
         switch (kind) {
             case ST_SYM_TYPE:  map = st->types; break;
             case ST_SYM_IDENT: map = st->syms;  break;
-            default: nnc_abort_no_ctx("nnc_st_get: unknown sym kind.");
+            default: {
+                nnc_abort_no_ctx("nnc_st_get: unknown sym kind.\n");
+            }
         }
         if (map_has_s(map, key)) {
             sym = map_get_s(map, key);
@@ -132,7 +136,9 @@ void nnc_st_put(nnc_st* st, nnc_heap_ptr sym, nnc_st_sym_kind kind) {
     switch (kind) {
         case ST_SYM_TYPE:  nnc_st_put_type(st, (nnc_type*)sym); break;
         case ST_SYM_IDENT: nnc_st_put_sym(st, (nnc_sym*)sym);   break;
-        default: nnc_abort_no_ctx("nnc_st_put: unknown sym kind.");
+        default: {
+            nnc_abort_no_ctx("nnc_st_put: unknown sym kind.\n");
+        }
     }
 }
 
