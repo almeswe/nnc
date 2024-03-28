@@ -65,7 +65,13 @@ static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
         //data = nnc_3a_optimize_data(data);
         //nnc_dump_3a_data(stderr, data);
         //nnc_dump_3a_code(stderr, code);
-        nnc_gen_unit(code);
+        //nnc_3a_addr arg1 = nnc_3a_mkcgt();
+        //nnc_3a_addr arg2 = nnc_3a_mki2(0xff, &i64_type);
+        //nnc_3a_quad q = nnc_3a_mkquad1(
+        //    OP_MUL, arg1, &u64_type, arg1, arg2
+        //);
+        //buf_add(code->quads, q);
+        nnc_gen_code(code);
         ETRY;
     }
     CATCHALL {

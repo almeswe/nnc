@@ -23,6 +23,8 @@
     case OP_MOD:    \
     case OP_SHR:    \
     case OP_SHL:    \
+    case OP_SAL:    \
+    case OP_SAR:    \
     case OP_BW_OR:  \
     case OP_BW_AND: \
     case OP_BW_XOR
@@ -71,6 +73,8 @@ typedef enum _nnc_3a_op_kind {
     OP_MOD,
     OP_SHR,
     OP_SHL,
+    OP_SAL,
+    OP_SAR,
     OP_BW_OR,
     OP_BW_AND,
     OP_BW_XOR,
@@ -180,11 +184,13 @@ typedef struct _nnc_3a_name {
     const nnc_nesting* nesting;
 } nnc_3a_name;
 
+#define STORAGE_MEM (STORAGE_DATA_SEG | STORAGE_STACK_SEG)
+
 typedef enum _nnc_3a_storage_kind {
-    STORAGE_NONE,
-    STORAGE_REG,
-    STORAGE_DATA_SEG,
-    STORAGE_STACK_SEG,
+    STORAGE_NONE      = 0xb00001,
+    STORAGE_REG       = 0xb00010,
+    STORAGE_DATA_SEG  = 0xb00100,
+    STORAGE_STACK_SEG = 0xb01000,
 } nnc_3a_storage_type;
 
 #pragma pack(push)

@@ -29,6 +29,10 @@ typedef enum _nnc_x86_64_asm_instr {
     I_SHR,
     /* OP_SHL */
     I_SHL,
+    /* OP_SAL */
+    I_SAL,
+    /* OP_SAR */
+    I_SAR,
     /* OP_BW_OR */
     I_OR,
     /* OP_BW_AND */

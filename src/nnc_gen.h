@@ -7,5 +7,6 @@
 #include "nnc_gen_instr_set.h"
 
 void nnc_gen_unit(nnc_3a_unit* unit);
+void nnc_gen_code(_vec_(nnc_3a_unit) code);
 
 #endif
