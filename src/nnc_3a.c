@@ -679,7 +679,10 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
         .lr_var = map_init_with(8),
-        .lr_cgt = map_init_with(32)
+        .lr_cgt = map_init_with(32),
+        .quad_pointer = 0,
+        .local_stack_offset = 0,
+        .param_stack_offset = 0
     };
     unit.stat.initial = buf_len(unit.quads);
     #if _NNC_ENABLE_OPTIMIZATIONS

@@ -10,7 +10,8 @@
 /*
     Macro just to make map type definition more readable
 */
-#define _map_(keytype, valtype)   nnc_map*
+#define _map_(keytype, valtype)      nnc_map*
+#define dictionary(keytype, valtype) nnc_map*
 
 #define map_init()              nncmap_init(NNC_MAP_INICAP)
 #define map_init_with(exact)    nncmap_init(exact)
