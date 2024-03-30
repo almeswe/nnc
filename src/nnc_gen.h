@@ -3,8 +3,8 @@
 
 #include "nnc_3a.h"
 #include "nnc_misc.h"
-#include "nnc_gen_reg_alloc.h"
 #include "nnc_gen_instr_set.h"
+#include "nnc_gen_reg_alloc2.h"
 
 void nnc_gen_unit(nnc_3a_unit* unit);
 void nnc_gen_code(_vec_(nnc_3a_unit) code);

@@ -184,14 +184,14 @@ typedef struct _nnc_3a_name {
     const nnc_nesting* nesting;
 } nnc_3a_name;
 
-#define STORAGE_MEM (STORAGE_DATA_SEG | STORAGE_STACK_SEG)
-
-typedef enum _nnc_3a_storage_kind {
-    STORAGE_NONE      = 0xb00001,
-    STORAGE_REG       = 0xb00010,
-    STORAGE_DATA_SEG  = 0xb00100,
-    STORAGE_STACK_SEG = 0xb01000,
-} nnc_3a_storage_type;
+//#define STORAGE_MEM (STORAGE_DATA_SEG | STORAGE_STACK_SEG)
+//
+//typedef enum _nnc_3a_storage_kind {
+//    STORAGE_NONE      = 0xb00001,
+//    STORAGE_REG       = 0xb00010,
+//    STORAGE_DATA_SEG  = 0xb00100,
+//    STORAGE_STACK_SEG = 0xb01000,
+//} nnc_3a_storage_type;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -238,15 +238,15 @@ typedef struct _nnc_3a_opt_stat {
     .id = x, .quads = NULL \
 }
 
-typedef struct _nnc_3a_storage {
-    nnc_u32 reg;
-    nnc_u32 mem_offset;
-    nnc_3a_storage_type where;
-} nnc_3a_storage;
+//typedef struct _nnc_3a_storage {
+//    nnc_u32 reg;
+//    nnc_u32 mem_offset;
+//    nnc_3a_storage_type where;
+//} nnc_3a_storage;
 
 typedef struct _nnc_3a_live_range {
     nnc_u32 starts, ends;
-    nnc_3a_storage storage;
+    nnc_heap_ptr loc;
 } nnc_3a_live_range, nnc_3a_lr;
 
 typedef struct _nnc_3a_basic {
@@ -279,6 +279,8 @@ typedef struct _nnc_3a_unit {
     _map_(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
     _map_(const char*, nnc_3a_lr*) lr_var;
     nnc_u64 quad_pointer;
+    nnc_u32 param_stack_offset;
+    nnc_u32 local_stack_offset;
 } nnc_3a_unit;
 
 typedef nnc_3a_unit* nnc_3a_code;
