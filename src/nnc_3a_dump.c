@@ -200,6 +200,10 @@ nnc_static void nnc_dump_3a_deref_copy(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
+nnc_static void nnc_dump_3a_prepare_call(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%s\n", "(preparation before call)");
+}
+
 nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
     const char* repr = "";
     if (quad->op < OP_UJUMP || quad->op > OP_CJUMPNE) {
@@ -222,27 +226,28 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     }
     nnc_dump_3a_quad_type(quad);
     switch (quad->op) {
-        case OP_UNARY:      nnc_dump_3a_unary(quad);      break;
-        case OP_BINARY:     nnc_dump_3a_binary(quad);     break;
-        case OP_ARG:        nnc_dump_3a_arg(quad);        break;
-        case OP_REF:        nnc_dump_3a_ref(quad);        break;
-        case OP_COPY:       nnc_dump_3a_copy(quad);       break;
-        case OP_CAST:       nnc_dump_3a_cast(quad);       break;
-        case OP_RETF:       nnc_dump_3a_retf(quad);       break;
-        case OP_RETP:       nnc_dump_3a_retp(quad);       break;
-        case OP_DEREF:      nnc_dump_3a_deref(quad);      break;
-        case OP_FCALL:      nnc_dump_3a_fcall(quad);      break;
-        case OP_PCALL:      nnc_dump_3a_pcall(quad);      break;
-        case OP_UJUMP:      nnc_dump_3a_ujump(quad);      break;
-        case OP_CJUMPT:     nnc_dump_3a_cjumpt(quad);     break;
-        case OP_CJUMPF:     nnc_dump_3a_cjumpf(quad);     break;
-        case OP_CJUMPE:     nnc_dump_3a_cjumpe(quad);     break;
-        case OP_CJUMPLT:    nnc_dump_3a_cjumplt(quad);    break;
-        case OP_CJUMPGT:    nnc_dump_3a_cjumpgt(quad);    break;
-        case OP_CJUMPNE:    nnc_dump_3a_cjumpne(quad);    break;
-        case OP_CJUMPLTE:   nnc_dump_3a_cjumplte(quad);   break;
-        case OP_CJUMPGTE:   nnc_dump_3a_cjumpgte(quad);   break;
-        case OP_DEREF_COPY: nnc_dump_3a_deref_copy(quad); break;
+        case OP_UNARY:        nnc_dump_3a_unary(quad);        break;
+        case OP_BINARY:       nnc_dump_3a_binary(quad);       break;
+        case OP_ARG:          nnc_dump_3a_arg(quad);          break;
+        case OP_REF:          nnc_dump_3a_ref(quad);          break;
+        case OP_COPY:         nnc_dump_3a_copy(quad);         break;
+        case OP_CAST:         nnc_dump_3a_cast(quad);         break;
+        case OP_RETF:         nnc_dump_3a_retf(quad);         break;
+        case OP_RETP:         nnc_dump_3a_retp(quad);         break;
+        case OP_DEREF:        nnc_dump_3a_deref(quad);        break;
+        case OP_FCALL:        nnc_dump_3a_fcall(quad);        break;
+        case OP_PCALL:        nnc_dump_3a_pcall(quad);        break;
+        case OP_UJUMP:        nnc_dump_3a_ujump(quad);        break;
+        case OP_CJUMPT:       nnc_dump_3a_cjumpt(quad);       break;
+        case OP_CJUMPF:       nnc_dump_3a_cjumpf(quad);       break;
+        case OP_CJUMPE:       nnc_dump_3a_cjumpe(quad);       break;
+        case OP_CJUMPLT:      nnc_dump_3a_cjumplt(quad);      break;
+        case OP_CJUMPGT:      nnc_dump_3a_cjumpgt(quad);      break;
+        case OP_CJUMPNE:      nnc_dump_3a_cjumpne(quad);      break;
+        case OP_CJUMPLTE:     nnc_dump_3a_cjumplte(quad);     break;
+        case OP_CJUMPGTE:     nnc_dump_3a_cjumpgte(quad);     break;
+        case OP_DEREF_COPY:   nnc_dump_3a_deref_copy(quad);   break;
+        case OP_PREPARE_CALL: nnc_dump_3a_prepare_call(quad); break;
         default: { 
             nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.\n");
         }

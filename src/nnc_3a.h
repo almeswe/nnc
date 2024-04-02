@@ -103,6 +103,7 @@ typedef enum _nnc_3a_op_kind {
     OP_REF,
     OP_DEREF,
     OP_DEREF_COPY,
+    OP_PREPARE_CALL
     /* ***************** */
 } nnc_3a_op_kind;
 
@@ -273,14 +274,16 @@ typedef struct _nnc_3a_cfg {
 
 typedef struct _nnc_3a_unit {
     const char* name;
-    nnc_3a_quad* quads;
+    vector(nnc_3a_quad) quads;
     nnc_3a_cfg cfg;
     nnc_3a_opt_stat stat;
-    _map_(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
-    _map_(const char*, nnc_3a_lr*) lr_var;
+    dictionary(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
+    dictionary(const char*, nnc_3a_lr*) lr_var;
     nnc_u64 quad_pointer;
-    nnc_u32 param_stack_offset;
+    nnc_u32 stack_usage;
+    //nnc_u32 param_stack_offset;
     nnc_u32 local_stack_offset;
+    const vector(nnc_fn_param*) params;
 } nnc_3a_unit;
 
 typedef nnc_3a_unit* nnc_3a_code;
