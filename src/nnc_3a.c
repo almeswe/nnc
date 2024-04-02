@@ -60,8 +60,9 @@ nnc_static nnc_3a_addr nnc_3a_mkaddr(nnc_3a_addr resv, const nnc_type* rest) {
     };
 }
 
-nnc_static void nnc_3a_quads_add(const nnc_3a_quad* quad) {
+nnc_static nnc_u64 nnc_3a_quads_add(const nnc_3a_quad* quad) {
     buf_add(quads, *quad);
+    return buf_len(quads) - 1;
 }
 
 nnc_static void nnc_3a_data_quads_add(const nnc_3a_quad* quad) {
@@ -377,6 +378,8 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
 
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     const char* name = nnc_mk_nested_name(unary->expr->exact, st);
+    nnc_3a_quad prepare_call_quad = { .op = OP_PREPARE_CALL };
+    nnc_u64 idx = nnc_3a_quads_add(&prepare_call_quad);
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
         nnc_expr_to_3a(call->args[i], st);
@@ -393,6 +396,7 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
         quad.op = OP_FCALL;
         quad.res = nnc_3a_mkcgt();
         quad.res.type = unary->type;
+        quads[idx].res = quad.res;
     }
     nnc_3a_quads_add(&quad);
 }
@@ -682,7 +686,8 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
         .lr_cgt = map_init_with(32),
         .quad_pointer = 0,
         .local_stack_offset = 0,
-        .param_stack_offset = 0
+        //.param_stack_offset = 0,
+        .params = fn_stmt->params
     };
     unit.stat.initial = buf_len(unit.quads);
     #if _NNC_ENABLE_OPTIMIZATIONS

@@ -5,8 +5,6 @@
 
 nnc_3a_unit* glob_current_unit = NULL;
 nnc_static nnc_u32 nnc_glob_units = 0;
-nnc_u32 nnc_glob_stack_offset = 8;
-nnc_u32 nnc_glob_param_stack_offset = 0;
 
 #define gen_t0(...)  fprintf(stderr, __VA_ARGS__)
 #define gen_t1(...)  fprintf(stderr, "   " __VA_ARGS__)
@@ -18,11 +16,16 @@ nnc_u32 nnc_glob_param_stack_offset = 0;
 #define NNC_LABEL_PREFIX     "label_"
 #define NNC_RET_LABEL_PREFIX "label_ret_"
 
+nnc_static void nnc_gen_push_reg(nnc_register reg) {
+    nnc_push_reg(reg);
+    gen_t1("push %s\n", glob_reg_str[reg]);
+}
+
 nnc_static nnc_bool nnc_gen_reserve_reg(nnc_register reg) {
     nnc_bool need_push = nnc_reserve_reg(reg);
     if (need_push) {
         gen_instr(I_PUSH);
-        gen_t0("%s\n", glob_register_str[reg]);
+        gen_t0("%s\n", glob_reg_str[reg]);
     }
     return need_push;
 }
@@ -30,7 +33,19 @@ nnc_static nnc_bool nnc_gen_reserve_reg(nnc_register reg) {
 nnc_static void nnc_gen_unreserve_reg(nnc_register reg) {
     nnc_unreserve_reg(reg);
     gen_instr(I_POP);
-    gen_t0("%s\n", glob_register_str[reg]);
+    gen_t0("%s\n", glob_reg_str[reg]);
+}
+
+nnc_static void nnc_gen_alloc_stack(nnc_u32 amount) {
+    if (amount > 0) {
+        gen_t1("sub rsp, %u\n", amount);
+    }
+}
+
+nnc_static void nnc_gen_dealloc_stack(nnc_u32 amount) {
+    if (amount > 0) {
+        gen_t1("add rsp, %u\n", amount);
+    }
 }
 
 /**
@@ -194,12 +209,12 @@ nnc_static void nnc_gen_loc(const nnc_loc* at, const nnc_type* type) {
         }
         case LOCATION_LOCAL_STACK: {
             const char* ptr_size = nnc_get_ptr_size(type);
-            gen_t0("%s ptr [rbp-%ld]", ptr_size, at->mem);
+            gen_t0("%s ptr [rbp-%ld]", ptr_size, at->offset);
             break;
         }
         case LOCATION_PARAM_STACK: {
             const char* ptr_size = nnc_get_ptr_size(type);
-            gen_t0("%s ptr [rbp+%ld]", ptr_size, at->mem);
+            gen_t0("%s ptr [rbp+%ld]", ptr_size, at->offset);
             break;
         }
         case LOCATION_DATA: {
@@ -696,35 +711,28 @@ nnc_static void nnc_gen_op_xor(const nnc_3a_quad* quad) {
     nnc_gen_op_binary(quad, I_XOR);
 }
 
-nnc_static nnc_u64 nnc_get_start_of_next_call() {
-    nnc_bool found = false;
-    nnc_u64 i = glob_current_unit->quad_pointer;
-    for (; i < buf_len(glob_current_unit->quads); i++) {
-        if (glob_current_unit->quads[i].op == OP_FCALL || 
-            glob_current_unit->quads[i].op == OP_PCALL) {
-            found = true;
-            break;
-        }
-    }
-    assert(found);
-    return i;
-}
-
 nnc_static void nnc_gen_op_arg(const nnc_3a_quad* quad) {
     assert(!nnc_real_type(quad->arg1.type));
     assert(!nnc_struct_or_union_type(quad->arg1.type));
     assert(quad->arg1.kind == ADDR_CGT);
-    nnc_loc origin = *nnc_get_loc(&quad->arg1);
     nnc_bool need_to_push = false;
-    nnc_loc loc = nnc_store_arg(&quad->arg1, &need_to_push);
-    if (need_to_push) {
-        nnc_register reg_to_push = buf_last(glob_reg_alloc_state.pushed);
-        gen_t0("push %s\n", glob_register_str[reg_to_push]);
-    }
+    nnc_loc src = *nnc_get_loc(&quad->arg1);
+    nnc_loc dst = nnc_store_arg(&quad->arg1, &need_to_push);
     gen_instr(I_MOV);
-    nnc_gen_loc(&loc, quad->arg1.type);
+    assert(
+        dst.where == LOCATION_REG || 
+        dst.where == LOCATION_PARAM_STACK
+    );
+    if (dst.where == LOCATION_REG) {
+       // assert(!need_to_push);
+        nnc_gen_loc(&dst, quad->arg1.type);
+    }
+    if (dst.where == LOCATION_PARAM_STACK) {
+        gen_t0("%s ptr [rsp-%lu]", nnc_get_ptr_size(quad->arg1.type), dst.offset);
+    }
     gen_comma();
-    nnc_gen_loc(&origin, quad->arg1.type);
+    nnc_gen_loc(&src, quad->arg1.type);
+    nnc_call_stack_state_next(&quad->arg1);
 }
 
 // https://www.felixcloutier.com/x86/ret
@@ -747,48 +755,71 @@ nnc_static void nnc_gen_op_retf(const nnc_3a_quad* quad) {
     gen_t0(NNC_RET_LABEL_PREFIX"%s", glob_current_unit->name);
 }
 
-nnc_static void nnc_gen_restore_after_call() {
-    const nnc_u64 size = buf_len(glob_reg_alloc_state.pushed);
-    for (nnc_u64 i = 0; i < size; i++) {
-        const nnc_register reg = glob_reg_alloc_state.pushed[i];
-        gen_t1("pop %s\n", glob_register_str[reg]);
+nnc_static void nnc_gen_caller_prepare() {
+    nnc_gen_alloc_stack(glob_current_call_state->offset);
+}
+
+nnc_static void nnc_gen_caller_restore() {
+    nnc_gen_dealloc_stack(glob_current_call_state->offset);
+    vector(nnc_register) saved_regs = glob_current_call_state->pushed;
+    for (nnc_i64 i = 0; i < buf_len(saved_regs); i++) {
+        nnc_gen_unreserve_reg(saved_regs[i]);
     }
-    if (glob_reg_alloc_state.used_on_stack != 0) {
-        gen_t1("add rsp, %u\n", glob_reg_alloc_state.used_on_stack);
+    if (glob_current_call_state->rax_pushed) {
+        nnc_gen_unreserve_reg(R_RAX);
     }
-    buf_free(glob_reg_alloc_state.pushed);
-    glob_reg_alloc_state.pushed = NULL;
-    glob_reg_alloc_state.alloc_idx = 0;
-    glob_reg_alloc_state.alloc_simd_idx = 0;
-    glob_reg_alloc_state.used_on_stack = 0;
+    nnc_call_stack_state_fini();
 }
 
 nnc_static void nnc_gen_op_pcall(const nnc_3a_quad* quad) {
+    nnc_gen_caller_prepare();
     gen_instr(I_CALL);
     gen_t0("_%s", quad->arg1.exact.name.name);
     gen_crlf();
-    nnc_gen_restore_after_call();
+    nnc_gen_caller_restore();
 }
 
 nnc_static void nnc_gen_op_fcall(const nnc_3a_quad* quad) {
-    //todo: make register preserving here before call
-    //todo: make deduciton to which (OP_FCALL | OP_PCALL) OP_ARG belongs to. 
     assert(!nnc_real_type(quad->res.type));
-    nnc_loc loc = nnc_store_local(&quad->res);
-    nnc_bool rax_pushed = false;
-    if (!nnc_addr_inside_reg(&quad->res, R_RAX)) {
-        rax_pushed = nnc_gen_reserve_reg(R_RAX);
-    }
+    nnc_gen_caller_prepare();
     gen_instr(I_CALL);
-    gen_t0("_%s", quad->arg1.exact.name.name);
-    gen_crlf();
-    nnc_gen_restore_after_call();
+    gen_t0("_%s\n", quad->arg1.exact.name.name);
     if (!nnc_addr_inside_reg(&quad->res, R_RAX)) {
         nnc_gen_mov_reg_to_operand(R_RAX,
             &quad->res, quad->res.type);
     }
-    if (rax_pushed) {
-        nnc_gen_unreserve_reg(R_RAX);
+    nnc_gen_caller_restore();
+}
+
+nnc_static void nnc_gen_op_prepare_for_call(const nnc_3a_quad* quad) {
+    // if this condition is true, then preparation is done
+    // for function call, and we need to preserve RAX or XMM0 register
+    nnc_loc call_res_loc = {0};
+    nnc_bool rax_pushed = false;
+    nnc_register* call_res_reg_loc = NULL;
+    if (quad->res.kind != ADDR_NONE) {
+        rax_pushed = nnc_gen_reserve_reg(R_RAX);
+        call_res_loc = nnc_store_local(&quad->res);
+        if (call_res_loc.where == LOCATION_REG) {
+            call_res_reg_loc = &call_res_loc.reg;
+        }
+    }
+    nnc_call_stack_state_init(call_res_reg_loc);
+    glob_current_call_state->rax_pushed = rax_pushed;
+    vector(nnc_register) pushed = glob_current_call_state->pushed;
+    for (nnc_i64 i = buf_len(pushed); i > 0; i--) {
+        const nnc_register reg = pushed[i-1];
+        // if this is preparation for function call,
+        // we need to allocate storage for the result of 
+        // the function, but this appears before the `nnc_call_stack_state_init`,
+        // which will think that location (register) is used before call,
+        // and will push it, so unpush register where result is stored then.
+        if (call_res_loc.where == LOCATION_REG && call_res_loc.reg == reg) {
+            nnc_unreserve_reg(reg);
+        }
+        else {
+            gen_t1("push %s\n", glob_reg_str[reg]);
+        }
     }
 }
 
@@ -893,15 +924,15 @@ nnc_static void nnc_gen_op(const nnc_3a_quad* quad) {
             case OP_MINUS:  nnc_gen_op_minus(quad); break;
             case OP_BW_NOT: nnc_gen_op_not(quad);   break;
             /* Binary operators */
-            case OP_ADD: nnc_gen_op_add(quad); break;
-            case OP_SUB: nnc_gen_op_sub(quad); break;
-            case OP_MUL: nnc_gen_op_mul(quad); break;
-            case OP_DIV: nnc_gen_op_div(quad); break;
-            case OP_MOD: nnc_gen_op_mod(quad); break;
-            case OP_SHR: nnc_gen_op_shr(quad); break;
-            case OP_SHL: nnc_gen_op_shl(quad); break;
-            case OP_SAL: nnc_gen_op_sal(quad); break;
-            case OP_SAR: nnc_gen_op_sar(quad); break;
+            case OP_ADD:    nnc_gen_op_add(quad); break;
+            case OP_SUB:    nnc_gen_op_sub(quad); break;
+            case OP_MUL:    nnc_gen_op_mul(quad); break;
+            case OP_DIV:    nnc_gen_op_div(quad); break;
+            case OP_MOD:    nnc_gen_op_mod(quad); break;
+            case OP_SHR:    nnc_gen_op_shr(quad); break;
+            case OP_SHL:    nnc_gen_op_shl(quad); break;
+            case OP_SAL:    nnc_gen_op_sal(quad); break;
+            case OP_SAR:    nnc_gen_op_sar(quad); break;
             case OP_BW_OR:  nnc_gen_op_or(quad);  break;
             case OP_BW_AND: nnc_gen_op_and(quad); break;
             case OP_BW_XOR: nnc_gen_op_xor(quad); break;
@@ -911,6 +942,7 @@ nnc_static void nnc_gen_op(const nnc_3a_quad* quad) {
             case OP_RETF:  nnc_gen_op_retf(quad);  break;
             case OP_PCALL: nnc_gen_op_pcall(quad); break;
             case OP_FCALL: nnc_gen_op_fcall(quad); break;
+            case OP_PREPARE_CALL: nnc_gen_op_prepare_for_call(quad); break;
             /* Conditional operators */
             case OP_UJUMP:    nnc_gen_op_ujump(quad);    break;
             case OP_CJUMPT:   nnc_gen_op_cjumpt(quad);   break;
@@ -942,6 +974,8 @@ nnc_static void nnc_gen_bootstrap() {
     "   syscall\n"
     "\n"
     "_start:\n"
+    "   pop rdi\n"
+    "   mov rsi, rsp\n"
     "   call _main\n"
     "   mov rdi, rax\n"
     "   call _exit\n"
@@ -983,6 +1017,56 @@ nnc_static void nnc_gen_unit_epilogue(nnc_3a_unit* unit) {
     //}
 }
 
+extern vector(nnc_3a_lr*) glob_reg_lr[21];
+
+nnc_static nnc_u32 nnc_unit_params_calc_stack() {
+    nnc_u32 stack_usage = 0;
+    const vector(nnc_fn_param*) params = glob_current_unit->params;
+    nnc_3a_addr param = { .kind = ADDR_NAME };
+    nnc_call_stack_state_init(NULL);
+    assert(glob_current_call_state->pushed == NULL);
+    for (nnc_u64 i = 0; i < buf_len(params); i++) {
+        param.type = params[i]->var->type;
+        param.exact.name.name = params[i]->var->name;
+        nnc_loc loc = nnc_store_param(&param);
+        if (loc.where == LOCATION_PARAM_STACK) {
+            stack_usage += param.type->size;
+        }
+        nnc_call_stack_state_next(&param);
+    }
+    nnc_call_stack_state_fini();
+    return stack_usage;
+}
+
+nnc_static void nnc_store_params(nnc_3a_unit* unit) {
+    glob_current_unit->stack_usage = nnc_unit_params_calc_stack();
+    const vector(nnc_fn_param*) params = glob_current_unit->params;
+    nnc_3a_addr param = { .kind = ADDR_NAME };
+    nnc_call_stack_state_init(NULL);
+    for (nnc_u64 i = 0; i < buf_len(params); i++) {
+        param.type = params[i]->var->type;
+        param.exact.name.name = params[i]->var->name;
+        nnc_store_param(&param);
+        nnc_call_stack_state_next(&param);
+    }
+    nnc_call_stack_state_fini();
+}
+
+nnc_static void nnc_gen_callee_prepare() {
+    for (nnc_u64 i = 0; i < nnc_arr_size(glob_reg_lr); i++) {
+        buf_free(glob_reg_lr[i]);
+    }
+    memset(glob_reg_lr, 0, sizeof(glob_reg_lr));
+    nnc_store_params(glob_current_unit);
+    nnc_gen_unit_prologue(glob_current_unit);
+}
+
+nnc_static void nnc_gen_callee_restore() {
+    gen_t0(NNC_RET_LABEL_PREFIX"%s:\n", glob_current_unit->name);
+    nnc_gen_unit_epilogue(glob_current_unit);
+    gen_t1("ret\n\n");
+}
+
 #if 1
     #undef MAG
     #undef RED
@@ -994,16 +1078,11 @@ nnc_static void nnc_gen_unit_epilogue(nnc_3a_unit* unit) {
     #define RESET "" 
 #endif
 
-extern vector(nnc_3a_lr*) nnc_reg_lr[21];
-
 void nnc_gen_unit(nnc_3a_unit* unit) {
-    //todo: too bad please reimplement this
-    memset(nnc_reg_lr, 0, sizeof(nnc_reg_lr));
-    // 
     glob_current_unit = unit;
     nnc_glob_units++;
     gen_t0(MAG "_%s:\n" RESET, unit->name);
-    nnc_gen_unit_prologue(unit);
+    nnc_gen_callee_prepare();
     gen_t0("# -----CODE-----\n");
     for (nnc_u64 i = 0; i < buf_len(unit->quads); i++) {
         //gen_t0("# ");
@@ -1016,12 +1095,10 @@ void nnc_gen_unit(nnc_3a_unit* unit) {
         glob_current_unit->quad_pointer++;
     }
     gen_t0("# -----CODE-----\n");
-    gen_t0(NNC_RET_LABEL_PREFIX"%s:\n", glob_current_unit->name);
-    nnc_gen_unit_epilogue(unit);
-    gen_t1("ret\n\n");
+    nnc_gen_callee_restore();
 }
 
-void nnc_gen_code(_vec_(nnc_3a_unit) code) {
+void nnc_gen_code(vector(nnc_3a_unit) code) {
     nnc_gen_bootstrap();
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
         nnc_gen_unit(&code[i]);

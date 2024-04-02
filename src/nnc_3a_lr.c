@@ -55,7 +55,8 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
         case OP_RETP:
         case OP_UJUMP:
         case OP_FCALL:
-        case OP_PCALL: {
+        case OP_PCALL: 
+        case OP_PREPARE_CALL: {
             break;
         }
         /* unary operators */
