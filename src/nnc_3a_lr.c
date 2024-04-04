@@ -37,17 +37,17 @@ nnc_static void nnc_3a_lr_put_var(nnc_map* lr_var, const nnc_3a_addr* var, nnc_i
     }
 }
 
-nnc_static void nnc_3a_lr_put_addr(nnc_3a_unit* unit, const nnc_3a_addr* addr, nnc_i32 pos) {
+nnc_static void nnc_3a_lr_put_addr(nnc_3a_proc* proc, const nnc_3a_addr* addr, nnc_i32 pos) {
     switch (addr->kind) {
-        case ADDR_CGT:  nnc_3a_lr_put_cgt(unit->lr_cgt, addr, pos); break;
-        case ADDR_NAME: nnc_3a_lr_put_var(unit->lr_var, addr, pos); break;
+        case ADDR_CGT:  nnc_3a_lr_put_cgt(proc->lr_cgt, addr, pos); break;
+        case ADDR_NAME: nnc_3a_lr_put_var(proc->lr_var, addr, pos); break;
         default: break;
     }
 }
 
-void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
-    const nnc_3a_quad* quad = &unit->quads[pos];
-    nnc_3a_lr_put_addr(unit, &quad->res, pos);
+void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
+    const nnc_3a_quad* quad = &proc->quads[pos];
+    nnc_3a_lr_put_addr(proc, &quad->res, pos);
     // process liverange of certain arguments, depending on quad operator.
     switch (quad->op) {
         /* do not consider */
@@ -71,7 +71,7 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
         case OP_COPY:
         case OP_CAST:
         case OP_DEREF: {
-            nnc_3a_lr_put_addr(unit, &quad->arg1, pos);
+            nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
             break;
         }
         
@@ -80,8 +80,8 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
         /* binary conditional operators */
         case OP_DEREF_COPY:
         case OP_BINARY_JUMP: {
-            nnc_3a_lr_put_addr(unit, &quad->arg1, pos);
-            nnc_3a_lr_put_addr(unit, &quad->arg2, pos);
+            nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
+            nnc_3a_lr_put_addr(proc, &quad->arg2, pos);
             break;
         }
         default: {
@@ -90,8 +90,8 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
     }
 }
 
-void nnc_3a_make_lr_for_unit(nnc_3a_unit* unit) {
-    for (nnc_u64 i = 0; i < buf_len(unit->quads); i++) {
-        nnc_3a_lr_process_quad(unit, i);
+void nnc_3a_make_lr_for_proc(nnc_3a_proc* proc) {
+    for (nnc_u64 i = 0; i < buf_len(proc->quads); i++) {
+        nnc_3a_lr_process_quad(proc, i);
     }
 }

@@ -273,7 +273,7 @@ typedef struct _nnc_3a_cfg {
     _vec_(nnc_3a_cfg_node*) nodes;
 } nnc_3a_cfg;
 
-typedef struct _nnc_3a_unit {
+typedef struct _nnc_3a_proc {
     const char* name;
     vector(nnc_3a_quad) quads;
     nnc_3a_cfg cfg;
@@ -285,10 +285,10 @@ typedef struct _nnc_3a_unit {
     //nnc_u32 param_stack_offset;
     nnc_u32 local_stack_offset;
     const vector(nnc_fn_param*) params;
-} nnc_3a_unit;
+} nnc_3a_proc;
 
-typedef nnc_3a_unit* nnc_3a_code;
-typedef nnc_3a_unit  nnc_3a_data;
+typedef nnc_3a_proc* nnc_3a_code;
+typedef nnc_3a_proc  nnc_3a_data;
 
 extern nnc_3a_code code;
 extern nnc_3a_data data;
@@ -343,7 +343,7 @@ nnc_3a_data nnc_3a_optimize_data(
 );
 
 _vec_(nnc_3a_basic) nnc_3a_get_blocks(
-    const nnc_3a_unit* unit
+    const nnc_3a_proc* unit
 );
 
 nnc_3a_cfg nnc_3a_get_cfg(

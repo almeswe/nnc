@@ -293,7 +293,7 @@ nnc_static void nnc_dump_3a_lr_var(nnc_map_key key, nnc_map_val val) {
     fprintf(stream, "[_%s] lives at (%u:%u)\n", (char*)key, lr->starts+1, lr->ends+1);
 }
 
-void nnc_dump_3a_unit(FILE* to, const nnc_3a_unit* unit) {
+void nnc_dump_3a_unit(FILE* to, const nnc_3a_proc* unit) {
     stream = to;
     dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
         (nnc_i32)(unit->stat.percent * 100));
