@@ -56,6 +56,7 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
         case OP_UJUMP:
         case OP_FCALL:
         case OP_PCALL: 
+        case OP_DECL_LOCAL:
         case OP_PREPARE_CALL: {
             break;
         }
@@ -69,14 +70,15 @@ void nnc_3a_lr_process_quad(nnc_3a_unit* unit, nnc_i32 pos) {
         case OP_RETF:
         case OP_COPY:
         case OP_CAST:
-        case OP_DEREF:
-        case OP_DEREF_COPY: {
+        case OP_DEREF: {
             nnc_3a_lr_put_addr(unit, &quad->arg1, pos);
             break;
         }
+        
         /* binary operators */
         case OP_BINARY:
         /* binary conditional operators */
+        case OP_DEREF_COPY:
         case OP_BINARY_JUMP: {
             nnc_3a_lr_put_addr(unit, &quad->arg1, pos);
             nnc_3a_lr_put_addr(unit, &quad->arg2, pos);

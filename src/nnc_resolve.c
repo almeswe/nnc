@@ -110,10 +110,13 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
  * @throw `NNC_SEMANTIC` in case when `type` is not listed in `st`. 
  */
 nnc_static void nnc_complete_type(nnc_type* type, nnc_st* st, const nnc_ctx* ctx) {
-    if (type->kind != T_INCOMPLETE) {// &&
-        //type->kind != T_ALIAS) {
+    while (type->kind == T_ARRAY ||
+           type->kind == T_POINTER) {
+        type = type->base;
+    }
+    if (type->kind != T_INCOMPLETE) {
         return;
-    } 
+    }
     nnc_type* st_type = NULL;
     if (type->repr != NULL) {
         st_type = nnc_st_get_type(st, type->repr);
@@ -1099,7 +1102,7 @@ nnc_static void nnc_resolve_comma_expr(nnc_binary_expression* binary, nnc_st* st
  * @param st Pointer to `nnc_st` instance.
  */
 nnc_static nnc_bool nnc_resolve_binary_expr(nnc_binary_expression* binary, nnc_st* st) {
-    if (!nnc_resolve_expr(binary->lexpr, st) || 
+    if (!nnc_resolve_expr(binary->lexpr, st) ||
         !nnc_resolve_expr(binary->rexpr, st)) {
         return false;
     }

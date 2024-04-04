@@ -1,5 +1,5 @@
-#ifndef __NNC_x86_64_GEN_REG_ALLOC2_H__
-#define __NNC_x86_64_GEN_REG_ALLOC2_H__
+#ifndef __NNC_x86_64_GEN_REG_ALLOC_H__
+#define __NNC_x86_64_GEN_REG_ALLOC_H__
 
 #include "nnc_3a.h"
 

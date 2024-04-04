@@ -4,9 +4,9 @@
 #include "nnc_3a.h"
 #include "nnc_misc.h"
 #include "nnc_gen_instr_set.h"
-#include "nnc_gen_reg_alloc2.h"
+#include "nnc_gen_reg_alloc.h"
 
 void nnc_gen_unit(nnc_3a_unit* unit);
-void nnc_gen_code(_vec_(nnc_3a_unit) code);
+void nnc_gen_code(vector(nnc_3a_unit) code);
 
 #endif
