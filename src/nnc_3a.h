@@ -103,7 +103,8 @@ typedef enum _nnc_3a_op_kind {
     OP_REF,
     OP_DEREF,
     OP_DEREF_COPY,
-    OP_PREPARE_CALL
+    OP_PREPARE_CALL,
+    OP_DECL_LOCAL
     /* ***************** */
 } nnc_3a_op_kind;
 

@@ -248,6 +248,7 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_CJUMPGTE:     nnc_dump_3a_cjumpgte(quad);     break;
         case OP_DEREF_COPY:   nnc_dump_3a_deref_copy(quad);   break;
         case OP_PREPARE_CALL: nnc_dump_3a_prepare_call(quad); break;
+        case OP_DECL_LOCAL:                                   break;
         default: { 
             nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.\n");
         }

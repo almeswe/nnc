@@ -1,4 +1,4 @@
-#include "nnc_gen_reg_alloc2.h"
+#include "nnc_gen_reg_alloc.h"
 
 #define nnc_get_priority(x)      nnc_real_type((x)->type) ? simd_priority : genp_priority
 #define nnc_get_priority_size(x) nnc_real_type((x)->type) ? nnc_arr_size(simd_priority ) : nnc_arr_size(genp_priority) 
@@ -120,36 +120,43 @@ nnc_static void nnc_update_reg(nnc_register reg, nnc_3a_lr* by) {
 
 nnc_static nnc_loc nnc_store_inside_reg(const nnc_3a_addr* addr, nnc_register reg) {
     nnc_loc* loc = nnc_new(nnc_loc);
+    loc->type = addr->type;
     loc->reg = reg, loc->where = LOCATION_REG;
     nnc_put_loc(loc, addr);
     return *loc;
 }
 
-nnc_static nnc_loc nnc_store_arg_on_stack(const nnc_3a_addr* addr, nnc_memory amount) {
+nnc_static nnc_loc nnc_store_arg_on_stack(const nnc_3a_addr* arg, nnc_memory amount) {
+    assert(amount > 0);
     glob_current_call_state->offset += amount;
     nnc_u32 offset = glob_current_call_state->offset;
     nnc_loc* loc = nnc_new(nnc_loc);
+    loc->type = arg->type;
     loc->offset = offset, loc->where = LOCATION_PARAM_STACK;
-    nnc_put_loc(loc, addr);
+    nnc_put_loc(loc, arg);
     return *loc;
 }
 nnc_static nnc_loc nnc_store_param_on_stack(const nnc_3a_addr* param, nnc_memory amount) {
+    assert(amount > 0);
     glob_current_call_state->offset += amount;
     nnc_u32 stack_usage = glob_current_unit->stack_usage;
     nnc_u32 offset = glob_current_call_state->offset;
     offset = 16 + stack_usage - offset;
     nnc_loc* loc = nnc_new(nnc_loc);
+    loc->type = param->type;
     loc->offset = offset, loc->where = LOCATION_PARAM_STACK;
     nnc_put_loc(loc, param);
     return *loc;
 }
 
-nnc_static nnc_loc nnc_store_local_on_stack(const nnc_3a_addr* addr, nnc_memory amount) {
-    nnc_u32 offset = glob_current_unit->local_stack_offset;
+nnc_static nnc_loc nnc_store_local_on_stack(const nnc_3a_addr* local, nnc_memory amount) {
+    assert(amount > 0);
     glob_current_unit->local_stack_offset += amount;
+    nnc_u32 offset = glob_current_unit->local_stack_offset;
     nnc_loc* loc = nnc_new(nnc_loc);
+    loc->type = local->type;
     loc->offset = offset, loc->where = LOCATION_LOCAL_STACK;
-    nnc_put_loc(loc, addr);
+    nnc_put_loc(loc, local);
     return *loc;
 }
 
@@ -233,7 +240,7 @@ nnc_loc nnc_store_arg(const nnc_3a_addr* arg, nnc_bool* need_to_push) {
     nnc_u8 current_idx = nnc_call_stack_state_idx(arg);
     nnc_register current = priority[current_idx];
     if (current_idx >= priority_size) {
-        return nnc_store_arg_on_stack(arg, arg->type->size);
+        return nnc_store_arg_on_stack(arg, nnc_sizeof(arg->type));
     }
     nnc_3a_lr inf_lr = {
         .starts = glob_current_unit->quad_pointer,
@@ -263,7 +270,7 @@ nnc_loc nnc_store_param(const nnc_3a_addr* param) {
     nnc_u8 current_idx = nnc_call_stack_state_idx(param);
     nnc_register current = priority[current_idx];
     if (current_idx >= priority_size) {
-        return nnc_store_param_on_stack(param, param->type->size);
+        return nnc_store_param_on_stack(param, nnc_sizeof(param->type));
     }
     nnc_update_reg(current, lr);
     return nnc_store_inside_reg(param, current);
@@ -274,7 +281,6 @@ nnc_loc nnc_store_local(const nnc_3a_addr* local) {
         local->kind == ADDR_NAME ||
         local->kind == ADDR_CGT
     );
-    assert(!nnc_struct_or_union_type(local->type));
     const static nnc_register genp_priority[] = {
         R_RAX, R_RBX, R_R10, R_R11, R_R12, 
         R_R13, R_R14, R_R15, R_R9,  R_R8, 
@@ -296,8 +302,9 @@ nnc_loc nnc_store_local(const nnc_3a_addr* local) {
         return *stored;
     }
     if (local->kind == ADDR_NAME) {
-        return nnc_store_local_on_stack(local, local->type->size);
+        return nnc_store_local_on_stack(local, nnc_sizeof(local->type));
     }
+    assert(!nnc_struct_or_union_type(local->type));
     for (nnc_u64 i = 0; i < priority_size; i++) {
         assert(priority[i] < nnc_arr_size(glob_reg_lr));
         // get mapping record (register => live range associated with it)
@@ -310,7 +317,7 @@ nnc_loc nnc_store_local(const nnc_3a_addr* local) {
         nnc_update_reg(priority[i], lr);
         return nnc_store_inside_reg(local, priority[i]);
     }
-    return nnc_store_local_on_stack(local, local->type->size);
+    return nnc_store_local_on_stack(local, nnc_sizeof(local->type));
 }
 
 nnc_bool nnc_reserve_reg(nnc_register reg) {
