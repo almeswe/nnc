@@ -1117,11 +1117,21 @@ nnc_static nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
     return nnc_stmt_new(STMT_CONTINUE, continue_stmt);
 }
 
+nnc_static nnc_fn_storage nnc_parse_fn_storage(nnc_parser* parser) {
+    nnc_fn_storage storage = FN_ST_NONE;
+    if (nnc_parser_peek(parser) == TOK_EXT) {
+        storage |= FN_ST_EXTERN;
+        nnc_parser_next(parser);
+    }
+    return storage;
+}
+
 nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_FN);
-    const nnc_tok* tok = nnc_parser_get(parser);
     nnc_fn_statement* fn_stmt = nnc_new(nnc_fn_statement);
+    fn_stmt->storage = nnc_parse_fn_storage(parser);
+    const nnc_tok* tok = nnc_parser_get(parser);
     if (nnc_parser_match(parser, TOK_IDENT)) {
         fn_stmt->var = nnc_ident_new(tok->lexeme);
         fn_stmt->var->ctx = *nnc_parser_get_ctx(parser);
@@ -1145,6 +1155,10 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_CPAREN);
     fn_stmt->ret = nnc_parse_fn_ret_type_expr(parser);
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
+    if (fn_stmt->storage & FN_ST_EXTERN) {
+        nnc_parser_expect(parser, TOK_SEMICOLON);
+        return nnc_stmt_new(STMT_FN, fn_stmt);
+    }
     fn_stmt->body = nnc_parse_compound_stmt(parser, ST_CTX_FN);
     assert(fn_stmt->body->kind == STMT_COMPOUND);
     // put all function parameters inside inner scope of the function
