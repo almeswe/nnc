@@ -4,6 +4,15 @@
 #include "nnc_ast.h"
 
 /**
+ * @brief Resolves & determines size of specified type. (in bytes)
+ * @param type Pointer to `nnc_type` instance.
+ * @return Size of type. 
+ */
+nnc_u64 nnc_sizeof(
+    const nnc_type* type
+);
+
+/**
  * @brief Checks if specified type is function.
  *  This function is not sensitive for alias types.
  * @param type Pointer to `nnc_type` to be checked.

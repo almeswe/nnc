@@ -50,7 +50,7 @@ typedef struct _nnc_expression_statement {
 } nnc_expression_statement;
 
 typedef struct _nnc_compound_statement {
-	nnc_statement** stmts;
+	vector(nnc_statement*) stmts;
 	struct _nnc_st* scope;
 } nnc_compound_statement;
 
@@ -65,7 +65,7 @@ typedef nnc_statement   nnc_else_branch;
 
 typedef struct _nnc_if_statement {
 	nnc_if_branch* if_br;
-	nnc_elif_branch** elif_brs;
+	vector(nnc_elif_branch*) elif_brs;
 	nnc_else_branch* else_br;
 } nnc_if_statement;
 
@@ -100,9 +100,15 @@ typedef nnc_struct_member nnc_var_type;
 typedef nnc_struct_member nnc_fn_param;
 typedef nnc_struct_member nnc_union_member;
 
+typedef enum _nnc_fn_storage {
+	FN_ST_NONE   = 0b0,
+	FN_ST_EXTERN = 0b1
+} nnc_fn_storage;
+
 typedef struct _nnc_fn_statement {
 	nnc_ident* var;
-	nnc_fn_param** params;
+	nnc_fn_storage storage;
+	vector(nnc_fn_param*) params;
 	nnc_type_expression* ret;
 	nnc_statement* body;
 } nnc_fn_statement;

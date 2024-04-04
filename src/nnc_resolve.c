@@ -8,7 +8,7 @@
  * @param type Pointer to `nnc_type` instance.
  * @return Size of type. 
  */
-nnc_static nnc_u64 nnc_sizeof(const nnc_type* type) {
+nnc_u64 nnc_sizeof(const nnc_type* type) {
     assert(!nnc_incomplete_type(type));
     return nnc_unalias(type)->size;
 }
@@ -1232,7 +1232,9 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     fn_stmt->var->nesting = nnc_get_imp_nesting(st);
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type_expr(fn_stmt->ret, st);
-    nnc_resolve_stmt(fn_stmt->body, st);
+    if (fn_stmt->storage != FN_ST_EXTERN) {
+        nnc_resolve_stmt(fn_stmt->body, st);
+    }
 }
 
 /**
@@ -1449,12 +1451,19 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
  * @param st Pointer to `nnc_st` instance.
  */
 nnc_static void nnc_resolved_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
-    if (stmt->kind == STMT_FN  || 
-        stmt->kind == STMT_LET ||
-        stmt->kind == STMT_NAMESPACE) {
-        if (st->ctx == ST_CTX_GLOBAL) {
+    nnc_heap_ptr exact = stmt->exact;
+    if (st->ctx != ST_CTX_GLOBAL) {
+        return;
+    }
+    if (stmt->kind == STMT_FN) {
+        nnc_fn_storage storage = ((nnc_fn_statement*)exact)->storage;
+        if (storage != FN_ST_EXTERN) {
             nnc_stmt_to_3a(stmt, st);
         }
+    }
+    if (stmt->kind == STMT_LET ||
+        stmt->kind == STMT_NAMESPACE) {
+        nnc_stmt_to_3a(stmt, st);
     }
 }
 
