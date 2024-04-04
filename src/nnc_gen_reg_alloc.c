@@ -1,9 +1,13 @@
 #include "nnc_gen_reg_alloc.h"
 
+#define LOC_LABEL_SIZE 512
+
 #define nnc_get_priority(x)      nnc_real_type((x)->type) ? simd_priority : genp_priority
 #define nnc_get_priority_size(x) nnc_real_type((x)->type) ? nnc_arr_size(simd_priority ) : nnc_arr_size(genp_priority) 
 
 vector(nnc_call_stack_state) glob_call_stack = NULL;
+
+nnc_static nnc_u32 glob_data_offset = 0;
 
 const char* glob_reg_str[] = {
     [R_RAX]  = "rax", 
@@ -32,26 +36,6 @@ const char* glob_reg_str[] = {
 
 vector(nnc_3a_lr*) glob_reg_lr[21] = {0};
 nnc_static dictionary(const char*, nnc_loc*) glob_loc_map = NULL;
-
-nnc_static void nnc_make_loc_key(char* keybuf, const nnc_3a_addr* addr) {
-    switch (addr->kind) {
-        case ADDR_CGT:  sprintf(keybuf, "_%s@CGT%lu", glob_current_unit->name, addr->exact.cgt); break;
-        case ADDR_NAME: sprintf(keybuf, "_%s@_%s",    glob_current_unit->name, addr->exact.name.name); break;
-        default: {
-            nnc_abort_no_ctx("nnc_make_loc_key: invalid addr\n");
-        }
-    }
-}
-
-nnc_static void nnc_put_loc(const nnc_loc* loc, const nnc_3a_addr* addr) {
-    char keybuf[128] = {0};
-    nnc_make_loc_key(keybuf, addr);
-    char* key = nnc_strdup(keybuf);
-    if (glob_loc_map == NULL) {
-        glob_loc_map = map_init();
-    }
-    map_put_s(glob_loc_map, key, loc);
-}
 
 nnc_static nnc_3a_lr* nnc_get_lr(const nnc_3a_addr* addr) {
     nnc_bool addr_has_lr = true;
@@ -118,10 +102,76 @@ nnc_static void nnc_update_reg(nnc_register reg, nnc_3a_lr* by) {
     }
 }
 
+nnc_static void nnc_make_cgt_loc_label(char* buf, const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_CGT);
+    sprintf(buf, "cgt_%s@%lu", glob_current_unit->name, addr->exact.cgt);
+}
+
+nnc_static void nnc_make_var_loc_label(char* buf, const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_NAME);
+    sprintf(buf, "v_%s", addr->exact.name.name);
+}
+
+nnc_static void nnc_make_str_loc_label(char* buf, const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_SCONST);
+
+    static nnc_u32 str_label_counter = 0;
+    static dictionary(char*, char*) str_id_value_map = NULL;
+
+    nnc_str value = addr->exact.sconst.sconst;
+
+    if (str_id_value_map == NULL) {
+        str_id_value_map = map_init_with(8);
+    }
+    if (map_has_s(str_id_value_map, value)) {
+        const char* label = map_get_s(str_id_value_map, value);
+        strcpy(buf, label);
+    }
+    else {
+        sprintf(buf, "s_%u", str_label_counter++);
+        char* label = nnc_strdup(buf);
+        map_put_s(str_id_value_map, value, label);
+    }
+}
+
+nnc_static void nnc_make_loc_label(char* buf, const nnc_3a_addr* addr) {
+    switch (addr->kind) {
+        case ADDR_CGT:    nnc_make_cgt_loc_label(buf, addr); break;
+        case ADDR_NAME:   nnc_make_var_loc_label(buf, addr); break;
+        case ADDR_SCONST: nnc_make_str_loc_label(buf, addr); break;
+        default: {
+            nnc_abort_no_ctx("nnc_make_loc_label\n");
+        }
+    }
+}
+
+nnc_static void nnc_put_loc(const nnc_loc* loc, const nnc_3a_addr* addr) {
+    char internal_buf[LOC_LABEL_SIZE] = {0};
+    nnc_make_loc_label(internal_buf, addr);
+    char* key = nnc_strdup(internal_buf);
+    if (glob_loc_map == NULL) {
+        glob_loc_map = map_init();
+    }
+    map_put_s(glob_loc_map, key, loc);
+}
+
+const nnc_loc* nnc_get_loc(const nnc_3a_addr* addr) {
+    char internal_buf[LOC_LABEL_SIZE] = {0};
+    nnc_make_loc_label(internal_buf, addr);
+    if (glob_loc_map == NULL) {
+        glob_loc_map = map_init();
+    }
+    assert(glob_loc_map != NULL);
+    if (!map_has_s(glob_loc_map, internal_buf)) {
+        return NULL;
+    }
+    return (nnc_loc*)map_get_s(glob_loc_map, internal_buf);
+}
+
 nnc_static nnc_loc nnc_store_inside_reg(const nnc_3a_addr* addr, nnc_register reg) {
     nnc_loc* loc = nnc_new(nnc_loc);
     loc->type = addr->type;
-    loc->reg = reg, loc->where = LOCATION_REG;
+    loc->reg = reg, loc->where = L_REG;
     nnc_put_loc(loc, addr);
     return *loc;
 }
@@ -132,7 +182,7 @@ nnc_static nnc_loc nnc_store_arg_on_stack(const nnc_3a_addr* arg, nnc_memory amo
     nnc_u32 offset = glob_current_call_state->offset;
     nnc_loc* loc = nnc_new(nnc_loc);
     loc->type = arg->type;
-    loc->offset = offset, loc->where = LOCATION_PARAM_STACK;
+    loc->offset = offset, loc->where = L_PARAM_STACK;
     nnc_put_loc(loc, arg);
     return *loc;
 }
@@ -144,47 +194,42 @@ nnc_static nnc_loc nnc_store_param_on_stack(const nnc_3a_addr* param, nnc_memory
     offset = 16 + stack_usage - offset;
     nnc_loc* loc = nnc_new(nnc_loc);
     loc->type = param->type;
-    loc->offset = offset, loc->where = LOCATION_PARAM_STACK;
+    loc->offset = offset, loc->where = L_PARAM_STACK;
     nnc_put_loc(loc, param);
     return *loc;
 }
 
-nnc_static nnc_loc nnc_store_local_on_stack(const nnc_3a_addr* local, nnc_memory amount) {
-    assert(amount > 0);
-    glob_current_unit->local_stack_offset += amount;
+nnc_static nnc_loc nnc_store_on_data(const nnc_3a_addr* global) {
+    char internal_buf[LOC_LABEL_SIZE] = {0};
+    nnc_make_loc_label(internal_buf, global);
+    const nnc_loc* loc = nnc_get_loc(global);
+    if (loc != NULL) {
+        return *loc;
+    }
+    nnc_loc* new_loc = nnc_new(nnc_loc);
+    new_loc->where = L_DATA;
+    new_loc->type = global->type;
+    new_loc->offset = global->kind == ADDR_SCONST;
+    new_loc->ds_name = nnc_strdup(internal_buf);
+    nnc_put_loc(new_loc, global);
+    return *new_loc;
+}
+
+nnc_static nnc_loc nnc_store_on_stack(const nnc_3a_addr* local, nnc_memory requires) {
+    assert(requires > 0);
+    glob_current_unit->local_stack_offset += requires;
     nnc_u32 offset = glob_current_unit->local_stack_offset;
     nnc_loc* loc = nnc_new(nnc_loc);
     loc->type = local->type;
-    loc->offset = offset, loc->where = LOCATION_LOCAL_STACK;
+    loc->offset = offset, loc->where = L_LOCAL_STACK;
     nnc_put_loc(loc, local);
     return *loc;
-}
-
-const nnc_loc* nnc_get_loc(const nnc_3a_addr* addr) {
-    assert(
-        addr->kind == ADDR_CGT ||
-        addr->kind == ADDR_NAME 
-    );
-    char keybuf[128] = {0};
-    nnc_make_loc_key(keybuf, addr);
-    if (glob_loc_map == NULL) {
-        glob_loc_map = map_init();
-    }
-    assert(glob_loc_map != NULL);
-    if (!map_has_s(glob_loc_map, keybuf)) {
-        return NULL;
-    }
-    return (nnc_loc*)map_get_s(glob_loc_map, keybuf);
 }
 
 void nnc_store_at(nnc_loc loc, const nnc_3a_addr* addr) {
     nnc_loc* new_loc = nnc_new(nnc_loc);
     *new_loc = loc;
     nnc_put_loc(new_loc, addr);
-}
-
-nnc_loc nnc_store_imm(const nnc_3a_addr* imm) {
-    assert(false && "not implemented yet.");
 }
 
 void nnc_call_stack_state_init(const nnc_register* do_not_touch) {
@@ -220,6 +265,56 @@ void nnc_call_stack_state_fini() {
     }
     assert(glob_call_stack != NULL);
     buf_pop(glob_call_stack);
+}
+
+nnc_static nnc_loc nnc_store_ss_or_sd(const nnc_3a_addr* imm) {
+    char internal_buf[128] = {0};
+    union { nnc_f64 f; nnc_u64 u; } map = {
+        .f = imm->exact.fconst.fconst
+    };
+    nnc_u64 len = snprintf(internal_buf, 
+        sizeof internal_buf, "sd_%lxh", map.u);
+    nnc_loc* new_loc = nnc_new(nnc_loc);
+    new_loc->where = L_DATA;
+    new_loc->ds_name = nnc_cnew(char, len + 1);
+    strcpy(new_loc->ds_name, internal_buf);
+    //todo: return here
+    //nnc_put_loc(new_loc, imm);
+}
+
+nnc_static nnc_loc nnc_store_imm64(const nnc_3a_addr* imm) {
+    char internal_buf[128] = {0};
+    nnc_u64 len = snprintf(internal_buf, sizeof internal_buf,
+        "imm64_%lud", imm->exact.iconst.iconst);
+            nnc_loc* new_loc = nnc_new(nnc_loc);
+    new_loc->where = L_DATA;
+    new_loc->ds_name = nnc_cnew(char, len + 1);
+    strcpy(new_loc->ds_name, internal_buf);
+}
+
+nnc_loc nnc_store_imm(const nnc_3a_addr* imm) {
+    assert(false);
+    assert(
+        imm->kind == ADDR_ICONST ||
+        imm->kind == ADDR_FCONST
+    );
+    if (imm->kind == ADDR_FCONST) {
+        assert(imm->type->kind == T_PRIMITIVE_F64);
+        return nnc_store_ss_or_sd(imm);
+    }
+    assert(imm->type->kind != T_PRIMITIVE_I64);
+    if (imm->kind == ADDR_ICONST &&
+        imm->type->kind == T_PRIMITIVE_U64) {
+        return nnc_store_imm64(imm);
+    }
+    nnc_loc imm_loc = { .where = L_IMM };
+    imm_loc.imm = imm->exact.iconst.iconst;
+    return imm_loc;
+}
+
+nnc_loc nnc_store_str(const nnc_3a_addr* str) {
+    assert(str->kind == ADDR_SCONST);
+    return nnc_store_on_data(str);
 }
 
 nnc_loc nnc_store_arg(const nnc_3a_addr* arg, nnc_bool* need_to_push) {
@@ -302,7 +397,7 @@ nnc_loc nnc_store_local(const nnc_3a_addr* local) {
         return *stored;
     }
     if (local->kind == ADDR_NAME) {
-        return nnc_store_local_on_stack(local, nnc_sizeof(local->type));
+        return nnc_store_on_stack(local, nnc_sizeof(local->type));
     }
     assert(!nnc_struct_or_union_type(local->type));
     for (nnc_u64 i = 0; i < priority_size; i++) {
@@ -317,7 +412,57 @@ nnc_loc nnc_store_local(const nnc_3a_addr* local) {
         nnc_update_reg(priority[i], lr);
         return nnc_store_inside_reg(local, priority[i]);
     }
-    return nnc_store_local_on_stack(local, nnc_sizeof(local->type));
+    return nnc_store_on_stack(local, nnc_sizeof(local->type));
+}
+
+nnc_static nnc_u32 glob_s_count  = 0;
+nnc_static nnc_u32 glob_ss_count = 0;
+nnc_static nnc_u32 glob_sd_count = 0;
+nnc_static nnc_u32 glob_imm64_count = 0;
+
+nnc_static nnc_loc nnc_store_glob_str(const nnc_3a_addr* global) {
+    // make unique identifier for string literal
+    // inside data segment where it will be stored.
+    char buf[32] = {0};
+    int len = snprintf(buf, sizeof buf,
+        "s_%u", glob_s_count++);
+    char* name = nnc_cnew(char, len + 1);
+    strcpy(name, buf);
+    // put on data segment
+    nnc_loc loc = {
+        .type = global->type,
+        .where = L_DATA,
+        .ds_name = name
+    };
+    return loc;
+}
+
+nnc_static nnc_loc nnc_store_glob_const(const nnc_3a_addr* global) {
+    assert(false);
+}
+
+nnc_static nnc_loc nnc_store_glob_var(const nnc_3a_addr* global) {
+    assert(false);    
+}
+
+nnc_loc nnc_store_global(const nnc_3a_addr* global) {
+    assert(
+        global->kind == ADDR_NAME   ||
+        global->kind == ADDR_SCONST ||
+        global->kind == ADDR_FCONST ||
+        global->kind == ADDR_ICONST
+    );
+    if (global->kind == ADDR_ICONST) {
+        assert(nnc_sizeof(global->type) == 8);
+    }
+    if (global->kind == ADDR_SCONST) {
+        return nnc_store_glob_str(global);
+    }
+    if (global->kind == ADDR_FCONST ||
+        global->kind == ADDR_ICONST) {
+        return nnc_store_glob_const(global);
+    }
+    return nnc_store_glob_var(global);
 }
 
 nnc_bool nnc_reserve_reg(nnc_register reg) {
@@ -337,4 +482,71 @@ nnc_bool nnc_reserve_reg(nnc_register reg) {
 void nnc_unreserve_reg(nnc_register reg) {
     assert(!nnc_reg_lr_empty(reg));
     buf_pop(glob_reg_lr[reg]);
+}
+
+nnc_static nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_CGT);
+    const static nnc_register genp_priority[] = {
+        R_RAX, R_RBX, R_R10, R_R11, R_R12, 
+        R_R13, R_R14, R_R15, R_R9,  R_R8, 
+        R_RCX, R_RDX, R_RDI, R_RSI 
+    };
+    const static nnc_register simd_priority[] = {
+        R_XMM0, R_XMM1, R_XMM2, R_XMM3,
+        R_XMM4, R_XMM5, R_XMM6, R_XMM7
+    };
+    nnc_loc loc = {0};
+    nnc_3a_lr* lr = nnc_get_lr(addr);
+    assert(lr != NULL);
+    const nnc_register* priority = nnc_real_type(addr->type) ?
+        simd_priority : genp_priority;
+    const nnc_u64 priority_size = nnc_real_type(addr->type) ?
+        nnc_arr_size(simd_priority) : nnc_arr_size(genp_priority);
+    const nnc_loc* stored = nnc_get_loc(addr);  
+    if (stored != NULL) {
+        return *stored;
+    }
+    assert(!nnc_struct_or_union_type(addr->type));
+    for (nnc_u64 i = 0; i < priority_size; i++) {
+        assert(priority[i] < nnc_arr_size(glob_reg_lr));
+        // get mapping record (register => live range associated with it)
+        nnc_3a_lr* top_lr = nnc_peek_reg(priority[i]);
+        // if current register's live range does not intersects
+        // with specified live range, allocate this register
+        if (nnc_lr_intersects(lr, top_lr)) {
+            continue;
+        }
+        nnc_update_reg(priority[i], lr);
+        return nnc_store_inside_reg(addr, priority[i]);
+    }
+    return nnc_store_on_stack(addr, nnc_sizeof(addr->type));
+}
+
+nnc_static nnc_loc nnc_store_var(const nnc_3a_addr* addr, nnc_bool globally) {
+    assert(addr->kind == ADDR_NAME);
+    if (globally) {
+        return nnc_store_on_data(addr);
+    }
+    else {
+        return nnc_store_on_stack(addr, nnc_sizeof(addr->type));
+    }
+}
+
+//todo: clear map before each procedure
+nnc_loc nnc_store(const nnc_3a_addr* addr, nnc_bool globally) {
+    const nnc_loc* loc = nnc_get_loc(addr); 
+    if (loc != NULL) {
+        return *loc;
+    }
+    switch (addr->kind) {
+        case ADDR_CGT:    return nnc_store_cgt(addr);
+        case ADDR_SCONST: return nnc_store_str(addr);
+        case ADDR_FCONST: return nnc_store_imm(addr);
+        case ADDR_ICONST: return nnc_store_imm(addr);
+        case ADDR_NAME:   return nnc_store_var(addr, globally);
+        default: {
+            nnc_abort_no_ctx("nnc_store: unimplemented addr->kind.\n");
+        }
+    }
+    return *loc;
 }

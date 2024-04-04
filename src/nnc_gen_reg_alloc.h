@@ -3,15 +3,16 @@
 
 #include "nnc_3a.h"
 
-#define LOCATION_MEM (LOCATION_DATA | LOCATION_LOCAL_STACK | LOCATION_PARAM_STACK)
+#define LOCATION_MEM (L_DATA | L_LOCAL_STACK | L_PARAM_STACK)
 #define IS_LOCATION_MEM(x) ((x & LOCATION_MEM) > 0)
 
 typedef enum _nnc_location_type {
-    LOCATION_NONE        = 0b00001,
-    LOCATION_REG         = 0b00010,
-    LOCATION_DATA        = 0b00100,
-    LOCATION_LOCAL_STACK = 0b01000,
-    LOCATION_PARAM_STACK = 0b10000
+    L_NONE        = 0b000001,
+    L_REG         = 0b000010,
+    L_DATA        = 0b000100,
+    L_LOCAL_STACK = 0b001000,
+    L_PARAM_STACK = 0b010000,
+    L_IMM         = 0b100000
 } nnc_loc_type, nnc_location_type;
 
 typedef nnc_i64 nnc_memory;
@@ -31,9 +32,12 @@ typedef enum _nnc_x86_64_register {
 } nnc_register;
 
 typedef struct _nnc_location {
-    nnc_memory offset;    
+    nnc_memory offset;
     nnc_register reg;
+    char* ds_name;
     nnc_loc_type where;
+    nnc_u64 imm;
+    const nnc_type* type;
 } nnc_loc, nnc_location;
 
 typedef struct _nnc_call_stack_state {
@@ -49,7 +53,7 @@ typedef struct _nnc_call_stack_state {
 
 extern vector(nnc_call_stack_state) glob_call_stack;
 
-extern nnc_3a_unit* glob_current_unit;
+extern nnc_3a_proc* glob_current_unit;
 extern const char* glob_reg_str[];
 
 void nnc_call_stack_state_init(
@@ -67,9 +71,9 @@ void nnc_store_at(
     const nnc_3a_addr* addr
 );
 
-nnc_loc nnc_store_imm(
-    const nnc_3a_addr* imm
-);
+//nnc_loc nnc_store_imm(
+//    const nnc_3a_addr* imm
+//);
 
 nnc_loc nnc_store_arg(
     const nnc_3a_addr* arg,
@@ -80,9 +84,13 @@ nnc_loc nnc_store_param(
     const nnc_3a_addr* param
 );
 
-nnc_loc nnc_store_local(
-    const nnc_3a_addr* local
-);
+//nnc_loc nnc_store_local(
+//    const nnc_3a_addr* local
+//);
+//
+//nnc_loc nnc_store_global(
+//    const nnc_3a_addr* global
+//);
 
 const nnc_loc* nnc_get_loc(
     const nnc_3a_addr* addr
@@ -102,6 +110,11 @@ nnc_bool nnc_reserve_reg(
 
 void nnc_unreserve_reg(
     nnc_register reg
+);
+
+nnc_loc nnc_store(
+    const nnc_3a_addr* addr,
+    nnc_bool globally
 );
 
 #endif 

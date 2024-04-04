@@ -691,11 +691,11 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
     nnc_3a_quads_add(&b_next);
 }
 
-extern void nnc_3a_make_lr_for_unit(nnc_3a_unit* unit);
+extern void nnc_3a_make_lr_for_proc(nnc_3a_proc* proc);
 
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
     cgt_cnt = 0;
-    nnc_3a_unit unit = {
+    nnc_3a_proc proc = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
         .quads = (nnc_stmt_to_3a(fn_stmt->body, st), quads),
         .lr_var = map_init_with(8),
@@ -705,18 +705,18 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
         //.param_stack_offset = 0,
         .params = fn_stmt->params
     };
-    unit.stat.initial = buf_len(unit.quads);
+    proc.stat.initial = buf_len(proc.quads);
     #if _NNC_ENABLE_OPTIMIZATIONS
     unit.quads = nnc_3a_optimize(unit.quads, &unit.stat);
     #endif
-    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&unit);
-    unit.cfg = nnc_3a_get_cfg(blocks);
+    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&proc);
+    proc.cfg = nnc_3a_get_cfg(blocks);
     #if _NNC_ENABLE_OPTIMIZATIONS
     unit.cfg = nnc_3a_cfg_optimize(unit.cfg, &unit.stat);
     #endif
-    nnc_3a_make_lr_for_unit(&unit);
+    nnc_3a_make_lr_for_proc(&proc);
     quads = NULL;
-    buf_add(code, unit);
+    buf_add(code, proc);
 }
 
 nnc_static void nnc_if_branch_to_3a(const nnc_cond_n_body* branch, const nnc_3a_quad* b_true, 
