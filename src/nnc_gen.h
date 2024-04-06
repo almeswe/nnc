@@ -3,6 +3,7 @@
 
 #include "nnc_3a.h"
 #include "nnc_misc.h"
+#include "nnc_ast_eval.h"
 #include "nnc_gen_instr_set.h"
 #include "nnc_gen_reg_alloc.h"
 

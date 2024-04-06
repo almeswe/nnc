@@ -14,7 +14,7 @@ nnc_static nnc_bool nnc_3a_jump_op(nnc_3a_op_kind op) {
     return false;
 }
 
-_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_unit* unit) {
+_vec_(nnc_3a_basic) nnc_3a_get_blocks(const nnc_3a_proc* unit) {
     nnc_u32 block_id = 0;
     nnc_u64 size = buf_len(unit->quads);
     nnc_3a_basic block = {0};

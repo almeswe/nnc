@@ -103,8 +103,11 @@ typedef enum _nnc_3a_op_kind {
     OP_REF,
     OP_DEREF,
     OP_DEREF_COPY,
-    OP_PREPARE_CALL,
-    OP_DECL_LOCAL
+    /* hint operators */
+    OP_HINT_PREPARE_CALL,
+    OP_HINT_DECL_LOCAL,
+    OP_HINT_DECL_GLOBAL,
+    OP_HINT_DECL_STRING,
     /* ***************** */
 } nnc_3a_op_kind;
 
@@ -186,15 +189,6 @@ typedef struct _nnc_3a_name {
     const nnc_nesting* nesting;
 } nnc_3a_name;
 
-//#define STORAGE_MEM (STORAGE_DATA_SEG | STORAGE_STACK_SEG)
-//
-//typedef enum _nnc_3a_storage_kind {
-//    STORAGE_NONE      = 0xb00001,
-//    STORAGE_REG       = 0xb00010,
-//    STORAGE_DATA_SEG  = 0xb00100,
-//    STORAGE_STACK_SEG = 0xb01000,
-//} nnc_3a_storage_type;
-
 #pragma pack(push)
 #pragma pack(1)
 typedef struct _nnc_3a_addr {
@@ -228,6 +222,7 @@ typedef struct _nnc_3a_quad {
     nnc_3a_addr res;
     nnc_3a_addr arg1;
     nnc_3a_addr arg2;
+    nnc_heap_ptr hint;
 } nnc_3a_quad;
 
 typedef struct _nnc_3a_opt_stat {
