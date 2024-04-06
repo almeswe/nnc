@@ -487,7 +487,9 @@ nnc_static nnc_expression* nnc_parse_lengthof_expr(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_LENGTHOF);
     nnc_unary_expression* expr = nnc_unary_expr_new(UNARY_LENGTHOF);
     expr->ctx = *nnc_parser_get_ctx(parser);
+    nnc_parser_expect(parser, TOK_OPAREN);
     expr->expr = nnc_parse_expr(parser);
+    nnc_parser_expect(parser, TOK_CPAREN);
     return nnc_expr_new(EXPR_UNARY, expr);
 }
 
@@ -1127,7 +1129,6 @@ nnc_static nnc_fn_storage nnc_parse_fn_storage(nnc_parser* parser) {
 }
 
 nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
-    //todo: specifiers like extern, static etc..
     nnc_parser_expect(parser, TOK_FN);
     nnc_fn_statement* fn_stmt = nnc_new(nnc_fn_statement);
     fn_stmt->storage = nnc_parse_fn_storage(parser);

@@ -496,6 +496,8 @@ nnc_static void nnc_dump_stmt(nnc_dump_data data) {
 void nnc_dump_ast(const nnc_ast* ast) {
     fprintf(stderr, _c(BCYN, "%s\n"), "ast");
     nnc_dump_indent(1);
-    nnc_dump_stmt(DUMP_DATA(1, ast->root));
+    for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {
+        nnc_dump_stmt(DUMP_DATA(1, ast->root[i]));
+    }
     fflush(stderr);
 }
