@@ -563,7 +563,7 @@ nnc_type* nnc_binary_expr_infer_type(nnc_binary_expression* expr, nnc_st* st) {
             // return value is not used here
             // just need to be sure that types are the same
             expr->type = nnc_infer_imp(t_lexpr, t_rexpr);
-            return nnc_unsigned_type(expr->type) ? &u8_type : &i8_type;
+            return expr->type = (nnc_unsigned_type(expr->type) ? &u8_type : &i8_type);
         default:
             return &unknown_type;
     }
