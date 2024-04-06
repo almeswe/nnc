@@ -105,7 +105,16 @@ nnc_static void nnc_fconst_to_3a(const nnc_dbl_literal* fconst, const nnc_st* st
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static void nnc_sconst_hint(const nnc_str_literal* sconst, const nnc_st* st) {
+    nnc_3a_quad hint_quad = nnc_3a_mkquad(
+        OP_HINT_DECL_STRING, nnc_3a_mks1(sconst) 
+    );
+    hint_quad.hint = (nnc_heap_ptr)sconst;
+    nnc_3a_quads_add(&hint_quad);
+}
+
 nnc_static void nnc_sconst_to_3a(const nnc_str_literal* sconst, const nnc_st* st) {
+    nnc_sconst_hint(sconst, st);
     nnc_3a_addr arg = nnc_3a_mks1(sconst);
     nnc_3a_quad quad = nnc_3a_mkquad1(
         OP_COPY, nnc_3a_mkcgt(), sconst->type, arg
@@ -183,7 +192,6 @@ nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
 }
 
 nnc_static void nnc_lval_deref_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    //todo: this approach doesn't take to account pointer arithmetic
     nnc_expr_to_3a(unary->expr, st);
     // get the address for dereference
     nnc_3a_addr addr = *nnc_3a_quads_res();
@@ -392,10 +400,15 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
     nnc_3a_quads_add(&quad);
 }
 
+nnc_static nnc_u64 nnc_call_hint(const nnc_unary_expression* unary, const nnc_st* st) {
+    nnc_3a_quad hint_quad = { .op = OP_HINT_PREPARE_CALL };
+    hint_quad.hint = (nnc_heap_ptr)unary;
+    return nnc_3a_quads_add(&hint_quad);
+}
+
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     const char* name = nnc_mk_nested_name(unary->expr->exact, st);
-    nnc_3a_quad prepare_call_quad = { .op = OP_PREPARE_CALL };
-    nnc_u64 idx = nnc_3a_quads_add(&prepare_call_quad);
+    nnc_u64 idx = nnc_call_hint(unary, st);
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
         nnc_expr_to_3a(call->args[i], st);
@@ -556,6 +569,29 @@ nnc_static void nnc_gt_to_3a(const nnc_binary_expression* binary, const nnc_st* 
     nnc_binary_rel_to_3a(binary, OP_CJUMPGT, st);
 }
 
+nnc_static void nnc_add_or_sub_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    nnc_expr_to_3a(binary->lexpr, st);
+    nnc_3a_addr arg1 = *nnc_3a_quads_res();
+    nnc_expr_to_3a(binary->rexpr, st);
+    nnc_3a_addr arg2 = *nnc_3a_quads_res();
+    if (nnc_arr_or_ptr_type(arg1.type) &&
+        !nnc_arr_or_ptr_type(arg2.type)) {
+        // apply pointer arithmetic here
+        nnc_3a_quad quad = nnc_3a_mkquad1(
+            OP_MUL, arg2, arg2.type, arg2, nnc_3a_mki3(nnc_sizeof(arg1.type->base))
+        );
+        nnc_3a_quads_add(&quad);
+    }
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        bin_op_map[binary->kind], arg1, binary->type, arg1, arg2
+    );
+    nnc_3a_quads_add(&quad);
+}
+
+nnc_static void nnc_sub_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
+    
+}
+
 nnc_static void nnc_lte_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
     nnc_binary_rel_to_3a(binary, OP_CJUMPLTE, st);
 }
@@ -602,16 +638,18 @@ nnc_static void nnc_binary_to_3a(const nnc_binary_expression* binary, const nnc_
     nnc_3a_addr arg2 = {0};
     nnc_3a_op_kind op = OP_NONE;
     switch (binary->kind) {
-        case BINARY_EQ:     nnc_eq_to_3a(binary, st);     break;
-        case BINARY_OR:     nnc_or_to_3a(binary, st);     break;
-        case BINARY_LT:     nnc_lt_to_3a(binary, st);     break;
-        case BINARY_GT:     nnc_gt_to_3a(binary, st);     break;
-        case BINARY_LTE:    nnc_lte_to_3a(binary, st);    break;
-        case BINARY_GTE:    nnc_gte_to_3a(binary, st);    break;
-        case BINARY_AND:    nnc_and_to_3a(binary, st);    break;
-        case BINARY_NEQ:    nnc_neq_to_3a(binary, st);    break;
-        case BINARY_COMMA:  nnc_comma_to_3a(binary, st);  break;
-        case BINARY_ASSIGN: nnc_assign_to_3a(binary, st); break;
+        case BINARY_EQ:     nnc_eq_to_3a(binary, st);         break;
+        case BINARY_OR:     nnc_or_to_3a(binary, st);         break;
+        case BINARY_LT:     nnc_lt_to_3a(binary, st);         break;
+        case BINARY_GT:     nnc_gt_to_3a(binary, st);         break;
+        case BINARY_LTE:    nnc_lte_to_3a(binary, st);        break;
+        case BINARY_GTE:    nnc_gte_to_3a(binary, st);        break;
+        case BINARY_AND:    nnc_and_to_3a(binary, st);        break;
+        case BINARY_NEQ:    nnc_neq_to_3a(binary, st);        break;
+        case BINARY_COMMA:  nnc_comma_to_3a(binary, st);      break;
+        case BINARY_ASSIGN: nnc_assign_to_3a(binary, st);     break;
+        case BINARY_ADD:    nnc_add_or_sub_to_3a(binary, st); break;
+        case BINARY_SUB:    nnc_add_or_sub_to_3a(binary, st); break;
         default: {
             op = bin_op_map[binary->kind];
             nnc_expr_to_3a(binary->lexpr, st);
@@ -762,29 +800,33 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
     nnc_3a_quads_add(&b_true);
 }
 
-nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_DECL_LOCAL, nnc_3a_mkname1(let_stmt->var)
+nnc_static void nnc_let_stmt_hint(const nnc_let_statement* let_stmt, const nnc_st* st) {
+    nnc_3a_quad hint_quad = nnc_3a_mkquad(
+        OP_HINT_DECL_LOCAL, nnc_3a_mkname1(let_stmt->var)
     );
-    nnc_3a_quads_add(&quad);
+    if (st->ctx == ST_CTX_GLOBAL ||
+        st->ctx == ST_CTX_NAMESPACE) {
+        hint_quad.op = OP_HINT_DECL_GLOBAL;  
+        hint_quad.hint = (nnc_heap_ptr)let_stmt->init;
+    }
+    nnc_3a_quads_add(&hint_quad);
+}
+
+nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
+    nnc_let_stmt_hint(let_stmt, st);
     if (let_stmt->init == NULL) {
+        return;
+    }
+    if (st->ctx == ST_CTX_GLOBAL ||
+        st->ctx == ST_CTX_NAMESPACE) {
         return;
     }
     nnc_expr_to_3a(let_stmt->init, st);
     nnc_3a_addr resv = *nnc_3a_quads_res();
-    quad = nnc_3a_mkquad(
+    nnc_3a_quad quad = nnc_3a_mkquad(
         OP_COPY, nnc_3a_mkname1(let_stmt->var), resv
     );
     nnc_3a_quads_add(&quad);
-    if (st->ctx == ST_CTX_GLOBAL ||
-        st->ctx == ST_CTX_NAMESPACE) {
-        // in this case let-stmt is in global scope
-        // so it's value must be allocated in data segment
-        for (nnc_u64 i = 0; i < buf_len(quads); i++) {
-            nnc_3a_data_quads_add(&quads[i]);
-        }
-        quads = NULL;
-    }
 }
 
 nnc_static void nnc_for_stmt_to_3a(const nnc_for_statement* for_stmt, const nnc_st* st) {
