@@ -454,6 +454,9 @@ nnc_static void nnc_dump_fn_stmt(nnc_dump_data data) {
         fn_stmt->var->name, buf_len(fn_stmt->params));
     nnc_dump_type(fn_stmt->var->type);
     fprintf(stderr, ">\n");
+    if (fn_stmt->storage & FN_ST_EXTERN) {
+        return;
+    }
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {
         nnc_dump_indent(data.indent + 1);
         fprintf(stderr, TREE_BR "<param%lu>=", i+1);

@@ -174,6 +174,7 @@ typedef struct _nnc_3a_sconst {
 #define nnc_3a_mkname1(x) (nnc_3a_addr){ \
     .kind = ADDR_NAME,                   \
     .type = x->type,                     \
+    .exact.name.ictx = x->ictx,          \
     .exact.name.name = x->name,          \
     .exact.name.nesting = x->nesting     \
 }
@@ -185,6 +186,7 @@ typedef struct _nnc_3a_sconst {
 }
 
 typedef struct _nnc_3a_name {
+    nnc_ident_ctx ictx;
     const char* name;
     const nnc_nesting* nesting;
 } nnc_3a_name;
