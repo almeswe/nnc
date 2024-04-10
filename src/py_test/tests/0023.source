@@ -1,0 +1,12 @@
+type struct {
+    x: i32;
+    y: i32;
+} as s;
+
+let v: s;
+
+fn main(): i32 {
+    v.x = 1;
+    v.y = 2;
+    return 3 - v.x - v.y;
+}

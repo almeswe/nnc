@@ -1,0 +1,48 @@
+fn
+foo(x: i32*): i32
+{
+	let y: i32[100];
+	let p: i32*;
+	
+	y[0] = 2000;
+	
+	if(x[0] != 1000)
+	{
+		return 1;
+	}
+	
+	p = x;
+	
+	if(p[0] != 1000)
+	{
+		return 2;
+	}
+	
+	p = y;
+	
+	if(p[0] != 2000)
+	{
+		return 3;
+	}
+	
+	if(lengthof(x) != sizeof(void*))
+	{
+		return 4;
+	}
+	
+	if(lengthof(y) <= lengthof(x))
+	{
+		return 5;
+	}
+	
+	return 0;
+}
+
+fn
+main() : i32
+{
+	let x: i32[100];
+	x[0] = 1000;
+	
+	return foo(x);
+}

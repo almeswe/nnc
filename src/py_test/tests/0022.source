@@ -1,0 +1,6 @@
+let x: i32;
+
+fn main(): i32 {
+    x = 0;
+    return x;
+}
