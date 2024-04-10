@@ -1,12 +1,19 @@
 #include "nnc_3a.h"
-#include <stdio.h>
+#include "nnc_gen.h"
 
 static FILE* stream = NULL;
 static char buf[128] = {0};
 static int pad = 10;
 
 #define dump_indent "   "
-#define dump_3a(fmt, ...) fprintf(stream, fmt, __VA_ARGS__)
+
+#define REDIRECT_3a_DUMP_TO_BLOB 1
+
+#if REDIRECT_3a_DUMP_TO_BLOB == 0 
+    #define dump_3a(fmt, ...) fprintf(stream, fmt, __VA_ARGS__)
+#else
+    #define dump_3a(...) text_put(__VA_ARGS__) 
+#endif
 
 static const char* op_str[] = {
     /*  binary operators */
@@ -200,6 +207,18 @@ nnc_static void nnc_dump_3a_deref_copy(const nnc_3a_quad* quad) {
     dump_3a(" %s\n", nnc_dump_3a_addr(&quad->arg1));
 }
 
+nnc_static void nnc_dump_3a_declare_local(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%s\n", "(declaration of local)");
+}
+
+nnc_static void nnc_dump_3a_declare_global(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%s\n", "(declaration of global)");
+}
+
+nnc_static void nnc_dump_3a_declare_string(const nnc_3a_quad* quad) {
+    dump_3a(dump_indent "%s\n", "(declaration of string)");
+}
+
 nnc_static void nnc_dump_3a_prepare_call(const nnc_3a_quad* quad) {
     dump_3a(dump_indent "%s\n", "(preparation before call)");
 }
@@ -247,10 +266,10 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_CJUMPLTE:     nnc_dump_3a_cjumplte(quad);     break;
         case OP_CJUMPGTE:     nnc_dump_3a_cjumpgte(quad);     break;
         case OP_DEREF_COPY:   nnc_dump_3a_deref_copy(quad);   break;
-        case OP_HINT_DECL_LOCAL:  break;
-        case OP_HINT_DECL_GLOBAL: break;
-        case OP_HINT_DECL_STRING: break;
-        case OP_HINT_PREPARE_CALL: nnc_dump_3a_prepare_call(quad); break;
+        case OP_HINT_DECL_LOCAL:   nnc_dump_3a_declare_local(quad);  break;
+        case OP_HINT_DECL_GLOBAL:  nnc_dump_3a_declare_global(quad); break;
+        case OP_HINT_DECL_STRING:  nnc_dump_3a_declare_string(quad); break;
+        case OP_HINT_PREPARE_CALL: nnc_dump_3a_prepare_call(quad);   break;
         default: { 
             nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.\n");
         }

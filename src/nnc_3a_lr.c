@@ -54,8 +54,6 @@ void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
         case OP_NONE:
         case OP_RETP:
         case OP_UJUMP:
-        case OP_FCALL:
-        case OP_PCALL: 
         case OP_HINT_DECL_LOCAL:
         case OP_HINT_DECL_STRING:
         case OP_HINT_DECL_GLOBAL:
@@ -72,6 +70,8 @@ void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
         case OP_RETF:
         case OP_COPY:
         case OP_CAST:
+        case OP_FCALL:
+        case OP_PCALL: 
         case OP_DEREF: {
             nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
             break;

@@ -202,6 +202,18 @@ nnc_static nnc_loc nnc_store_param_on_stack(const nnc_3a_addr* param, nnc_memory
     return *loc;
 }
 
+nnc_static nnc_loc nnc_store_fn(const nnc_3a_addr* global_fn) {
+    char internal_buf[LOC_LABEL_SIZE] = {0};
+    sprintf(internal_buf, "_%s", global_fn->exact.name.name);
+    nnc_loc* new_loc = nnc_new(nnc_loc);
+    new_loc->where = L_DATA;
+    new_loc->offset = 1;
+    new_loc->type = global_fn->type;
+    new_loc->ds_name = nnc_strdup(internal_buf);
+    nnc_put_loc(new_loc, global_fn);
+    return *new_loc;
+}
+
 nnc_static nnc_loc nnc_store_on_data(const nnc_3a_addr* global) {
     char internal_buf[LOC_LABEL_SIZE] = {0};
     // assuming that `nnc_get_loc` check was done already
@@ -320,7 +332,7 @@ nnc_loc nnc_store_str(const nnc_3a_addr* str) {
     return nnc_store_on_data(str);
 }
 
-nnc_loc nnc_store_arg(const nnc_3a_addr* arg, nnc_bool* need_to_push) {
+nnc_loc nnc_store_arg(const nnc_3a_addr* arg) {
     assert(
         arg->kind == ADDR_NAME || 
         arg->kind == ADDR_CGT
@@ -347,6 +359,52 @@ nnc_loc nnc_store_arg(const nnc_3a_addr* arg, nnc_bool* need_to_push) {
     nnc_reserve_reg(current);
     return nnc_store_inside_reg(arg, current);
 }
+
+nnc_static nnc_bool glob_param_spilled = false;
+nnc_static const char* glob_spilled_param_label = NULL;
+nnc_static nnc_register glob_param_reg_to_spill = R_RAX;
+
+nnc_static void nnc_spill_param_at_reg(nnc_map_key key, nnc_map_val val) {
+    if (!glob_param_spilled) {
+        nnc_loc* loc = val;
+        if (loc->where == L_REG && glob_param_reg_to_spill == loc->reg) {
+            glob_param_spilled = true;
+            glob_spilled_param_label = (const char*)key;
+            // means it is variable
+            if (memcmp((void*)"v_", (void*)key, 2) != 0) {
+                return;
+            }
+            loc->where = L_LOCAL_STACK;
+            glob_current_proc->local_stack_offset += nnc_sizeof(loc->type);
+            loc->offset = glob_current_proc->local_stack_offset;
+        }
+    }
+}
+
+nnc_loc nnc_spill_param(const nnc_3a_addr* param) {
+    assert(param->kind == ADDR_NAME);
+    nnc_loc* loc = (nnc_loc*)nnc_get_loc(param);
+    assert(loc != NULL && loc->where == L_REG);
+    nnc_unreserve_reg(loc->reg);
+    nnc_dispose(loc);
+    return nnc_store_on_stack(param, nnc_sizeof(param->type));
+}
+
+nnc_loc nnc_try_spill_param_at(nnc_register reg) {
+    glob_param_spilled = false;
+    glob_param_reg_to_spill = reg;
+    glob_spilled_param_label = NULL;
+    nnc_map_iter(glob_loc_map, nnc_spill_param_at_reg);
+    assert(glob_param_spilled);
+    assert(glob_spilled_param_label != NULL);
+    assert(map_has_s(glob_loc_map, glob_spilled_param_label));
+    const nnc_loc* loc = map_get_s(glob_loc_map, glob_spilled_param_label);
+    if (loc->where & LOCATION_MEM) {
+        nnc_unreserve_reg(reg);
+    }
+    return *loc;
+}
+
 
 nnc_loc nnc_store_param(const nnc_3a_addr* param) {
     assert(param->kind == ADDR_NAME);
@@ -521,8 +579,25 @@ nnc_static nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
     return nnc_store_on_stack(addr, nnc_sizeof(addr->type));
 }
 
+nnc_static nnc_bool nnc_addr_is_fn(const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_NAME);
+    if (!nnc_fn_type(addr->type)) {
+        return false;
+    }
+    for (nnc_u64 i = 0; i < buf_len(code); i++) {
+        if (nnc_strcmp(code[i].name, addr->exact.name.name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 nnc_static nnc_loc nnc_store_var(const nnc_3a_addr* addr, nnc_bool globally) {
     assert(addr->kind == ADDR_NAME);
+    nnc_ident_ctx ictx = addr->exact.name.ictx;;
+    if (ictx == IDENT_FUNCTION) {
+        return nnc_store_fn(addr);
+    }
     if (globally) {
         return nnc_store_on_data(addr);
     }

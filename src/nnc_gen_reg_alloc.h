@@ -38,6 +38,7 @@ typedef struct _nnc_location {
     nnc_loc_type where;
     nnc_u64 imm;
     const nnc_type* type;
+    nnc_bool dereference;
 } nnc_loc, nnc_location;
 
 typedef struct _nnc_call_stack_state {
@@ -53,7 +54,7 @@ typedef struct _nnc_call_stack_state {
 
 extern vector(nnc_call_stack_state) glob_call_stack;
 
-extern nnc_3a_proc* glob_current_unit;
+extern nnc_3a_proc* glob_current_proc;
 extern const char* glob_reg_str[];
 
 void nnc_call_stack_state_init(
@@ -71,26 +72,21 @@ void nnc_store_at(
     const nnc_3a_addr* addr
 );
 
-//nnc_loc nnc_store_imm(
-//    const nnc_3a_addr* imm
-//);
-
 nnc_loc nnc_store_arg(
-    const nnc_3a_addr* arg,
-    nnc_bool* need_to_push
+    const nnc_3a_addr* arg
+);
+
+nnc_loc nnc_spill_param(
+    const nnc_3a_addr* param
+);
+
+nnc_loc nnc_try_spill_param_at(
+    const nnc_register reg
 );
 
 nnc_loc nnc_store_param(
     const nnc_3a_addr* param
 );
-
-//nnc_loc nnc_store_local(
-//    const nnc_3a_addr* local
-//);
-//
-//nnc_loc nnc_store_global(
-//    const nnc_3a_addr* global
-//);
 
 const nnc_loc* nnc_get_loc(
     const nnc_3a_addr* addr
