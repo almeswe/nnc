@@ -1,0 +1,7 @@
+fn main(): i32 {
+    let x: i32;
+    let p: i32*;
+    x = 0;
+    p = &x;
+    return p[0];
+}

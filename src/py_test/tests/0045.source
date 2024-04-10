@@ -1,0 +1,19 @@
+type struct {
+    x: i32;
+    nest: struct {
+        y: i32;
+        z: i32;
+    };
+} as s;
+
+
+fn main(): i32 {
+    let v: s;
+    v.x = 1;
+    v.nest.y = 2;
+    v.nest.z = 3;
+    if (v.x + v.nest.y + v.nest.z != 6) {
+        return 1;
+    }
+    return 0;
+}

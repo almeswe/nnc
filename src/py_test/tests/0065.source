@@ -1,0 +1,21 @@
+fn main(): i32 {
+    a[0] = 5;
+    a[2] = 2;
+    a[3] = 3;
+
+    if (lengthof(a) != 4*sizeof(i32))
+		{return 1;}
+		
+	if (a[0] != 5)
+		{return 2;}
+	if (a[1] != 0)
+		{return 3;}
+	if (a[2] != 2)
+		{return 4;}
+	if (a[3] != 3)
+		{return 5;}
+	
+	return 0;
+}
+
+let a: i32[4];

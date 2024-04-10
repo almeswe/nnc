@@ -1,0 +1,17 @@
+fn main(): i32 {
+    let x: i32;
+    let p: i32*;
+    if (lengthof(0) < 2) {
+        return 1;
+    }
+    if (sizeof(u8) < 1) {
+        return 1;
+    }
+    if (sizeof(i32) -2 < 0) {
+        return 1;
+    }
+    if (lengthof(&x) != lengthof(p)) {
+        return 1;
+    }
+    return 0;
+}

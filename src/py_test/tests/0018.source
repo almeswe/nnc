@@ -1,0 +1,11 @@
+type struct {
+    p: s_t*;
+    x: i32;
+} as s_t;
+
+fn main(): i32 {
+    let s: s_t;
+    s.x = 0;
+    s.p = &s;
+    return s.p.p.p.p.p.x;
+}

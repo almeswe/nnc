@@ -1,0 +1,14 @@
+type struct {
+    x: i32;
+    y: i32;
+} as s_t;
+
+fn main(): u64 {
+    let s: s_t;
+    let p: s_t*;
+
+    p = &s;
+    s.x = 1;
+    p.y = 2;
+    return p.y + p.x - 3;
+}

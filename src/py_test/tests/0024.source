@@ -1,0 +1,13 @@
+fn strlen(p: u8*): i32 {
+    let len: i32 = 0;
+    while (p[len]) {
+        len = len + 1;
+    }
+    return len;
+}
+
+fn main(): i32 {
+    let p: u8*;
+    p = "hello";
+    return strlen(p) - 5;
+}

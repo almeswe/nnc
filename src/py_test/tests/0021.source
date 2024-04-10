@@ -1,0 +1,7 @@
+type i32 as x;
+
+fn main(): i32 {
+    let v: x;
+    v = 0;
+    return v;
+}

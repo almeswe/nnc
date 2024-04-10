@@ -1,0 +1,20 @@
+fn main(): i32 {
+    let x: i32;
+	
+	x = 0;
+	x = x + 2;
+	x = x + 2;
+	if (x != 4) {
+		return 1;
+    }
+	x = x - 1;
+	if (x != 3) {
+		return 2;
+    }
+	x = x * 2;
+	if (x != 6) {
+		return 3;
+    }
+	return 0;
+
+}

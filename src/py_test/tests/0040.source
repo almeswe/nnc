@@ -1,0 +1,18 @@
+fn naive_mul(a: i32, b: i32): i32 {
+    return a * b;
+}
+
+fn main(): i32 {
+    let call_1: i32 = 0;
+    let call_2: i32 = 0;
+    // 2 * 3 * 4 * 5 * 1
+    call_1 = naive_mul(
+        2, naive_mul(
+            naive_mul(3, 4),
+            naive_mul(5, 1)
+        )
+    );
+    // 2 * 3 * 4
+    call_2 = naive_mul(2, naive_mul(3, 4));
+    return call_1 + call_2;
+}

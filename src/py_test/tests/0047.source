@@ -1,0 +1,39 @@
+type struct {
+    a: i32;
+    b: union {
+        _1: i32;
+        _2: i32;
+    };
+    c: struct {
+        _: union {
+            _: struct {
+                _: i32;
+            };
+        };
+    };
+    d: struct {
+        _: i32;
+    };
+} as s;
+
+fn main(): i32 {
+    let v: s;
+    v.a = 1;
+    v.b._1 = 2;
+    v.c._._._ = 3;
+    v.d._ = 4;
+
+    if (v.a != 1) {
+		return 1;
+    }
+	if (v.b._1 != 2 && v.b._2 != 2) {
+		return 2;
+    }
+	if (v.c._._._ != 3) {
+		return 3;
+    }
+	if (v.d._ != 4) {
+		return 4;
+    }
+	return 0;
+}

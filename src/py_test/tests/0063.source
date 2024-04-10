@@ -1,0 +1,20 @@
+fn zero(): i32 {
+    return 0;
+}
+
+let s: fn(): i32;
+
+fn anon(): fn(): i32 {
+    return s;
+}
+
+type fn(): fn(): i32 as fty;
+
+fn go(): fty {
+    return anon;
+}
+
+fn main(): i32 {
+    s = zero;
+    return go()()();
+}
