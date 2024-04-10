@@ -44,13 +44,6 @@ nnc_ctx* nnc_parser_get_ctx(nnc_parser* parser) {
     return &parser->current.ctx_copy;
 }
 
-nnc_ctx* nnc_parser_get_ctx2(nnc_parser* parser) {
-    nnc_ctx* cctx = &parser->current.ctx;
-    const nnc_tok* ctok = nnc_parser_get(parser); 
-    cctx->hint_sz = ctok->size;
-    return cctx;
-}
-
 nnc_tok* nnc_parser_get_lookup(nnc_parser* parser) {
     return &parser->lookup.tok;
 }
@@ -67,6 +60,17 @@ nnc_bool nnc_parser_match(nnc_parser* parser, nnc_tok_kind kind) {
     return nnc_parser_peek(parser) == kind;
 }
 
+nnc_static void nnc_parser_concat_str(nnc_parser* parser) {
+    while (parser->lookup.tok.kind == TOK_STR) {
+        memcpy(parser->current.tok.lexeme + parser->current.tok.size - 1,
+            parser->lookup.tok.lexeme + 1, parser->lookup.tok.size);
+        parser->current.tok.size += parser->lookup.tok.size - 2;
+        nnc_lex_next(&parser->lex);
+        parser->lookup.tok = parser->lex.ctok;
+        parser->lookup.ctx = parser->lex.cctx;
+    }
+}
+
 nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
     nnc_lex_next(&parser->lex);
     if (!parser->lookup.is_first) {
@@ -81,6 +85,10 @@ nnc_tok_kind nnc_parser_next(nnc_parser* parser) {
     }
     parser->lookup.tok = parser->lex.ctok;
     parser->lookup.ctx = parser->lex.cctx;
+    if (parser->current.tok.kind == TOK_STR &&
+        parser->lookup.tok.kind  == TOK_STR) {
+        nnc_parser_concat_str(parser);
+    }
     return parser->current.tok.kind;
 }
 

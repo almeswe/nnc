@@ -313,7 +313,7 @@ nnc_static nnc_bool nnc_type_needs_size_resolve(const nnc_type* type) {
  */
 nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* st) {
     if (enumerator->init == NULL) {
-        return true;
+        nnc_abort("enumerator must be initialized.", &enumerator->var->ctx);
     }
     nnc_resolve_expr(enumerator->init, st);
     const nnc_ctx* init_expr_ctx = nnc_expr_get_ctx(enumerator->init); 
@@ -326,7 +326,7 @@ nnc_static nnc_bool nnc_resolve_enumerator(nnc_enumerator* enumerator, nnc_st* s
         THROW(NNC_SEMANTIC, "enumerator initializer "
             "must be of integral type.", *init_expr_ctx);
     }
-    enumerator->var->type = &i64_type;
+    enumerator->var->type = nnc_expr_infer_type(enumerator->init, st);
     enumerator->init_const.d = nnc_evald(enumerator->init, st);
     return true;
 }
