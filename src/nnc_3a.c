@@ -161,8 +161,10 @@ nnc_static const char* nnc_mk_nested_name(const nnc_ident* ident, const nnc_st* 
 nnc_static void nnc_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     const char* name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(name, ident->type);
+    arg.exact.name.ictx = ident->ictx;
     if (ident->ictx == IDENT_ENUMERATOR) {
         const nnc_enumerator* enumerator = ident->refs.enumerator;
+        assert(!nnc_incomplete_type(enumerator->var->type));
         arg = nnc_3a_mki2(
             enumerator->init_const.u, 
             enumerator->var->type
@@ -179,6 +181,7 @@ nnc_static void nnc_lval_expr_to_3a(const nnc_expression* expr, const nnc_st* st
 nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     const char* ident_name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
+    arg.exact.name.ictx = ident->ictx;
     nnc_3a_op_kind op = OP_REF;
     //nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
     nnc_type* type = ident->type;
@@ -292,10 +295,13 @@ nnc_static void nnc_lval_index_to_3a(const nnc_unary_expression* unary, const nn
     buf_free(data.sizes);
 }
 
+nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st);
+
 nnc_static void nnc_lval_unary_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     switch (unary->kind) {
         case UNARY_DEREF:         nnc_lval_deref_to_3a(unary, st); break;
         case UNARY_POSTFIX_DOT:   nnc_lval_dot_to_3a(unary, st);   break;
+        case UNARY_POSTFIX_CALL:  nnc_call_to_3a(unary, st);       break;
         case UNARY_POSTFIX_INDEX: nnc_lval_index_to_3a(unary, st); break;
         default: {
             nnc_abort("nnc_lval_unary_to_3a: unknown kind.\n", &unary->ctx);
@@ -407,7 +413,6 @@ nnc_static nnc_u64 nnc_call_hint(const nnc_unary_expression* unary, const nnc_st
 }
 
 nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
-    const char* name = nnc_mk_nested_name(unary->expr->exact, st);
     nnc_u64 idx = nnc_call_hint(unary, st);
     const struct _nnc_unary_postfix_call* call = &unary->exact.call;
     for (nnc_u64 i = 0; i < call->argc; i++) {
@@ -418,8 +423,10 @@ nnc_static void nnc_call_to_3a(const nnc_unary_expression* unary, const nnc_st* 
         };
         nnc_3a_quads_add(&quad);
     }
+    nnc_expr_to_3a(unary->expr, st);
+    nnc_3a_addr arg1 = *nnc_3a_quads_res();
     nnc_3a_quad quad = nnc_3a_mkquad(
-        OP_PCALL, {0}, nnc_3a_mkname2(name, unary->type), nnc_3a_mki3(call->argc)
+        OP_PCALL, {0}, arg1, nnc_3a_mki3(call->argc)
     );
     if (unary->type->kind != T_VOID) {
         quad.op = OP_FCALL;
@@ -536,13 +543,13 @@ nnc_static void nnc_binary_rel_to_3a(const nnc_binary_expression* binary, nnc_3a
     nnc_3a_addr laddr = *nnc_3a_quads_res(); 
     nnc_expr_to_3a(binary->rexpr, st);
     nnc_3a_addr raddr = *nnc_3a_quads_res();
-    nnc_3a_quad quad = nnc_3a_mkquad(
-        op, nnc_3a_mki3(b_true.label), laddr, raddr
+    nnc_3a_quad quad = nnc_3a_mkquad1(
+        op, nnc_3a_mki3(b_true.label), binary->type, laddr, raddr
     );
     nnc_3a_quads_add(&quad);
     nnc_3a_addr res = nnc_3a_mkcgt();
     quad = nnc_3a_mkquad1(
-        OP_COPY, res, &i8_type, nnc_3a_mki3(0)
+        OP_COPY, res, binary->type, nnc_3a_mki3(0)
     );
     nnc_3a_quads_add(&quad);
     quad = nnc_3a_mkquad(
@@ -551,7 +558,7 @@ nnc_static void nnc_binary_rel_to_3a(const nnc_binary_expression* binary, nnc_3a
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_true);
     quad = nnc_3a_mkquad1(
-        OP_COPY, res, &i8_type, nnc_3a_mki3(1)
+        OP_COPY, res, binary->type, nnc_3a_mki3(1)
     );
     nnc_3a_quads_add(&quad);
     nnc_3a_quads_add(&b_next);
@@ -586,10 +593,6 @@ nnc_static void nnc_add_or_sub_to_3a(const nnc_binary_expression* binary, const 
         bin_op_map[binary->kind], arg1, binary->type, arg1, arg2
     );
     nnc_3a_quads_add(&quad);
-}
-
-nnc_static void nnc_sub_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
-    
 }
 
 nnc_static void nnc_lte_to_3a(const nnc_binary_expression* binary, const nnc_st* st) {
