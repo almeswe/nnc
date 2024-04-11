@@ -15,6 +15,10 @@ static int pad = 10;
     #define dump_3a(...) text_put(__VA_ARGS__) 
 #endif
 
+//todo: move to separate file
+extern nnc_bool nnc_is_escape(nnc_byte code);
+extern nnc_byte nnc_escape(nnc_byte code);
+
 static const char* op_str[] = {
     /*  binary operators */
     [OP_ADD]    = "+",
@@ -57,7 +61,18 @@ nnc_static void nnc_dump_3a_name(const nnc_3a_addr* addr) {
 nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
     memset(buf, 0, sizeof buf);
     const nnc_3a_sconst* sconst = &addr->exact.sconst;
-    sprintf(buf, "\"%s\"", sconst->sconst);
+    const nnc_str str = addr->exact.sconst.sconst;
+    const nnc_u64 len = strlen(str);
+    buf[0] = '\"';
+    for (nnc_u64 i = 0; i < len; i++) {
+        if (nnc_is_escape(str[i])) {
+            buf[i + 1] = nnc_escape(str[i]);
+        }
+        else {
+            buf[i + 1] = str[i];
+        }
+    }
+    buf[len] = '\"';
 }
 
 nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
