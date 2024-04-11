@@ -1,0 +1,43 @@
+let buf: u8[16];
+let stdout: u8 = 1u8;
+
+fn ext write(fd: i32, buf: u8*, size: u32): u32;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print_num(val: u32) {
+    if (val == 0) {
+        write(stdout, "0", 1);
+    }
+    let i: i32 = (i32)lengthof(buf);
+    let s: i32 = 0;
+    memset(buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout, buf+i+1, s);
+}
+
+fn println_num(val: u32) {
+    print_num(val);
+    write(stdout, "\r\n", 2u32);
+}
+
+fn main(): i32
+{
+   let a: u32 = 24680u32;
+   let b: u32 = 0o1234567u32;
+   let c: u32 = 0x2468acu32;
+   let d: u32 = 0x2468ACu32;
+
+   println_num(a);
+   println_num(b);
+   println_num(c);
+   println_num(d);
+
+   return 0;
+}

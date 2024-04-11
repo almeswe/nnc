@@ -2,7 +2,6 @@ fn main(): i32 {
     a[0] = 5;
     a[2] = 2;
     a[3] = 3;
-
     if (lengthof(a) != 4*sizeof(i32))
 		{return 1;}
 		
