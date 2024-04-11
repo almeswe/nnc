@@ -174,7 +174,8 @@ nnc_bool nnc_same_types(const nnc_type* t1, const nnc_type* t2) {
  */
 nnc_bool nnc_integral_type(const nnc_type* type) {
     const T_UNALIAS(type);
-    return ref_type->kind == T_PRIMITIVE_I8  || 
+    return ref_type->kind == T_ENUM ||
+           ref_type->kind == T_PRIMITIVE_I8  || 
            ref_type->kind == T_PRIMITIVE_U8  ||
            ref_type->kind == T_PRIMITIVE_I16 || 
            ref_type->kind == T_PRIMITIVE_U16 ||
@@ -372,6 +373,9 @@ nnc_bool nnc_can_imp_cast_assign(const nnc_type* from, const nnc_type* to) {
     }
     if (nnc_fn_type(ref_to) && nnc_fn_type(ref_from)) {
         return nnc_can_imp_cast_fns(ref_to, ref_from);
+    }
+    if (nnc_fn_type(ref_to) && nnc_ptr_type(ref_from)) {
+        return ref_to;
     }
     if (nnc_ptr_type(ref_to) && nnc_arr_or_ptr_type(ref_from)) {
         return nnc_can_imp_cast_ptrs(ref_from, ref_to);
