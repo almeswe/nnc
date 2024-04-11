@@ -1,0 +1,16 @@
+fn main(): i32 {
+    let x: i32;
+    let l: i64;
+
+    x = 0, l = 0;
+
+    x = ~x;
+    if (x != 0xffffffffu32) {
+        return 1;
+    }
+    l = ~l;
+    if ((i64)x != 0xffffffffffffffffu64) {
+        return 2;
+    }
+    return 0;
+}

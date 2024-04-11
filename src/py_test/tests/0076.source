@@ -1,0 +1,7 @@
+fn f(fp: i32): i32 {
+    return fp;
+}
+
+fn main(): i32 {
+    return f(0);
+}

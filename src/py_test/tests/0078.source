@@ -1,0 +1,11 @@
+fn main(): i32 {
+    return f(1) - g(1);
+}
+
+fn f(a: i32): i32 {
+    return a;
+}
+
+fn g(a: i32): i32 {
+	return a;
+}

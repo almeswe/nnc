@@ -1,0 +1,29 @@
+fn main(): i32 {
+    let v_u8: u8 = 255u8;
+    let v_i8: i8 = 0i8 - 1i8;
+    if ((u8)v_u8 != 0xffu8) {
+        return 1;
+    }
+    if ((u16)v_u8 != 0x00ffu16) {
+        return 1;
+    }
+    if ((u32)v_u8 != 0x000000ffu32) {
+        return 1;
+    }
+    if ((u64)v_u8 != 0x00000000000000ffu64) {
+        return 1;
+    }
+    if ((i8)v_i8 != 0xffu64) {
+        return 1;
+    }
+    if ((i16)v_i8 != 0xffffu64) {
+        return 1;
+    }
+    if ((i32)v_i8 != 0xffffffffu64) {
+        return 1;
+    }
+    if ((i64)v_i8 != 0xffffffffffffffffu64) {
+        return 1;
+    }
+    return 0;
+}

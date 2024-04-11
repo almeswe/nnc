@@ -1,0 +1,9 @@
+let s: struct {
+    x: enum {
+        X = 0
+    };
+};
+
+fn main(): i32 {
+    return (i32)X;
+}

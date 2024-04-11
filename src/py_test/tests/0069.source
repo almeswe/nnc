@@ -1,0 +1,10 @@
+fn main(): i32 {
+    let x: i32 = 0;
+    let foo: void*;
+    let bar: void**;
+
+    foo = (void*)&x;
+    bar = &foo;
+
+    return **(i32**)bar;
+}
