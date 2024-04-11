@@ -295,6 +295,7 @@ nnc_static nnc_loc nnc_store_ss_or_sd(const nnc_3a_addr* imm) {
 }
 
 nnc_static nnc_loc nnc_store_imm64(const nnc_3a_addr* imm) {
+    assert(false);
     char internal_buf[128] = {0};
     static nnc_u32 imm64_counter = 0;
     nnc_u64 len = snprintf(internal_buf, 
@@ -315,13 +316,12 @@ nnc_loc nnc_store_imm(const nnc_3a_addr* imm) {
         assert(imm->type->kind == T_PRIMITIVE_F64);
         return nnc_store_ss_or_sd(imm);
     }
-    assert(imm->type->kind != T_PRIMITIVE_I64);
     nnc_u64 imm_val = imm->exact.iconst.iconst;
-    if (imm->kind == ADDR_ICONST) {
-        if (imm_val > UINT32_MAX) {
-            return nnc_store_imm64(imm);
-        }
-    }
+    //if (imm->kind == ADDR_ICONST) {
+    //    if (imm_val > UINT32_MAX) {
+    //        return nnc_store_imm64(imm);
+    //    }
+    //}
     nnc_loc imm_loc = { .where = L_IMM };
     imm_loc.imm = imm_val;
     return imm_loc;
@@ -360,27 +360,6 @@ nnc_loc nnc_store_arg(const nnc_3a_addr* arg) {
     return nnc_store_inside_reg(arg, current);
 }
 
-nnc_static nnc_bool glob_param_spilled = false;
-nnc_static const char* glob_spilled_param_label = NULL;
-nnc_static nnc_register glob_param_reg_to_spill = R_RAX;
-
-nnc_static void nnc_spill_param_at_reg(nnc_map_key key, nnc_map_val val) {
-    if (!glob_param_spilled) {
-        nnc_loc* loc = val;
-        if (loc->where == L_REG && glob_param_reg_to_spill == loc->reg) {
-            glob_param_spilled = true;
-            glob_spilled_param_label = (const char*)key;
-            // means it is variable
-            if (memcmp((void*)"v_", (void*)key, 2) != 0) {
-                return;
-            }
-            loc->where = L_LOCAL_STACK;
-            glob_current_proc->local_stack_offset += nnc_sizeof(loc->type);
-            loc->offset = glob_current_proc->local_stack_offset;
-        }
-    }
-}
-
 nnc_loc nnc_spill_param(const nnc_3a_addr* param) {
     assert(param->kind == ADDR_NAME);
     nnc_loc* loc = (nnc_loc*)nnc_get_loc(param);
@@ -389,22 +368,6 @@ nnc_loc nnc_spill_param(const nnc_3a_addr* param) {
     nnc_dispose(loc);
     return nnc_store_on_stack(param, nnc_sizeof(param->type));
 }
-
-nnc_loc nnc_try_spill_param_at(nnc_register reg) {
-    glob_param_spilled = false;
-    glob_param_reg_to_spill = reg;
-    glob_spilled_param_label = NULL;
-    nnc_map_iter(glob_loc_map, nnc_spill_param_at_reg);
-    assert(glob_param_spilled);
-    assert(glob_spilled_param_label != NULL);
-    assert(map_has_s(glob_loc_map, glob_spilled_param_label));
-    const nnc_loc* loc = map_get_s(glob_loc_map, glob_spilled_param_label);
-    if (loc->where & LOCATION_MEM) {
-        nnc_unreserve_reg(reg);
-    }
-    return *loc;
-}
-
 
 nnc_loc nnc_store_param(const nnc_3a_addr* param) {
     assert(param->kind == ADDR_NAME);
