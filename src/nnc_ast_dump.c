@@ -18,7 +18,7 @@ nnc_static void nnc_dump_expr(nnc_dump_data data);
 nnc_static void nnc_dump_stmt(nnc_dump_data data);
 nnc_static void nnc_dump_compound_stmt(nnc_dump_data data);
 
-nnc_static nnc_bool nnc_is_escape(nnc_byte code) {
+nnc_bool nnc_is_escape(nnc_byte code) {
     switch (code) {
         case '\0': case '\a':
         case '\b': case '\f':
@@ -31,7 +31,7 @@ nnc_static nnc_bool nnc_is_escape(nnc_byte code) {
     return false;
 }
 
-nnc_static nnc_byte nnc_escape(nnc_byte code) {
+nnc_byte nnc_escape(nnc_byte code) {
     switch (code) {
         case '\0': return '0';
         case '\a': return 'a';
