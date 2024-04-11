@@ -26,7 +26,7 @@ nnc_static nnc_u8 glob_reg_junk_level[21] = {0};
 #define gen_t1(...)    text_put("   " __VA_ARGS__)
 #define gen_instr(i)   gen_t1("%s ", nnc_asm_instr_str[i])
 #define gen_reg(r)     gen_t0("%s", glob_reg_str[(r)])
-#if 1
+#if 0
     #define gen_note(...)  gen_t1("# "  __VA_ARGS__)
 #else
     #define gen_note(...)
@@ -212,6 +212,7 @@ nnc_static void nnc_gen_clear_reg(const nnc_loc* reg) {
     if (nnc_arr_type(reg->type)) {
         size = REG_HAS_JUNK_64;
     }
+    //todo: make it not generate xor when trashed by 64bits, but write 32bits.
     if (junk_level != REG_HAS_JUNK_0) {
         if (junk_level > size) {
             gen_note("---- reg %s has %d junked byte(s)\n", 
@@ -258,19 +259,90 @@ nnc_static void nnc_gen_reg_to_mem_mov(const nnc_loc* reg, const nnc_loc* mem) {
     gen_note("--- mov reg to memory:\n");
     //todo: maybe not regular mov?
     gen_instr(I_MOV);
-    nnc_gen_loc(mem, mem->type);
+    nnc_gen_loc(mem, reg->type);
     gen_comma();
-    gen_t0("%s", nnc_get_reg_of_size(reg->reg, mem->type));
+    gen_t0("%s", nnc_get_reg_of_size(reg->reg, reg->type));
     gen_crlf();
+}
+
+nnc_static nnc_bool nnc_gen_int_conv(const nnc_loc* dst_loc, const nnc_loc* src_loc) {
+    nnc_asm_instr i_mov = I_MOV;
+    nnc_u64 dst_type_size = nnc_sizeof(dst_loc->type);
+    nnc_u64 src_type_size = nnc_sizeof(src_loc->type);
+    nnc_bool is_u = nnc_unsigned_type(dst_loc->type);
+    if (dst_type_size < src_type_size) {
+        return false;
+    }
+    switch (dst_type_size) {
+        case S_BYTE: {
+            i_mov = I_MOV;
+            break;
+        }
+        case S_WORD: {
+            switch (src_type_size) {
+                case S_BYTE: i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case S_WORD: i_mov = I_MOV; break;
+                default: assert(false);
+            }
+            break;
+        }
+        case S_DWORD: {
+            switch (src_type_size) {
+                case S_BYTE:  i_mov = is_u ? I_MOVZX : I_MOVSX; break;
+                case S_WORD:  i_mov = is_u ? I_MOVZX : I_MOVSX; break; 
+                case S_DWORD: i_mov = I_MOV; break;
+                default: assert(false);
+            }
+            break;
+        }
+        case S_QWORD: {
+            switch (src_type_size) {
+                case S_BYTE:  i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case S_WORD:  i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case S_DWORD: i_mov = is_u ? I_MOV   : I_MOVSXD; break;
+                case S_QWORD: i_mov = I_MOV; break;
+                default: assert(false);
+            }
+            break;
+        }
+        default: assert(false);
+    }
+    const nnc_type* dst_type = dst_loc->type;
+    const nnc_type* src_type = src_loc->type;
+    // special case for unsigned extension of r64 with r/m32
+    if (is_u && dst_type_size == S_QWORD && src_type_size == S_DWORD) {
+        dst_type = src_type;
+    }
+    if (dst_loc->where == L_REG) {
+        nnc_gen_clear_reg(dst_loc);
+    }
+    gen_instr(i_mov);
+    nnc_gen_loc(dst_loc, dst_type);
+    gen_comma();
+    nnc_gen_loc(src_loc, src_type);
+    gen_crlf();
+    return true;
+}
+
+nnc_static nnc_bool nnc_gen_conv(const nnc_loc* dst_loc, const nnc_loc* src_loc) {
+    gen_note("--- conversion:\n");
+    if (nnc_integral_type(dst_loc->type) && nnc_integral_type(src_loc->type)) {
+        return nnc_gen_int_conv(dst_loc, src_loc);
+    }
+    else {
+        return false;
+    }
 }
 
 nnc_static void nnc_gen_mov_reg_to_reg(const nnc_loc* dst_reg, const nnc_loc* src_reg) {
     assert(dst_reg->where == L_REG);
     assert(src_reg->where == L_REG);
     gen_note("--- mov reg to reg:\n");
-    nnc_asm_instr i_mov = I_MOV;
-    const nnc_type* dst_type = dst_reg->type;
-    const nnc_type* src_type = src_reg->type;
+    if (glob_current_quad->op == OP_CAST) {
+        if (nnc_gen_conv(dst_reg, src_reg)) {
+            return;
+        }
+    }
     if (!dst_reg->dereference) {
         if (src_reg->reg == dst_reg->reg) {
             return;
@@ -285,10 +357,10 @@ nnc_static void nnc_gen_mov_reg_to_reg(const nnc_loc* dst_reg, const nnc_loc* sr
             ((nnc_loc*)src_reg)->dereference = false;
         }
     }
-    gen_instr(i_mov);
-    nnc_gen_loc(dst_reg, dst_type);
+    gen_instr(I_MOV);
+    nnc_gen_loc(dst_reg, dst_reg->type);
     gen_comma();
-    nnc_gen_loc(src_reg, dst_type);
+    nnc_gen_loc(src_reg, dst_reg->type);
     gen_crlf();
 }
 
@@ -459,6 +531,10 @@ nnc_static void nnc_gen_op_ref(const nnc_3a_quad* quad) {
     nnc_gen_operand(&quad->arg1, quad->res.type);
 }
 
+nnc_static void nnc_gen_op_cast(const nnc_3a_quad* quad) {
+    nnc_gen_mov_operand_to_operand(&quad->res, &quad->arg1);
+}
+
 nnc_static void nnc_gen_op_deref_copy(const nnc_3a_quad* quad) {
     nnc_gen_mov_operand_to_operand(&quad->res, &quad->arg1);
 }
@@ -561,7 +637,7 @@ nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, nnc_asm_instr mul) {
         nnc_gen_mov_operand_to_reg(&rax_loc, &quad->arg1);
     }
     gen_instr(mul);
-    nnc_gen_operand(&quad->arg1, quad->res.type);
+    nnc_gen_operand(&quad->arg2, quad->res.type);
     gen_crlf();
     nnc_pollute(R_RDX, size);
     if (!nnc_addr_inside_reg(&quad->res, R_RAX)) {
@@ -692,7 +768,9 @@ nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, nnc_3a_op_kind div, 
         rax_pushed = nnc_gen_reserve_reg(R_RAX);
         nnc_gen_mov_operand_to_reg(&rax_loc, &quad->arg1);
     }
-    nnc_gen_clear_reg(&rdx_loc);
+    if (glob_reg_junk_level[R_RDX] != REG_HAS_JUNK_0) {
+        nnc_gen_xor_reg(&rdx_loc);
+    }
     if (nnc_signed_type(quad->res.type)) {
         nnc_gen_rdx_extend(quad);
     }
@@ -866,6 +944,9 @@ nnc_static void nnc_gen_op_arg(const nnc_3a_quad* quad) {
         dst.where == L_REG || 
         dst.where == L_PARAM_STACK
     );
+    if (dst.where == L_REG) {
+        nnc_gen_clear_reg(&dst);
+    }
     gen_instr(I_MOV);
     //todo: apply nnc_gen_mov_operand_to_reg
     if (dst.where == L_REG) {
@@ -990,23 +1071,23 @@ nnc_static void nnc_gen_label(const nnc_3a_addr* addr) {
     gen_t0(NNC_LABEL_PREFIX"%lu\n", addr->exact.iconst.iconst);
 }
 
-nnc_static void nnc_gen_instr_cmp(const nnc_3a_quad* quad) {
+nnc_static void nnc_gen_cmp(const nnc_3a_quad* quad) {
     assert(
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    //assert(
-    //    nnc_addr_inside(&quad->arg1, L_REG) &&
-    //    nnc_addr_inside(&quad->arg2, L_REG | LOCATION_MEM)
-    //);
+    const nnc_type* type = quad->arg1.type;
+    if (nnc_sizeof(type) < nnc_sizeof(quad->arg2.type)) {
+        type = quad->arg2.type;
+    }
     gen_instr(I_CMP);
-    nnc_gen_operand(&quad->arg1, quad->arg1.type);
+    nnc_gen_operand(&quad->arg1, type);
     gen_comma();
-    nnc_gen_operand(&quad->arg2, quad->arg1.type);
+    nnc_gen_operand(&quad->arg2, type);
     gen_crlf();
 }
 
-nnc_static void nnc_gen_instr_cmp_x(const nnc_3a_quad* quad, nnc_u32 with_x) {
+nnc_static void nnc_gen_cmp_x(const nnc_3a_quad* quad, nnc_u32 with_x) {
     assert(
         quad->arg1.kind == ADDR_CGT || 
         nnc_addr_inside(&quad->arg1, L_REG | LOCATION_MEM)
@@ -1032,42 +1113,42 @@ nnc_static void nnc_gen_op_ujump(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_gen_op_cjumpt(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp_x(quad, 0);
+    nnc_gen_cmp_x(quad, 0);
     nnc_gen_instr_jump(quad, I_JNZ);
 }
 
 nnc_static void nnc_gen_op_cjumpf(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp_x(quad, 0);
+    nnc_gen_cmp_x(quad, 0);
     nnc_gen_instr_jump(quad, I_JZ);
 }
 
 nnc_static void nnc_gen_op_cjumplt(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, nnc_signed_type(quad->res.type) ? I_JL : I_JB);
 }
 
 nnc_static void nnc_gen_op_cjumpgt(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, nnc_signed_type(quad->res.type) ? I_JG : I_JA);
 }
 
 nnc_static void nnc_gen_op_cjumplte(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, nnc_signed_type(quad->res.type) ? I_JLE : I_JBE);
 }
 
 nnc_static void nnc_gen_op_cjumpgte(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, nnc_signed_type(quad->res.type) ? I_JGE : I_JAE);
 }
 
 nnc_static void nnc_gen_op_cjumpe(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, I_JE);
 }
 
 nnc_static void nnc_gen_op_cjumpne(const nnc_3a_quad* quad) {
-    nnc_gen_instr_cmp(quad);
+    nnc_gen_cmp(quad);
     nnc_gen_instr_jump(quad, I_JNE);
 }
 
@@ -1101,6 +1182,10 @@ nnc_static void nnc_gen_memory_zero(const char* name, nnc_u64 size) {
     data_put("\n");
 }
 
+nnc_static void nnc_gen_memory_pad() {
+    data_put(".long 0x00 # pad\n");
+}
+
 nnc_static void nnc_gen_op_decl_local(const nnc_3a_quad* quad) {
     nnc_store(&quad->res, false);
 }
@@ -1117,6 +1202,12 @@ nnc_static void nnc_gen_op_decl_global(const nnc_3a_quad* quad) {
         //todo: make expr to memory conversion
         nnc_i64 value = nnc_evald(e, NULL);
         nnc_gen_memory_init((char*)(&value), loc.ds_name, nnc_sizeof(quad->res.type));
+    }
+    // if array is declared on data segment, 
+    // add 8byte padding after it, so there was less
+    // corruption in case of buffer overflow
+    if (nnc_arr_type(quad->res.type)) {
+        nnc_gen_memory_pad();
     }
 }
 
@@ -1137,8 +1228,8 @@ nnc_static void nnc_gen_quad(const nnc_3a_quad* quad) {
     else {
         switch (quad->op) {
             /* Other operators */
-            case OP_CAST:       break;
             case OP_REF:        nnc_gen_op_ref(quad);        break;
+            case OP_CAST:       nnc_gen_op_cast(quad);       break;
             case OP_COPY:       nnc_gen_op_copy(quad);       break;
             case OP_DEREF:      nnc_gen_op_deref(quad);      break;
             case OP_DEREF_COPY: nnc_gen_op_deref_copy(quad); break;
@@ -1400,10 +1491,12 @@ nnc_blob_buf nnc_build(nnc_assembly_file file) {
         "_write:\n"
         "   mov rax, 1\n"
         "   syscall\n"
+        "   ret\n"
         "\n"
         "_exit:\n"
         "   mov rax, 60\n"
         "   syscall\n"
+        "   ret\n"
         "\n"
         "_start:\n"
         "   pop rdi\n"

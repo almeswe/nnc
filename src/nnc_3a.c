@@ -182,14 +182,8 @@ nnc_static void nnc_lval_ident_to_3a(const nnc_ident* ident, const nnc_st* st) {
     const char* ident_name = nnc_mk_nested_name(ident, st);
     nnc_3a_addr arg = nnc_3a_mkname2(ident_name, ident->type);
     arg.exact.name.ictx = ident->ictx;
-    nnc_3a_op_kind op = OP_REF;
-    //nnc_3a_op_kind op = nnc_arr_or_ptr_type(ident->type) ? OP_COPY : OP_REF;
-    nnc_type* type = ident->type;
-    if (op == OP_REF) {
-        type = nnc_ptr_type_new(type);
-    }
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        op, nnc_3a_mkcgt(), type, arg
+        OP_REF, nnc_3a_mkcgt(), nnc_ptr_type_new(ident->type), arg
     );
     nnc_3a_quads_add(&quad);
 }
@@ -361,13 +355,9 @@ nnc_static void nnc_not_to_3a(const nnc_unary_expression* unary, const nnc_st* s
 nnc_static void nnc_cast_to_3a(const nnc_unary_expression* unary, const nnc_st* st) {
     nnc_expr_to_3a(unary->expr, st);
     nnc_3a_addr res = *nnc_3a_quads_res();
-    //todo: change this back?
     nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_CAST, res, unary->type, res
+        OP_CAST, nnc_3a_mkcgt(), unary->type, res
     );
-    //nnc_3a_quad quad = nnc_3a_mkquad1(
-    //    OP_CAST, nnc_3a_mkcgt(), unary->type, res
-    //);
     nnc_3a_quads_add(&quad);
 }
 
@@ -623,6 +613,8 @@ nnc_static void nnc_assign_to_3a(const nnc_binary_expression* binary, const nnc_
     nnc_expr_to_3a(binary->rexpr, st);
     nnc_3a_addr copy = *nnc_3a_quads_res();
     // actual assignment to the calculated address
+    assert(nnc_arr_or_ptr_type(addr.type));
+    copy.type = addr.type->base;
     nnc_3a_quad quad = nnc_3a_mkquad1(
         OP_DEREF_COPY, addr, copy.type, copy
     );

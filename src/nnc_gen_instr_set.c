@@ -43,6 +43,7 @@ const char* nnc_asm_instr_str[] = {
     [I_MOVZX]     = "movzx",
     [I_MOVSS]     = "movss",
     [I_MOVSD]     = "movsd",
+    [I_MOVSXD]    = "movsxd",
     [I_CVTSD2SI]  = "cvtsd2si",   
     [I_CVTSD2SS]  = "cvtsd2ss",   
     [I_CVTSS2SD]  = "cvtss2sd",   

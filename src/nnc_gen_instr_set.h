@@ -72,6 +72,7 @@ typedef enum _nnc_x86_64_asm_instr {
     I_MOVZX,
     I_MOVSS,
     I_MOVSD,
+    I_MOVSXD,
     /* OP_CAST */
     I_CVTSD2SI,    /* convert scalar double-precision floating-point values to a doubleword integer */
     I_CVTSD2SS,    /* convert scalar double-precision floating-point values to scalar single-precision floating-point values */
