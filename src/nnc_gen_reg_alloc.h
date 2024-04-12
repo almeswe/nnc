@@ -10,6 +10,7 @@ typedef enum _nnc_location_type {
     L_NONE        = 0b000001,
     L_REG         = 0b000010,
     L_DATA        = 0b000100,
+    //todo: make just stack, not param or local (wtf)
     L_LOCAL_STACK = 0b001000,
     L_PARAM_STACK = 0b010000,
     L_IMM         = 0b100000
@@ -48,7 +49,30 @@ typedef struct _nnc_call_stack_state {
     nnc_u32 offset;
     nnc_bool rax_pushed;
     nnc_bool xmm0_pushed;
+    nnc_u64 call_ptr;
 } nnc_call_stack_state;
+
+typedef struct _nnc_caller_state {
+    nnc_u8 alloc_int_reg_idx;
+    nnc_u8 alloc_sse_reg_idx;
+    vector(nnc_register) reg_preserved;
+    nnc_u32 stack_ptr;
+    nnc_bool rax_preserved;
+    nnc_bool xmm_preserved;
+} nnc_caller_state;
+
+typedef struct _nnc_callee_state {
+    // callee preserved registers
+    // possible values according to x86_64 ABI: 
+    //  rbx, rsp, rbp, r12 - r15.
+    vector(nnc_register) reg_preserved;
+    // live range information for each register
+    vector(nnc_3a_lr*) reg_lr[21];
+    // junk level information for each register
+    nnc_u8 reg_junk[21];
+    // size of stack used by callee
+    nnc_u32 stack_size;
+} nnc_callee_state;
 
 #define glob_current_call_state (&buf_last(glob_call_stack))
 
@@ -78,10 +102,6 @@ nnc_loc nnc_store_arg(
 
 nnc_loc nnc_spill_param(
     const nnc_3a_addr* param
-);
-
-nnc_loc nnc_try_spill_param_at(
-    const nnc_register reg
 );
 
 nnc_loc nnc_store_param(

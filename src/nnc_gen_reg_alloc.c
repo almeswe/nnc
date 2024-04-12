@@ -1,5 +1,32 @@
 #include "nnc_gen_reg_alloc.h"
 
+/**
+ * @brief Priority array for allocation SSE registers.
+ *  Used in all cases of SSE allocation.
+ */
+const static nnc_register _sse_p[] = {
+    R_XMM0, R_XMM1, R_XMM2, R_XMM3,
+    R_XMM4, R_XMM5, R_XMM6, R_XMM7
+};
+
+/**
+ * @brief Priority array for allocation INTEGER registers
+ *  for function parameters & arguments.
+ */
+const static nnc_register _int_p_param[] = {
+    R_RDI, R_RSI, R_RDX, R_RCX, R_R8, R_R9
+};
+
+/**
+ * @brief Priority array for allocation INTEGER registers
+ *  for local CGTs (Compiler Generated Temporaries).
+ */
+const static nnc_register _int_p_local[] = {
+    R_RAX, R_RBX, R_R10, R_R11, R_R12, 
+    R_R13, R_R14, R_R15, R_R9,  R_R8, 
+    R_RCX, R_RDX, R_RDI, R_RSI 
+};
+
 #define LOC_LABEL_SIZE 512
 
 #define nnc_get_priority(x)      nnc_real_type((x)->type) ? simd_priority : genp_priority
@@ -7,7 +34,10 @@
 
 vector(nnc_call_stack_state) glob_call_stack = NULL;
 
-nnc_static nnc_u32 glob_data_offset = 0;
+nnc_static nnc_u32 glob_s_count  = 0;
+nnc_static nnc_u32 glob_ss_count = 0;
+nnc_static nnc_u32 glob_sd_count = 0;
+nnc_static nnc_u32 glob_imm64_count = 0;
 
 const char* glob_reg_str[] = {
     [R_RAX]  = "rax", 
@@ -84,6 +114,21 @@ nnc_bool nnc_reg_in_use(nnc_register reg) {
     lr->starts = glob_current_proc->quad_pointer;
     lr->ends = UINT32_MAX;
     return nnc_lr_intersects(lr, nnc_peek_reg(reg));
+}
+
+nnc_static void nnc_print_lr(nnc_register reg) {
+    nnc_u64 size = buf_len(glob_reg_lr[reg]);
+    fprintf(stdout, " %%%s (size: %lu):\n", glob_reg_str[reg], size);
+    for (nnc_u64 i = 0; i < size; i++) {
+        const nnc_3a_lr* lr = glob_reg_lr[reg][i];
+        if (lr == NULL) {
+            fprintf(stdout, " %lu. EMPTY\n", i + 1);
+        }
+        else {
+            fprintf(stdout, " %lu. [%u:%u]\n", i + 1, lr->starts, lr->ends);
+        }
+    }
+    fprintf(stdout, "\n");
 }
 
 void nnc_push_reg(nnc_register reg) {
@@ -200,7 +245,7 @@ nnc_static nnc_loc nnc_store_param_on_stack(const nnc_3a_addr* param, nnc_memory
     loc->offset = offset, loc->where = L_PARAM_STACK;
     nnc_put_loc(loc, param);
     return *loc;
-}
+}   
 
 nnc_static nnc_loc nnc_store_fn(const nnc_3a_addr* global_fn) {
     char internal_buf[LOC_LABEL_SIZE] = {0};
@@ -247,8 +292,8 @@ void nnc_store_at(nnc_loc loc, const nnc_3a_addr* addr) {
 void nnc_call_stack_state_init(const nnc_register* do_not_touch) {
     nnc_call_stack_state state = {0};
     for (nnc_register r = R_RBX; r <= R_R15; r++) {
-        if (nnc_reg_in_use(r)) {
-            if (do_not_touch == NULL || *do_not_touch != r) {
+        if (do_not_touch == NULL || *do_not_touch != r) {
+            if (nnc_reg_in_use(r)) {
                 nnc_push_reg(r);
                 buf_add(state.pushed, r);
             }
@@ -352,11 +397,11 @@ nnc_loc nnc_store_arg(const nnc_3a_addr* arg) {
     if (current_idx >= priority_size) {
         return nnc_store_arg_on_stack(arg, nnc_sizeof(arg->type));
     }
-    nnc_3a_lr inf_lr = {
-        .starts = glob_current_proc->quad_pointer,
-        .ends = UINT32_MAX
-    };
-    nnc_reserve_reg(current);
+    // create live range that ends where appropriate call happens 
+    nnc_3a_lr* arg_lr = nnc_new(nnc_3a_lr);
+    arg_lr->starts = glob_current_proc->quad_pointer;
+    arg_lr->ends = glob_current_call_state->call_ptr;
+    nnc_update_reg(current, arg_lr);
     return nnc_store_inside_reg(arg, current);
 }
 
@@ -394,55 +439,6 @@ nnc_loc nnc_store_param(const nnc_3a_addr* param) {
     nnc_update_reg(current, lr);
     return nnc_store_inside_reg(param, current);
 }
-
-nnc_loc nnc_store_local(const nnc_3a_addr* local) {
-    assert(
-        local->kind == ADDR_NAME ||
-        local->kind == ADDR_CGT
-    );
-    const static nnc_register genp_priority[] = {
-        R_RAX, R_RBX, R_R10, R_R11, R_R12, 
-        R_R13, R_R14, R_R15, R_R9,  R_R8, 
-        R_RCX, R_RDX, R_RDI, R_RSI 
-    };
-    const static nnc_register simd_priority[] = {
-        R_XMM0, R_XMM1, R_XMM2, R_XMM3,
-        R_XMM4, R_XMM5, R_XMM6, R_XMM7
-    };
-    nnc_loc loc = {0};
-    nnc_3a_lr* lr = nnc_get_lr(local);
-    assert(lr != NULL);
-    const nnc_register* priority = nnc_real_type(local->type) ?
-        simd_priority : genp_priority;
-    const nnc_u64 priority_size = nnc_real_type(local->type) ?
-        nnc_arr_size(simd_priority) : nnc_arr_size(genp_priority);
-    const nnc_loc* stored = nnc_get_loc(local);  
-    if (stored != NULL) {
-        return *stored;
-    }
-    if (local->kind == ADDR_NAME) {
-        return nnc_store_on_stack(local, nnc_sizeof(local->type));
-    }
-    assert(!nnc_struct_or_union_type(local->type));
-    for (nnc_u64 i = 0; i < priority_size; i++) {
-        assert(priority[i] < nnc_arr_size(glob_reg_lr));
-        // get mapping record (register => live range associated with it)
-        nnc_3a_lr* top_lr = nnc_peek_reg(priority[i]);
-        // if current register's live range does not intersects
-        // with specified live range, allocate this register
-        if (nnc_lr_intersects(lr, top_lr)) {
-            continue;
-        }
-        nnc_update_reg(priority[i], lr);
-        return nnc_store_inside_reg(local, priority[i]);
-    }
-    return nnc_store_on_stack(local, nnc_sizeof(local->type));
-}
-
-nnc_static nnc_u32 glob_s_count  = 0;
-nnc_static nnc_u32 glob_ss_count = 0;
-nnc_static nnc_u32 glob_sd_count = 0;
-nnc_static nnc_u32 glob_imm64_count = 0;
 
 nnc_static nnc_loc nnc_store_glob_str(const nnc_3a_addr* global) {
     // make unique identifier for string literal
@@ -491,6 +487,7 @@ nnc_loc nnc_store_global(const nnc_3a_addr* global) {
 
 nnc_bool nnc_reserve_reg(nnc_register reg) {
     //todo: free this lr?
+    //fprintf(stdout, "--%s\n", __FUNCTION__);
     nnc_3a_lr* lr = nnc_new(nnc_3a_lr);
     lr->starts = glob_current_proc->quad_pointer;
     lr->ends = UINT32_MAX;
@@ -505,27 +502,21 @@ nnc_bool nnc_reserve_reg(nnc_register reg) {
 
 void nnc_unreserve_reg(nnc_register reg) {
     assert(!nnc_reg_lr_empty(reg));
+    //assert(nnc_reg_in_use(reg));
     buf_pop(glob_reg_lr[reg]);
+    //fprintf(stdout, "--%s\n", __FUNCTION__), print_lr(reg);
 }
 
 nnc_static nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
     assert(addr->kind == ADDR_CGT);
-    const static nnc_register genp_priority[] = {
-        R_RAX, R_RBX, R_R10, R_R11, R_R12, 
-        R_R13, R_R14, R_R15, R_R9,  R_R8, 
-        R_RCX, R_RDX, R_RDI, R_RSI 
-    };
-    const static nnc_register simd_priority[] = {
-        R_XMM0, R_XMM1, R_XMM2, R_XMM3,
-        R_XMM4, R_XMM5, R_XMM6, R_XMM7
-    };
+    const vector(nnc_register) priority = _int_p_local;
+    nnc_u64 priority_size = nnc_arr_size(_int_p_local);
+    if (nnc_real_type(addr->type)) {
+        priority = _sse_p, priority_size = nnc_arr_size(_sse_p);
+    }
     nnc_loc loc = {0};
     nnc_3a_lr* lr = nnc_get_lr(addr);
     assert(lr != NULL);
-    const nnc_register* priority = nnc_real_type(addr->type) ?
-        simd_priority : genp_priority;
-    const nnc_u64 priority_size = nnc_real_type(addr->type) ?
-        nnc_arr_size(simd_priority) : nnc_arr_size(genp_priority);
     assert(!nnc_struct_or_union_type(addr->type));
     for (nnc_u64 i = 0; i < priority_size; i++) {
         assert(priority[i] < nnc_arr_size(glob_reg_lr));
@@ -540,19 +531,6 @@ nnc_static nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
         return nnc_store_inside_reg(addr, priority[i]);
     }
     return nnc_store_on_stack(addr, nnc_sizeof(addr->type));
-}
-
-nnc_static nnc_bool nnc_addr_is_fn(const nnc_3a_addr* addr) {
-    assert(addr->kind == ADDR_NAME);
-    if (!nnc_fn_type(addr->type)) {
-        return false;
-    }
-    for (nnc_u64 i = 0; i < buf_len(code); i++) {
-        if (nnc_strcmp(code[i].name, addr->exact.name.name)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 nnc_static nnc_loc nnc_store_var(const nnc_3a_addr* addr, nnc_bool globally) {

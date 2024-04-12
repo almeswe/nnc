@@ -72,7 +72,7 @@ nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
             buf[i + 1] = str[i];
         }
     }
-    buf[len] = '\"';
+    buf[len + 1] = '\"';
 }
 
 nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
