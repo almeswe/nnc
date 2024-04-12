@@ -20,6 +20,10 @@ nnc_3a_proc* glob_current_proc = NULL;
 
 nnc_static nnc_u8 glob_reg_junk_level[21] = {0};
 
+extern vector(nnc_3a_lr*) glob_reg_lr[21];
+extern dictionary(const char*, nnc_loc*) glob_loc_map;
+extern void nnc_dump_3a_quad(const nnc_3a_quad* quad);
+
 #define glob_current_quad (&glob_current_proc->quads[glob_current_proc->quad_pointer])
 
 #define gen_t0(...)    text_put(__VA_ARGS__)
@@ -34,8 +38,8 @@ nnc_static nnc_u8 glob_reg_junk_level[21] = {0};
 #define gen_comma()    gen_t0(", ")
 #define gen_crlf()     text_put("\r\n")
 
-#define NNC_LABEL_PREFIX     "label_"
-#define NNC_RET_LABEL_PREFIX "label_ret_"
+#define NNC_LABEL_PREFIX     "l_"
+#define NNC_RET_LABEL_PREFIX "lret_"
 
 nnc_static void nnc_gen_push_reg(nnc_register reg) {
     nnc_push_reg(reg);
@@ -102,49 +106,60 @@ nnc_static const char* nnc_get_ptr_size(const nnc_type* type) {
     return NULL;
 }
 
-nnc_static const char* nnc_get_reg_of_size(nnc_register reg, const nnc_type* type) {
-    static const char* arr[][4] = {
-        [R_RAX]  = { "al", "ax", "eax", "rax" },
-        [R_RBX]  = { "bl", "bx", "ebx", "rbx" },
-        [R_RCX]  = { "cl", "cx", "ecx", "rcx" },
-        [R_RDX]  = { "dl", "dx", "edx", "rdx" },
-        [R_RSI]  = { "sil", "si", "esi", "rsi" },
-        [R_RDI]  = { "dil", "di", "edi", "rdi" },
-        [R_R8]   = { "r8b", "r8w", "r8d", "r8" },
-        [R_R9]   = { "r9b", "r9w", "r9d", "r9" },
+nnc_static const char* nnc_get_reg_of_size(nnc_register reg, nnc_u64 size) {
+    const static char* _int[][4] = {
+        [R_RAX]  = { "al",   "ax",   "eax",  "rax" },
+        [R_RBX]  = { "bl",   "bx",   "ebx",  "rbx" },
+        [R_RCX]  = { "cl",   "cx",   "ecx",  "rcx" },
+        [R_RDX]  = { "dl",   "dx",   "edx",  "rdx" },
+        [R_RSI]  = { "sil",  "si",   "esi",  "rsi" },
+        [R_RDI]  = { "dil",  "di",   "edi",  "rdi" },
+        [R_R8]   = { "r8b",  "r8w",  "r8d",  "r8"  },
+        [R_R9]   = { "r9b",  "r9w",  "r9d",  "r9"  },
         [R_R10]  = { "r10b", "r10w", "r10d", "r10" },
         [R_R11]  = { "r11b", "r11w", "r11d", "r11" },
         [R_R12]  = { "r12b", "r12w", "r12d", "r12" },
         [R_R13]  = { "r13b", "r13w", "r13d", "r13" },
         [R_R14]  = { "r14b", "r14w", "r14d", "r14" },
-        [R_R15]  = { "r15b", "r15w", "r15d", "r15" },
-        [R_XMM0] = { "xmm0", "xmm0", "xmm0", "xmm0" },
-        [R_XMM1] = { "xmm1", "xmm1", "xmm1", "xmm1" },
-        [R_XMM2] = { "xmm2", "xmm2", "xmm2", "xmm2" },
-        [R_XMM3] = { "xmm3", "xmm3", "xmm3", "xmm3" },
-        [R_XMM4] = { "xmm4", "xmm4", "xmm4", "xmm4" },
-        [R_XMM5] = { "xmm5", "xmm5", "xmm5", "xmm5" },
-        [R_XMM6] = { "xmm6", "xmm6", "xmm6", "xmm6" },
-        [R_XMM7] = { "xmm7", "xmm7", "xmm7", "xmm7" }
+        [R_R15]  = { "r15b", "r15w", "r15d", "r15" }
     };
-    if (nnc_arr_or_ptr_type(type)) {
-        return arr[reg][3];
-    }
-    if (nnc_real_type(type)) {
-        return arr[reg][0];
+    const static char* _sse[] = {
+        [R_XMM0 - R_XMM0] = "xmm0",
+        [R_XMM1 - R_XMM0] = "xmm1",
+        [R_XMM2 - R_XMM0] = "xmm2", 
+        [R_XMM3 - R_XMM0] = "xmm3",
+        [R_XMM4 - R_XMM0] = "xmm4",
+        [R_XMM5 - R_XMM0] = "xmm5",
+        [R_XMM6 - R_XMM0] = "xmm6",
+        [R_XMM7 - R_XMM0] = "xmm7" 
+    };
+    if (reg >= R_XMM0 && reg <= R_XMM7) {
+        return _sse[reg - R_XMM0];
     }
     else {
-        switch (nnc_sizeof(type)) {
-            case S_BYTE:  return arr[reg][0];
-            case S_WORD:  return arr[reg][1];
-            case S_DWORD: return arr[reg][2];
-            case S_QWORD: return arr[reg][3];
+        switch (size) {
+            case S_BYTE:  return _int[reg][0];
+            case S_WORD:  return _int[reg][1];
+            case S_DWORD: return _int[reg][2];
+            case S_QWORD: return _int[reg][3];
             default: {
                 nnc_abort_no_ctx("nnc_get_reg_of_size: unsupported size.\n");
             }
         }
     }
     return NULL;
+}
+
+nnc_static const char* nnc_get_reg_of_type(nnc_register reg, const nnc_type* type) {
+    if (nnc_arr_or_ptr_type(type)) {
+        return nnc_get_reg_of_size(reg, S_QWORD);
+    }
+    if (nnc_real_type(type)) {
+        return nnc_get_reg_of_size(reg, S_QWORD);
+    }
+    else {
+        return nnc_get_reg_of_size(reg, nnc_sizeof(type));
+    }
 }
 
 nnc_static nnc_bool nnc_addr_inside_reg(const nnc_3a_addr* addr, nnc_register reg) {
@@ -168,7 +183,7 @@ nnc_static void nnc_gen_loc(const nnc_loc* at, const nnc_type* type) {
                 gen_t0("%s ptr [%s]", ptr_size, glob_reg_str[at->reg]);
             }
             else {
-                gen_t0("%s", nnc_get_reg_of_size(at->reg, type));
+                gen_t0("%s", nnc_get_reg_of_type(at->reg, type));
             }
             break;
         }
@@ -201,68 +216,38 @@ nnc_static void nnc_gen_loc(const nnc_loc* at, const nnc_type* type) {
 
 nnc_static void nnc_gen_xor_reg(const nnc_loc* reg) {
     assert(reg->where == L_REG);
-    gen_t1("xor %s, %s\n", glob_reg_str[reg->reg], glob_reg_str[reg->reg]);
+    nnc_u64 junk = glob_reg_junk_level[reg->reg];
+    if (junk != REG_HAS_JUNK_0) {
+        const char* reg_str = nnc_get_reg_of_size(reg->reg, junk);
+        gen_t1("xor %s, %s\n", reg_str, reg_str);
+    }
     nnc_pollute(reg->reg, REG_HAS_JUNK_0);
 }
 
 nnc_static void nnc_gen_clear_reg(const nnc_loc* reg) {
     assert(reg->where == L_REG);
-    nnc_u8 junk_level = glob_reg_junk_level[reg->reg];
-    nnc_u64 size = nnc_sizeof(reg->type);
-    if (nnc_arr_type(reg->type)) {
-        size = REG_HAS_JUNK_64;
+    nnc_u64 size = REG_HAS_JUNK_64;
+    nnc_u64 junk = glob_reg_junk_level[reg->reg];
+    if (!nnc_arr_type(reg->type)) {
+        size = nnc_sizeof(reg->type);
     }
-    //todo: make it not generate xor when trashed by 64bits, but write 32bits.
-    if (junk_level != REG_HAS_JUNK_0) {
-        if (junk_level > size) {
-            gen_note("---- reg %s has %d junked byte(s)\n", 
-                glob_reg_str[reg->reg], junk_level);
+    // make it not generate xor when trashed by 64bits, but write 32bits.
+    if (junk != REG_HAS_JUNK_0  &&
+        junk == REG_HAS_JUNK_64 && size == S_DWORD) {
+        nnc_pollute(reg->reg, REG_HAS_JUNK_32);
+    }
+    else {
+        if (junk > size) {
+            gen_note("---- reg %s has %d junked byte(s)\n", glob_reg_str[reg->reg], junk);
             nnc_gen_xor_reg(reg);
         }
+        nnc_pollute(reg->reg, size);
     }
-    nnc_pollute(reg->reg, size);
 }
 
 nnc_static void nnc_gen_operand(const nnc_3a_addr* addr, const nnc_type* type) {
     nnc_loc loc = nnc_store(addr, false);
     nnc_gen_loc(&loc, type);
-}
-
-nnc_static void nnc_gen_mov_mem_to_reg(const nnc_loc* reg, const nnc_loc* mem) {
-    assert(mem->where & LOCATION_MEM);
-    gen_note("--- mov memory to reg:\n");
-    nnc_asm_instr i_mov = I_MOV;
-    nnc_gen_clear_reg(reg);
-    if (nnc_arr_type(mem->type)) {
-        if (mem->where == L_DATA) {
-            ((nnc_loc*)mem)->offset = 1;
-        }
-        else {
-            i_mov = I_LEA;
-        }
-    }
-    else {
-        if (nnc_sizeof(mem->type) > nnc_sizeof(reg->type)) {
-            i_mov = nnc_signed_type(mem->type) ? I_MOVSX : I_MOVZX;
-        }
-    }
-    gen_instr(i_mov);
-    nnc_gen_loc(reg, mem->type);
-    gen_comma();
-    nnc_gen_loc(mem, mem->type);
-    gen_crlf();
-}
-
-nnc_static void nnc_gen_reg_to_mem_mov(const nnc_loc* reg, const nnc_loc* mem) {
-    assert(reg->where == L_REG);
-    assert(mem->where & LOCATION_MEM);
-    gen_note("--- mov reg to memory:\n");
-    //todo: maybe not regular mov?
-    gen_instr(I_MOV);
-    nnc_gen_loc(mem, reg->type);
-    gen_comma();
-    gen_t0("%s", nnc_get_reg_of_size(reg->reg, reg->type));
-    gen_crlf();
 }
 
 nnc_static nnc_bool nnc_gen_int_conv(const nnc_loc* dst_loc, const nnc_loc* src_loc) {
@@ -334,10 +319,48 @@ nnc_static nnc_bool nnc_gen_conv(const nnc_loc* dst_loc, const nnc_loc* src_loc)
     }
 }
 
+nnc_static void nnc_gen_mov_mem_to_reg(const nnc_loc* reg, const nnc_loc* mem) {
+    assert(mem->where & LOCATION_MEM);
+    gen_note("--- mov memory to reg:\n");
+    nnc_asm_instr i_mov = I_MOV;
+    if (glob_current_quad->op == OP_CAST) {
+        if (nnc_gen_conv(reg, mem)) {
+            return;
+        }
+    }
+    if (nnc_arr_type(mem->type)) {
+        if (mem->where == L_DATA) {
+            ((nnc_loc*)mem)->offset = 1;
+        }
+        else {
+            i_mov = I_LEA;
+        }
+    }
+    nnc_gen_clear_reg(reg);
+    gen_instr(i_mov);
+    nnc_gen_loc(reg, mem->type);
+    gen_comma();
+    nnc_gen_loc(mem, mem->type);
+    gen_crlf();
+}
+
+nnc_static void nnc_gen_reg_to_mem_mov(const nnc_loc* reg, const nnc_loc* mem) {
+    assert(reg->where == L_REG);
+    assert(mem->where & LOCATION_MEM);
+    gen_note("--- mov reg to memory:\n");
+    //todo: maybe not regular mov?
+    gen_instr(I_MOV);
+    nnc_gen_loc(mem, reg->type);
+    gen_comma();
+    gen_t0("%s", nnc_get_reg_of_type(reg->reg, reg->type));
+    gen_crlf();
+}
+
 nnc_static void nnc_gen_mov_reg_to_reg(const nnc_loc* dst_reg, const nnc_loc* src_reg) {
     assert(dst_reg->where == L_REG);
     assert(src_reg->where == L_REG);
     gen_note("--- mov reg to reg:\n");
+    gen_note("----- dst reg junked by %d:\n", glob_reg_junk_level[dst_reg->reg]);
     if (glob_current_quad->op == OP_CAST) {
         if (nnc_gen_conv(dst_reg, src_reg)) {
             return;
@@ -951,6 +974,10 @@ nnc_static void nnc_gen_op_arg(const nnc_3a_quad* quad) {
     //todo: apply nnc_gen_mov_operand_to_reg
     if (dst.where == L_REG) {
         nnc_gen_loc(&dst, quad->arg1.type);
+        // set register to be junked again
+        // no one knows what will happen with
+        // this register inside callee function
+        nnc_pollute(dst.reg, REG_HAS_JUNK_64);
     }
     if (dst.where == L_PARAM_STACK) {
         gen_t0("%s ptr [rsp-%lu]", nnc_get_ptr_size(quad->arg1.type), dst.offset);
@@ -983,9 +1010,12 @@ nnc_static void nnc_gen_caller_prepare() {
 
 nnc_static void nnc_gen_caller_restore() {
     nnc_gen_dealloc_stack(glob_current_call_state->offset);
-    vector(nnc_register) saved_regs = glob_current_call_state->pushed;
-    for (nnc_i64 i = 0; i < buf_len(saved_regs); i++) {
-        nnc_gen_unreserve_reg(saved_regs[i]);
+    vector(nnc_register) pushed = glob_current_call_state->pushed;
+    for (nnc_i64 i = 0; i < buf_len(pushed); i++) {
+        nnc_gen_unreserve_reg(pushed[i]);
+        //const nnc_3a_lr* lr = buf_last(glob_reg_lr[pushed[i]]);
+        //assert(lr != NULL);
+        //fprintf(stdout, "nnc_gen_caller_restore [%u:%u] for %s\n", lr->starts, lr->ends, glob_reg_str[pushed[i]]);
     }
     if (glob_current_call_state->rax_pushed) {
         nnc_gen_unreserve_reg(R_RAX);
@@ -1028,9 +1058,26 @@ nnc_static void nnc_gen_op_fcall(const nnc_3a_quad* quad) {
     nnc_gen_caller_restore();
 }
 
+nnc_static nnc_u64 nnc_get_call_ptr() {
+    nnc_i32 closure_val = 0;
+    nnc_u64 current_ptr = glob_current_proc->quad_pointer;
+    for (; current_ptr < buf_len(glob_current_proc->quads); current_ptr++) {
+        const nnc_3a_quad* quad = &glob_current_proc->quads[current_ptr];
+        if (quad->op == OP_HINT_PREPARE_CALL) {
+            closure_val++;
+        }
+        if (quad->op == OP_PCALL || quad->op == OP_FCALL) {
+            closure_val--;
+            assert(closure_val >= 0);
+            if (closure_val == 0) {
+                break;
+            }
+        }
+    }
+    return current_ptr;
+}
+
 nnc_static void nnc_gen_op_prepare_for_call(const nnc_3a_quad* quad) {
-    // if this condition is true, then preparation is done
-    // for function call, and we need to preserve RAX or XMM0 register
     nnc_loc call_res_loc = {0};
     nnc_bool rax_pushed = false;
     nnc_register* call_res_reg_loc = NULL;
@@ -1049,6 +1096,7 @@ nnc_static void nnc_gen_op_prepare_for_call(const nnc_3a_quad* quad) {
     }
     nnc_call_stack_state_init(call_res_reg_loc);
     glob_current_call_state->rax_pushed = rax_pushed;
+    glob_current_call_state->call_ptr = nnc_get_call_ptr();
     vector(nnc_register) pushed = glob_current_call_state->pushed;
     for (nnc_i64 i = buf_len(pushed); i > 0; i--) {
         const nnc_register reg = pushed[i - 1];
@@ -1295,6 +1343,7 @@ nnc_static void nnc_gen_proc_epilogue(nnc_3a_proc* proc) {
 }
 
 nnc_static nnc_u32 nnc_callee_calc_params_stack() {
+    //todo: maybe make another way to calculate this?
     nnc_u32 stack_usage = 0;
     const vector(nnc_fn_param*) params = glob_current_proc->params;
     nnc_3a_addr param = { .kind = ADDR_NAME };
@@ -1306,6 +1355,11 @@ nnc_static nnc_u32 nnc_callee_calc_params_stack() {
         nnc_loc loc = nnc_store_param(&param);
         if (loc.where == L_PARAM_STACK) {
             stack_usage += param.type->size;
+        }
+        // `nnc_store_param` changes state of register
+        // inside of `glob_reg_lr`, so rollback this event 
+        if (loc.where == L_REG) {
+            nnc_unreserve_reg(loc.reg);
         }
         nnc_call_stack_state_next(&param);
     }
@@ -1341,6 +1395,8 @@ nnc_static void nnc_callee_store_params(nnc_3a_proc* proc) {
     const vector(nnc_fn_param*) params = glob_current_proc->params;
     nnc_3a_addr param = { .kind = ADDR_NAME };
     nnc_call_stack_state_init(NULL);
+    assert(glob_current_call_state->pushed == NULL);
+    assert(buf_len(glob_current_call_state->pushed) == 0);
     for (nnc_u64 i = 0; i < buf_len(params); i++) {
         param.type = params[i]->var->type;
         param.exact.name.name = params[i]->var->name;
@@ -1349,6 +1405,9 @@ nnc_static void nnc_callee_store_params(nnc_3a_proc* proc) {
     }
     nnc_call_stack_state_fini();
 }
+
+extern nnc_callee_state glob_callee_state;
+extern vector(nnc_caller_state) glob_caller_states_stack;
 
 nnc_static void nnc_gen_callee_prepare() {
     nnc_gen_proc_prologue(glob_current_proc);
@@ -1359,10 +1418,6 @@ nnc_static void nnc_gen_callee_restore() {
     nnc_gen_proc_epilogue(glob_current_proc);
     gen_t1("ret\n\n");
 }
-
-extern vector(nnc_3a_lr*) glob_reg_lr[21];
-extern dictionary(const char*, nnc_loc*) glob_loc_map;
-extern void nnc_dump_3a_quad(const nnc_3a_quad* quad);
 
 nnc_static void nnc_callee_clear_lr() {
     // clear register live ranges from previous procudure
