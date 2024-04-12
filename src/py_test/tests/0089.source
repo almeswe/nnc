@@ -1,0 +1,70 @@
+//---------------------------------------------------------------
+let _io_internal_buf: u8[16];
+
+type enum {
+    stdin  = 0u32,
+    stdout = 1u32,
+    stderr = 2u32
+} as _io_stream;
+
+fn ext exit(code: i32);
+fn ext write(fd: i32, buf: u8*, size: u32): u32;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print(buf: u8*, size: u32) {
+    write(stdout as i32, buf, size);
+}
+
+fn error(buf: u8*, size: u32) {
+    write(stderr as i32, buf, size);
+    exit(1i32);
+}
+
+fn nnc_strlen(p: u8*): i32 {
+    let len: i32 = 0;
+    while (p[len]) {
+        len = len + 1;
+    }
+    return len;
+}
+
+fn print_num(val: u32) {
+    if (val == 0) {
+        write(stdout as i32, "0", 1);
+    }
+    let i: i32 = (i32)lengthof(_io_internal_buf);
+    let s: i32 = 0;
+    memset(_io_internal_buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        _io_internal_buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout as i32, _io_internal_buf+i+1, s);
+}
+
+fn println_num(val: u32) {
+    print_num(val);
+    write(stdout as i32, "\r\n", 2u32);
+}
+//---------------------------------------------------------------
+
+
+fn main(): i32 {
+    let res: i64 = 0i64;
+    if (res < -2147483648i64) {
+        print("Error: 0 < -2147483648\n", 23u32);
+        return 1;
+    }
+    elif (2147483648i64 < res) {
+        print("Error: 2147483647 < 0\n", 22u32);
+        return 2;
+    }
+    else {
+        print("long long constant test ok.\n", 28u32);
+    }
+    return 0;
+}

@@ -1,0 +1,103 @@
+//---------------------------------------------------------------
+let buf: u8[16];
+let stdout: u8 = 1u8;
+
+fn ext write(fd: i32, buf: u8*, size: u32): u32;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print_num(val: u32) {
+    if (val == 0) {
+        write(stdout, "0", 1);
+    }
+    let i: i32 = (i32)lengthof(buf);
+    let s: i32 = 0;
+    memset(buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout, buf+i+1, s);
+}
+
+fn println_num(val: u32) {
+    print_num(val);
+    write(stdout, "\r\n", 2u32);
+}
+//---------------------------------------------------------------
+
+let array: i32[16];
+
+//Swap integer values by array indexes
+fn swap(a: i32, b: i32) {
+    let tmp: i32 = array[a];
+    array[a] = array[b];
+    array[b] = tmp;
+}
+
+//Partition the array into two halves and return the
+//index about which the array is partitioned
+fn partition(left: i32, right: i32): i32 {
+    let pivotIndex: i32 = left;
+    let pivotValue: i32 = array[pivotIndex];
+    let index: i32 = left;
+    let i: i32;
+
+    swap(pivotIndex, right);
+    for (i = left; i < right; i = i + 1) {
+        if (array[i] < pivotValue) {
+            swap(i, index);
+            index = index + 1;
+        }
+    }
+    swap(right, index);
+    return index;
+}
+
+fn quicksort(left: i32, right: i32) {
+    if (left >= right) {
+        return;
+    }
+    let index: i32 = partition(left, right);
+    quicksort(left, index - 1);
+    quicksort(index + 1, right);
+}
+
+fn main(): i32 {
+    let i: i32;
+    array[0] = 62;
+    array[1] = 83;
+    array[2] = 4;
+    array[3] = 89;
+    array[4] = 36;
+    array[5] = 21;
+    array[6] = 74;
+    array[7] = 37;
+    array[8] = 65;
+    array[9] = 33;
+    array[10] = 96;
+    array[11] = 38;
+    array[12] = 53;
+    array[13] = 16;
+    array[14] = 74;
+    array[15] = 55;
+ 
+    for (i = 0; i < 16; i = i + 1) {
+        print_num(array[i]);
+        write(stdout, " ", 1u32);
+    }
+    write(stdout, "\n", 1u32);
+ 
+    quicksort(0, 15);
+ 
+    for (i = 0; i < 16; i = i + 1) {
+        print_num(array[i]);
+        write(stdout, " ", 1u32);
+    }
+    write(stdout, "\n", 1u32);
+ 
+    return 0;
+}
