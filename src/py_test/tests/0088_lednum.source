@@ -1,0 +1,188 @@
+//---------------------------------------------------------------
+let _io_internal_buf: u8[16];
+
+type enum {
+    stdin  = 0u32,
+    stdout = 1u32,
+    stderr = 2u32
+} as _io_stream;
+
+fn ext exit(code: i32);
+fn ext write(fd: i32, buf: u8*, size: u32): u32;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print(buf: u8*, size: u32) {
+    write(stdout as i32, buf, size);
+}
+
+fn error(buf: u8*, size: u32) {
+    write(stderr as i32, buf, size);
+    exit(1i32);
+}
+
+fn nnc_strlen(p: u8*): i32 {
+    let len: i32 = 0;
+    while (p[len]) {
+        len = len + 1;
+    }
+    return len;
+}
+
+fn print_num(val: u32) {
+    if (val == 0) {
+        write(stdout as i32, "0", 1);
+    }
+    let i: i32 = (i32)lengthof(_io_internal_buf);
+    let s: i32 = 0;
+    memset(_io_internal_buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        _io_internal_buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout as i32, _io_internal_buf+i+1, s);
+}
+
+fn println_num(val: u32) {
+    print_num(val);
+    write(stdout as i32, "\r\n", 2u32);
+}
+//---------------------------------------------------------------
+
+type enum {
+    MAX_DIGITS = 32
+} as _const;
+
+fn topline(d: i32, p: u8*){
+    *p = ' ', p = p + 1;
+
+    if (d == 0 || d == 2 || d == 3 || 
+        d == 5 || d == 7 || d == 8 || d == 9) {
+        *p = '_', p = p + 1;
+    }
+    else {
+        *p = ' ', p = p + 1;
+    }
+    *p = ' ', p = p + 1;
+ }
+ 
+fn midline(d: i32, p: u8*) {
+    if (d == 0 || d == 4 || d == 5 || 
+        d == 6 || d == 8 || d == 9) {
+        // *p++='|';
+        *p = '|', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+
+    if (d == 2 || d == 3 || d == 4 || 
+        d == 5 || d == 6 || d == 8 || d == 9) {
+        // *p++='_';
+        *p = '_', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+
+    if (d == 0 || d == 1 || d == 2 || 
+        d == 3 || d == 4 || d == 7 || d == 8 || d == 9) {
+        // *p++='|';
+        *p = '|', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+}
+
+fn botline(d: i32, p: u8*) {
+    if (d == 0 || d == 2 || d == 6 || d == 8) {
+        *p = '|', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+
+    if (d == 0 || d == 2 || d == 3 || d == 5 ||
+        d == 6 || d == 8) {
+        *p = '_', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+
+    if (d == 0 || d == 1 || d == 3 || 
+        d == 4 || d == 5 || d == 6 || d == 7 || d == 8 || d == 9) {
+        // *p++='|';
+        *p = '|', p = p + 1;
+    }
+    else {
+        //*p++=' ';	
+        *p = ' ', p = p + 1;
+    }
+ }
+
+let d: i32[MAX_DIGITS];
+
+fn print_led(x: u32, buf: u8*) {
+    let i: i32 = 0;
+    let n: i32 = 0;
+ 
+    ///* extract digits from x */
+ 
+    n = ( x == 0u32 ? 1 : 0 ); // /* 0 is a digit, hence a special case */
+ 
+    while (x) {
+       d[n] = (i32)(x % 10u32);
+        n = n+1;
+       if (n >= MAX_DIGITS) {
+           break;
+       }
+       x = x / 10u32;
+    }
+ 
+    ///* print top lines of all digits */
+    for (i=n-1;i>=0;i=i-1){
+       topline(d[i],buf);
+       buf = buf + 3;
+       *buf=' ', buf = buf + 1;
+    }
+    *buf='\n', buf = buf + 1; ///* move teletype to next line */
+ 
+    ///* print middle lines of all digits */
+ 
+    for (i=n-1;i>=0;i=i-1) {
+       midline(d[i],buf);
+       buf = buf + 3;
+       *buf=' ', buf = buf + 1;
+    }
+    *buf='\n', buf = buf + 1;
+ 
+    ///* print bottom lines of all digits */
+ 
+    for (i=n-1;i>=0;i=i-1) {
+       botline(d[i],buf);
+       buf = buf + 3;
+       *buf=' ', buf = buf + 1;
+    }
+    *buf='\n', buf = buf + 1;
+    *buf='\0';
+ }
+
+
+fn main(argc: i32, argv: u8**): i32 {
+    let buf: u8[5*MAX_DIGITS];
+    memset(buf, 0u8, (i32)lengthof(buf));
+    print_led(1234567, buf);
+    print(buf, nnc_strlen(buf));
+    print("\n", 1u32);
+    return 0;
+}
