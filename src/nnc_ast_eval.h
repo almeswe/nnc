@@ -5,9 +5,9 @@
 #include "nnc_symtable.h"
 #include "nnc_expression.h"
 
-//todo: add evaluation for unsigned and float expressions
-//todo: add support for determining the type of 
-// subexpression and use appropriate function for evaluation
-nnc_i64 nnc_evald(const nnc_expression* expr, const nnc_st* st);
+nnc_i64 nnc_evald(
+    const nnc_expression* expr,
+    const nnc_st* st
+);
 
 #endif
