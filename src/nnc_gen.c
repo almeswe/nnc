@@ -1453,7 +1453,7 @@ nnc_static void nnc_callee_clear_loc_map() {
     map_fini(prev_loc_map);
 }
 
-#define GEN_DEBUG 1
+#define GEN_DEBUG 0
 
 #if 1 || GEN_DEBUG == 0
     #undef MAG
@@ -1470,6 +1470,8 @@ nnc_static nnc_assembly_proc nnc_build_current_proc(const nnc_blob_buf* code_imp
     #if GEN_DEBUG == 1
         gen_t0(MAG);
     #endif
+    //todo: check if function static or not
+    gen_t0(".global _%s\n", glob_current_asm_proc.code->name);
     gen_t0("_%s:\n", glob_current_asm_proc.code->name);
     #if GEN_DEBUG == 1
         gen_t0(RESET);
@@ -1540,27 +1542,32 @@ nnc_blob_buf nnc_build(nnc_assembly_file file) {
     nnc_blob_buf_putf(&impl,
         ".intel_syntax noprefix \n"
         "\n"
-        ".global _start\n"
         ".text\n"
         "\n"
-        "_write:\n"
-        "   mov rax, 1\n"
-        "   syscall\n"
-        "   ret\n"
-        "\n"
-        "_exit:\n"
-        "   mov rax, 60\n"
-        "   syscall\n"
-        "   ret\n"
-        "\n"
-        "_start:\n"
-        "   pop rdi\n"
-        "   mov rsi, rsp\n"
-        "   call _main\n"
-        "   mov rdi, rax\n"
-        "   call _exit\n"
-        "   hlt\n\n"
     );
+    if (file.entry_here) {
+        nnc_blob_buf_putf(&impl,
+            "_write:\n"
+            "   mov rax, 1\n"
+            "   syscall\n"
+            "   ret\n"
+            "\n"
+            "_exit:\n"
+            "   mov rax, 60\n"
+            "   syscall\n"
+            "   ret\n"
+            "\n"
+            ".global _start\n"
+            "_start:\n"
+            "   pop rdi\n"
+            "   mov rsi, rsp\n"
+            "   call _main\n"
+            "   mov rdi, rax\n"
+            "   mov rax, 60\n"
+            "   syscall\n"
+            "   hlt\n\n"
+        );
+    }
     for (nnc_u64 i = 0; i < buf_len(file.procs); i++) {
         nnc_blob_buf_append(&impl, &file.procs[i].impl);
         nnc_blob_buf_fini(&file.procs[i].impl);

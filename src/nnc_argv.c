@@ -104,6 +104,5 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
                 "see `--" NNC_OPT_HELP_LONG "`.\n", argv[optind]));
         }
     }
-    buf_add(glob_nnc_argv.sources, NULL);
     return &glob_nnc_argv;
 }

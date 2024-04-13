@@ -29,62 +29,103 @@ static void nnc_stop_count_time() {
     //fprintf(stderr, "[elapsed: %.3lfms]\n", elapsed); 
 }
 
-static FILE* nnc_create_file(const char* path) {
+static void nnc_create_file(const char* path) {
     FILE* file = fopen(path, "w+");
     if (file == NULL) {
         nnc_abort_no_ctx(sformat("cannot create `%s`. "
             "[errno %d] %s.\n", path, errno, strerror(errno)));
     }
-    return file;
+    fclose(file);
 }
 
-static void nnc_write_blob(const char* path, FILE* fp, const nnc_blob_buf* blob) {
-    size_t written = fwrite(blob->blob, 1, blob->len, fp);
+static void nnc_write_blob(const char* path, const nnc_blob_buf* blob) {
+    FILE* file = fopen(path, "w+");
+    size_t written = fwrite(blob->blob, 1, blob->len, file);
     if (written != blob->len || errno != 0) {
         nnc_abort_no_ctx(sformat("cannot write data to `%s`. "
             "[errno %d] %s.\n", path, errno, strerror(errno)));
     }
+    fclose(file);
 }
 
-static void nnc_compile(const nnc_assembly_file* asm_file) {
-    char dot_s_file[MAX_PATH] = {0};
-    char dot_o_file[MAX_PATH] = {0};
-    sprintf(dot_s_file, "%s.s", glob_nnc_argv.output);
-    sprintf(dot_o_file, "%s.o", glob_nnc_argv.output);
-    // create output file and indicate if it is not possible
-    FILE* out = nnc_create_file(glob_nnc_argv.output);
-    fclose(out);
-    FILE* dot_o = nnc_create_file(dot_o_file);
-    fclose(dot_o);
-    FILE* dot_s = nnc_create_file(dot_s_file);
-    nnc_blob_buf asm_blob = nnc_build(*asm_file);
-    nnc_write_blob(dot_s_file, dot_s, &asm_blob);
-    fclose(dot_s);
-    system(sformat("as --64 -o %s %s", dot_o_file, dot_s_file));
-    system(sformat("ld -o %s %s", glob_nnc_argv.output, dot_o_file));
-    remove(dot_s_file);
-    remove(dot_o_file);
+static void nnc_remove_file(const char* path) {
+    remove(path);
+}
+
+static nnc_blob_buf nnc_compile(const char* path) {
+    nnc_check_for_errors();
+    glob_current_ast = nnc_parse(path);
+    nnc_check_for_errors();
+    nnc_resolve(glob_current_ast);
+    //if (glob_nnc_argv.dump_ast) {
+    //    nnc_dump_ast(glob_current_ast);
+    //}
+    nnc_check_for_errors();
+    //if (glob_nnc_argv.dump_ir) {
+    //    nnc_dump_3a_code(code);
+    //}
+    // todo: finalization
+    return nnc_build(nnc_gen(code));
+}
+
+static void nnc_assemble_and_link(const vector(nnc_blob_buf) compiled) {
+    char* ld_params = " ";
+    char dot_s[MAX_PATH] = {0};
+    char dot_o[MAX_PATH] = {0};
+    nnc_create_file(glob_nnc_argv.output);
+    nnc_u64 size = buf_len(glob_nnc_argv.sources);
+    for (nnc_u64 i = 0; i < size; i++) {
+        memset(dot_s, 0, sizeof dot_s);
+        memset(dot_o, 0, sizeof dot_o);
+        sprintf(dot_s, "%s.s", glob_nnc_argv.sources[i]);
+        sprintf(dot_o, "%s.o", glob_nnc_argv.sources[i]);
+        nnc_create_file(dot_o);
+        nnc_create_file(dot_s);
+        nnc_write_blob(dot_s, &compiled[i]);
+        //todo: check retcode..
+        system(sformat("as --64 -o %s %s", dot_o, dot_s));
+    }
+    for (nnc_u64 i = 0; i < size; i++) {
+        memset(dot_o, 0, sizeof dot_o);
+        sprintf(dot_o, "%s.o", glob_nnc_argv.sources[i]);
+        ld_params = sformat("%s %s", ld_params, dot_o);
+    }
+    // link all object (.o) files
+    for (nnc_u64 i = 0; i < buf_len(glob_nnc_argv.objects); i++) {
+        ld_params = sformat("%s %s", ld_params, glob_nnc_argv.objects[i]);
+    }
+    // link all static library (.a) files
+    for (nnc_u64 i = 0; i < buf_len(glob_nnc_argv.static_libs); i++) {
+        ld_params = sformat("%s %s", ld_params, glob_nnc_argv.static_libs[i]);
+    }
+    // link all shared library (.so) files
+    for (nnc_u64 i = 0; i < buf_len(glob_nnc_argv.shared_libs); i++) {
+        ld_params = sformat("%s %s", ld_params, glob_nnc_argv.shared_libs[i]);
+    }
+    system(sformat("ld -o %s %s", glob_nnc_argv.output, ld_params));
+    //todo: add shared and static libs
+    for (nnc_u64 i = 0; i < size; i++) {
+        memset(dot_s, 0, sizeof dot_s);
+        memset(dot_o, 0, sizeof dot_o);
+        sprintf(dot_s, "%s.s", glob_nnc_argv.sources[i]);
+        sprintf(dot_o, "%s.o", glob_nnc_argv.sources[i]);
+        nnc_remove_file(dot_s);
+        nnc_remove_file(dot_o);
+    }
 }
 
 static nnc_i32 nnc_main(nnc_i32 argc, char* argv[]) {
+    nnc_parse_argv(argc, argv);
+    nnc_u64 size = buf_len(glob_nnc_argv.sources);
+    if (size == 0) {
+        nnc_abort_no_ctx("no source specified.\n");
+    }
     TRY {
-        nnc_parse_argv(argc, argv);
-        assert(buf_len(glob_nnc_argv.sources) == 1);
-        assert(buf_len(glob_nnc_argv.objects) == 0);
-        assert(buf_len(glob_nnc_argv.static_libs) == 0);
-        assert(buf_len(glob_nnc_argv.shared_libs) == 0);
-        glob_current_ast = nnc_parse(glob_nnc_argv.sources[0]);
-        nnc_check_for_errors();
-        nnc_resolve(glob_current_ast);
-        if (glob_nnc_argv.dump_ast) {
-            nnc_dump_ast(glob_current_ast);
+        vector(nnc_blob_buf) compiled = NULL;
+        for (nnc_u64 i = 0; i < size; i++) {
+            buf_add(compiled, nnc_compile(glob_nnc_argv.sources[i]));
         }
-        nnc_check_for_errors();
-        if (glob_nnc_argv.dump_ir) {
-            nnc_dump_3a_code(code);
-        }
-        nnc_assembly_file unbuilt = nnc_gen(code);
-        nnc_compile(&unbuilt);
+        nnc_assemble_and_link(compiled);
         ETRY;
     }
     CATCHALL {
