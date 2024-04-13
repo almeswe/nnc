@@ -307,13 +307,7 @@ void nnc_ast_to_3a(
 );
 
 void nnc_dump_3a_code(
-    FILE* to,
     const nnc_3a_code code
-);
-
-void nnc_dump_3a_data(
-    FILE* to,
-    const nnc_3a_data data
 );
 
 void nnc_dump_3a_code_cfg(

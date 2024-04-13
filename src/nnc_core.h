@@ -17,5 +17,6 @@
 
 #include "nnc_3a.h"
 #include "nnc_gen.h"
+#include "nnc_argv.h"
 
 #endif

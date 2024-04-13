@@ -1,19 +1,19 @@
 #include "nnc_3a.h"
 #include "nnc_gen.h"
-
-static FILE* stream = NULL;
-static char buf[128] = {0};
-static int pad = 10;
+#include "nnc_argv.h"
 
 #define dump_indent "   "
 
-#define REDIRECT_3a_DUMP_TO_BLOB 1
+#define REDIRECT_3a_DUMP_TO_BLOB 0
 
-#if REDIRECT_3a_DUMP_TO_BLOB == 0 
+#if REDIRECT_3a_DUMP_TO_BLOB == 0
     #define dump_3a(fmt, ...) fprintf(stream, fmt, __VA_ARGS__)
 #else
     #define dump_3a(...) text_put(__VA_ARGS__) 
 #endif
+
+static FILE* stream = NULL;
+static char internal_buf[128] = {0};
 
 //todo: move to separate file
 extern nnc_bool nnc_is_escape(nnc_byte code);
@@ -45,57 +45,57 @@ nnc_static const char* nnc_dump_3a_op(nnc_3a_op_kind op) {
 }
 
 nnc_static void nnc_dump_3a_cgt(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
-    sprintf(buf, "t%lu", addr->exact.cgt);
+    memset(internal_buf, 0, sizeof internal_buf);
+    sprintf(internal_buf, "t%lu", addr->exact.cgt);
 }
 
 nnc_static void nnc_dump_3a_none(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
+    memset(internal_buf, 0, sizeof internal_buf);
 }
 
 nnc_static void nnc_dump_3a_name(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
-    sprintf(buf, "_%s", addr->exact.name.name);
+    memset(internal_buf, 0, sizeof internal_buf);
+    sprintf(internal_buf, "_%s", addr->exact.name.name);
 }
 
 nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
+    memset(internal_buf, 0, sizeof internal_buf);
     const nnc_3a_sconst* sconst = &addr->exact.sconst;
     const nnc_str str = addr->exact.sconst.sconst;
     const nnc_u64 len = strlen(str);
-    buf[0] = '\"';
+    internal_buf[0] = '\"';
     for (nnc_u64 i = 0; i < len; i++) {
         if (nnc_is_escape(str[i])) {
-            buf[i + 1] = nnc_escape(str[i]);
+            internal_buf[i + 1] = nnc_escape(str[i]);
         }
         else {
-            buf[i + 1] = str[i];
+            internal_buf[i + 1] = str[i];
         }
     }
-    buf[len + 1] = '\"';
+    internal_buf[len + 1] = '\"';
 }
 
 nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
+    memset(internal_buf, 0, sizeof internal_buf);
     const nnc_3a_iconst* iconst = &addr->exact.iconst;
     if (nnc_signed_type(addr->type)) {
-        sprintf(buf, "%ld", iconst->sconst);
+        sprintf(internal_buf, "%ld", iconst->sconst);
     }
     else {
-        sprintf(buf, "%lu", iconst->iconst);
+        sprintf(internal_buf, "%lu", iconst->iconst);
     }
 }
 
 nnc_static void nnc_dump_3a_fconst(const nnc_3a_addr* addr) {
-    memset(buf, 0, sizeof buf);
+    memset(internal_buf, 0, sizeof internal_buf);
     const nnc_3a_fconst* fconst = &addr->exact.fconst;
-    sprintf(buf, "%f", fconst->fconst);
+    sprintf(internal_buf, "%f", fconst->fconst);
 }
 
 nnc_static char* nnc_dump_3a_type(const nnc_type* type) {
-    memset(buf, 0, sizeof buf);
-    sprintf(buf, "(%s)", nnc_type_tostr(type));
-    return buf;
+    memset(internal_buf, 0, sizeof internal_buf);
+    sprintf(internal_buf, "(%s)", nnc_type_tostr(type));
+    return internal_buf;
 }
 
 nnc_static const char* nnc_dump_3a_addr(const nnc_3a_addr* addr) {
@@ -107,7 +107,7 @@ nnc_static const char* nnc_dump_3a_addr(const nnc_3a_addr* addr) {
         case ADDR_ICONST: nnc_dump_3a_iconst(addr); break;
         case ADDR_FCONST: nnc_dump_3a_fconst(addr); break;
     }
-    return buf;
+    return internal_buf;
 }
 
 nnc_static void nnc_dump_3a_binary(const nnc_3a_quad* quad) {
@@ -239,6 +239,7 @@ nnc_static void nnc_dump_3a_prepare_call(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_dump_3a_quad_type(const nnc_3a_quad* quad) {
+    static nnc_i32 pad = 10;
     const char* repr = "";
     if (quad->op < OP_UJUMP || quad->op > OP_CJUMPNE) {
         repr = quad->res.type == NULL ? 
@@ -291,9 +292,8 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
     }
 }
 
-void nnc_dump_3a_quads(FILE* to, const nnc_3a_quad* quads) {
+void nnc_dump_3a_quads(const nnc_3a_quad* quads) {
     static nnc_u32 quad_counter = 0;
-    stream = to;
     for (nnc_u64 i = 0; i < buf_len(quads); i++) {
         fprintf(stream, "%3lu) ", ++quad_counter);
         nnc_dump_3a_quad(&quads[i]);
@@ -329,8 +329,7 @@ nnc_static void nnc_dump_3a_lr_var(nnc_map_key key, nnc_map_val val) {
     fprintf(stream, "[_%s] lives at (%u:%u)\n", (char*)key, lr->starts+1, lr->ends+1);
 }
 
-void nnc_dump_3a_unit(FILE* to, const nnc_3a_proc* unit) {
-    stream = to;
+void nnc_dump_3a_proc(const nnc_3a_proc* unit) {
     dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
         (nnc_i32)(unit->stat.percent * 100));
     //dump_3a("@_%s:\n", set->name);
@@ -342,23 +341,16 @@ void nnc_dump_3a_unit(FILE* to, const nnc_3a_proc* unit) {
     for (nnc_u64 i = 0; i < buf_len(unit->cfg.nodes); i++) {
         const nnc_3a_cfg_node* node = unit->cfg.nodes[i];
         dump_3a("=========BLOCK[%u]=========\n", node->id);
-        nnc_dump_3a_quads(to, node->block->quads);
+        nnc_dump_3a_quads(node->block->quads);
     }
     nnc_map_iter(unit->lr_cgt, nnc_dump_3a_lr_cgt);
     nnc_map_iter(unit->lr_var, nnc_dump_3a_lr_var);
     //nnc_dump_3a_cfg(unit->name, &unit->cfg);
 }
 
-void nnc_dump_3a_code(FILE* to, const nnc_3a_code code) {
-    stream = to;
+void nnc_dump_3a_code(const nnc_3a_code code) {
+    stream = glob_nnc_argv.dump_dest;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
-        nnc_dump_3a_unit(to, &code[i]);
-    }
-}
-
-void nnc_dump_3a_data(FILE* to, const nnc_3a_data data) {
-    stream = to;
-    if (buf_len(data.quads) != 0) {
-        nnc_dump_3a_unit(to, &data);
+        nnc_dump_3a_proc(&code[i]);
     }
 }

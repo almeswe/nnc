@@ -1,14 +1,13 @@
 #include "nnc_core.h"
 #include <sys/time.h>
 
+nnc_ast* glob_current_ast = NULL;
 nnc_arena glob_arena = { 0 };
 nnc_error_canarie glob_error_canarie = { 0 };
 nnc_exception_stack glob_exception_stack = { 0 };
 
 static void nnc_check_for_errors() {
     if (nnc_error_occured()) {
-        //fprintf(stderr, "used memory: %lu B.\n", 
-        //    glob_arena.alloc_bytes);
         nnc_arena_fini(&glob_arena);
         nnc_abort_no_ctx(sformat("%ld error(s) detected.\n", glob_error_canarie));
     }
@@ -16,7 +15,7 @@ static void nnc_check_for_errors() {
 }
 
 static void nnc_print_used_mem() {
-    printf("used mem: %lu\n", glob_arena.alloc_bytes);
+    fprintf(stderr, "used mem: %lu\n", glob_arena.alloc_bytes);
 }
 
 static struct timeval start, end;
@@ -27,60 +26,24 @@ static void nnc_start_count_time() {
 static void nnc_stop_count_time() {
     gettimeofday(&end, NULL);
     nnc_f64 elapsed = (end.tv_usec - start.tv_usec) / 1000.0;
-    fprintf(stderr, "[elapsed: %.3lfms]\n", elapsed); 
+    //fprintf(stderr, "[elapsed: %.3lfms]\n", elapsed); 
 }
 
-/*
-static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
+static nnc_i32 nnc_main(nnc_i32 argc, char* argv[]) {
     TRY {
-        nnc_ast* ast = nnc_parse(argv[1]);
-        nnc_check_for_errors();
-        nnc_resolve(ast);
-        nnc_check_for_errors();
-        nnc_dump_ast(ast);
-       ETRY;
-    }
-    CATCHALL {
-        NNC_SHOW_CATCHED(&CATCHED.where);
-    }
-    nnc_check_for_errors();
-    return EXIT_SUCCESS;
-}
-*/
-
-nnc_ast* glob_current_ast = NULL;
-
-static nnc_i32 nnc_main(nnc_i32 argc, char** argv) {
-    TRY {
-        glob_current_ast = nnc_parse(argv[1]);
+        nnc_parse_argv(argc, argv);
+        glob_current_ast = nnc_parse(glob_nnc_argv.sources[0]);
         nnc_check_for_errors();
         nnc_resolve(glob_current_ast);
-        if (argc == 4) {
+        if (glob_nnc_argv.dump_ast) {
             nnc_dump_ast(glob_current_ast);
         }
         nnc_check_for_errors();
-        #ifdef NNC_SHOW_MEMORY_INFO
-            nnc_print_used_mem();
-        #endif
-        //nnc_ast_to_3a(ast, ast->st);
-        #ifdef NNC_SHOW_MEMORY_INFO
-            nnc_print_used_mem();
-        #endif
-        if (argc == 3) {
-            nnc_dump_3a_code(stdout, code);
+        if (glob_nnc_argv.dump_ir) {
+            nnc_dump_3a_code(code);
         }
-        //data = nnc_3a_optimize_data(data);
-        //nnc_dump_3a_data(stdout, data);
-        //nnc_3a_addr arg1 = nnc_3a_mkcgt();
-        //nnc_3a_addr arg2 = nnc_3a_mki2(0xff, &i64_type);
-        //nnc_3a_quad q = nnc_3a_mkquad1(
-        //    OP_MUL, arg1, &u64_type, arg1, arg2
-        //);
-        //buf_add(code->quads, q);
-        //nnc_gen_code(code);
-        if (argc == 2) {
-            fprintf(stderr, "%s", nnc_build(nnc_gen(code)).blob);
-        }
+        nnc_assembly_file out_asm = nnc_gen(code);
+        fprintf(stderr, "%s", nnc_build(out_asm).blob);
         ETRY;
     }
     CATCHALL {
