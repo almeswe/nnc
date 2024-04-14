@@ -135,8 +135,7 @@ class nnc_tester(object):
     def execute(self, tests: List[nnc_test_case] = None) -> nnc_tester_stat:
         if tests == None:
             tests = self.discover()
-        if len(tests) > 0:
-            self.__prepare()
+        self.__prepare()
         stat: nnc_tester_stat = nnc_tester_stat(len(tests))
         for i, test in zip(range(len(tests)), tests):
             print(f'{i+1}) {test}: {test.run()}')
