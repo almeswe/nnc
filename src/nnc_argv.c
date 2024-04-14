@@ -5,6 +5,8 @@ nnc_argv glob_nnc_argv = {0};
 static nnc_i32 glob_nnc_opt_idx = 0;
 
 static const char* glob_nnc_short_opt = 
+    NNC_OPT_COMPILE
+    NNC_OPT_GEN_DEBUG
     NNC_OPT_OUTPUT  ":"
 ;
 
@@ -14,8 +16,11 @@ static const struct option glob_nnc_long_opt[] = {
     
     { NNC_OPT_DUMP_IR_LONG,   no_argument,       &glob_nnc_argv.dump_ir,   true },
     { NNC_OPT_DUMP_AST_LONG,  no_argument,       &glob_nnc_argv.dump_ast,  true },
-    
-    { NNC_OPT_OUTPUT_LONG,    required_argument, NULL, NNC_OPT_OUTPUT[0] },
+
+    { NNC_OPT_COMPILE_LONG,   no_argument,       &glob_nnc_argv.compile,   NNC_OPT_COMPILE[0]   },
+    { NNC_OPT_GEN_DEBUG_LONG, no_argument,       &glob_nnc_argv.gen_debug, NNC_OPT_GEN_DEBUG[0] },
+
+    { NNC_OPT_OUTPUT_LONG,    required_argument, NULL, NNC_OPT_OUTPUT[0]         },
     { NNC_OPT_DUMP_DEST_LONG, required_argument, NULL, NNC_OPT_DUMP_DEST_LONG[0] },
 
     { 0, 0, 0, 0 }
@@ -68,6 +73,12 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
         }
         if (opt == 0) {
             ;
+        }
+        else if (opt == *NNC_OPT_GEN_DEBUG) {
+            glob_nnc_argv.gen_debug = true;
+        }
+        else if (opt == *NNC_OPT_COMPILE) {
+            glob_nnc_argv.compile = true;
         }
         else if (opt == *NNC_OPT_OUTPUT) {
             glob_nnc_argv.output = optarg;

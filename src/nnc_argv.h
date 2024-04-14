@@ -21,11 +21,16 @@
 #define NNC_ARGV_DEF_OUT "out"
 #define NNC_ARGV_DEF_FILE stderr
 
-#define NNC_OPT_OUTPUT  "o"
+#define NNC_OPT_OUTPUT    "o"
+#define NNC_OPT_COMPILE   "c"
+#define NNC_OPT_GEN_DEBUG "g"
 
 #define NNC_OPT_HELP_LONG            "help"
 #define NNC_OPT_VERBOSE_LONG         "verbose"
 #define NNC_OPT_OUTPUT_LONG          "output"
+#define NNC_OPT_GEN_DEBUG_LONG       "gen-debug"
+#define NNC_OPT_COMPILE_LONG         "compile"
+
 #define NNC_OPT_DUMP_DEST_LONG       "dump-dest"
 #define NNC_OPT_DUMP_IR_LONG         "dump-ir"
 #define NNC_OPT_DUMP_IR_PAT_LONG     "dump-ir-pat"
@@ -41,6 +46,8 @@ typedef struct _nnc_argv {
     vector(const char*) shared_libs;
     nnc_i32 help;
     nnc_i32 verbose;
+    nnc_i32 gen_debug;
+    nnc_i32 compile;
     nnc_i32 dump_ir;
     nnc_i32 dump_ast;
     nnc_i32 dump_with_color;
