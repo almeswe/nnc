@@ -79,11 +79,16 @@ static void nnc_assemble_and_link(const vector(nnc_blob_buf) compiled) {
         memset(dot_o, 0, sizeof dot_o);
         sprintf(dot_s, "%s.s", glob_nnc_argv.sources[i]);
         sprintf(dot_o, "%s.o", glob_nnc_argv.sources[i]);
-        nnc_create_file(dot_o);
         nnc_create_file(dot_s);
         nnc_write_blob(dot_s, &compiled[i]);
-        //todo: check retcode..
-        system(sformat("as --64 -o %s %s", dot_o, dot_s));
+        if (!glob_nnc_argv.compile) {
+            nnc_create_file(dot_o);
+            //todo: check retcode..
+            system(sformat("as --64 %s -o %s %s", (glob_nnc_argv.gen_debug ? "-g" : ""), dot_o, dot_s));
+        }
+    }
+    if (glob_nnc_argv.compile) {
+        return;
     }
     for (nnc_u64 i = 0; i < size; i++) {
         memset(dot_o, 0, sizeof dot_o);

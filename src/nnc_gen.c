@@ -1547,16 +1547,6 @@ nnc_blob_buf nnc_build(nnc_assembly_file file) {
     );
     if (file.entry_here) {
         nnc_blob_buf_putf(&impl,
-            "_write:\n"
-            "   mov rax, 1\n"
-            "   syscall\n"
-            "   ret\n"
-            "\n"
-            "_exit:\n"
-            "   mov rax, 60\n"
-            "   syscall\n"
-            "   ret\n"
-            "\n"
             ".global _start\n"
             "_start:\n"
             "   pop rdi\n"
