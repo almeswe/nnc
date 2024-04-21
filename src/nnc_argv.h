@@ -33,9 +33,7 @@
 
 #define NNC_OPT_DUMP_DEST_LONG       "dump-dest"
 #define NNC_OPT_DUMP_IR_LONG         "dump-ir"
-#define NNC_OPT_DUMP_IR_PAT_LONG     "dump-ir-pat"
 #define NNC_OPT_DUMP_AST_LONG        "dump-ast"
-#define NNC_OPT_DUMP_AST_PAT_LONG    "dump-ast-pat"
 #define NNC_OPT_DUMP_WITH_COLOR_LONG "dump-with-color"
 
 typedef struct _nnc_argv {
