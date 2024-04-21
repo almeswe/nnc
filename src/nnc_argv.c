@@ -48,6 +48,24 @@ nnc_static nnc_bool nnc_treat_unopt_arg(const char* arg) {
     return false;
 }
 
+static void nnc_validate_argv() {
+    nnc_bool dump_smth = false;
+    nnc_bool just_compile = false; 
+    if (glob_nnc_argv.help     || 
+        glob_nnc_argv.dump_ast || 
+        glob_nnc_argv.dump_ir) {
+        dump_smth = true;
+    }
+    if (glob_nnc_argv.compile) {
+        just_compile = true;
+    }
+    if (!just_compile && !dump_smth) {
+        if (buf_len(glob_nnc_argv.sources) < 1) {
+            nnc_abort_no_ctx("no source specified.\n");
+        }
+    }
+}
+
 const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
     glob_nnc_argv = (nnc_argv) {
         .output = NNC_ARGV_DEF_OUT,
@@ -115,5 +133,6 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
                 "see `--" NNC_OPT_HELP_LONG "`.\n", argv[optind]));
         }
     }
+    nnc_validate_argv(&glob_nnc_argv);
     return &glob_nnc_argv;
 }
