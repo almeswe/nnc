@@ -1017,8 +1017,11 @@ nnc_static void nnc_gen_caller_restore() {
         //assert(lr != NULL);
         //fprintf(stdout, "nnc_gen_caller_restore [%u:%u] for %s\n", lr->starts, lr->ends, glob_reg_str[pushed[i]]);
     }
-    if (glob_current_call_state->rax_pushed) {
-        nnc_gen_unreserve_reg(R_RAX);
+    if (glob_current_call_state->res->kind != ADDR_NONE) {
+        if (!nnc_addr_inside_reg(glob_current_call_state->res, R_RAX)) {
+            gen_note("restore RAX after function call\n");
+            nnc_gen_pop_reg(R_RAX, glob_current_call_state->rax_pushed);
+        }
     }
     nnc_call_stack_state_fini();
 }
@@ -1078,24 +1081,40 @@ nnc_static nnc_u64 nnc_get_call_ptr() {
 }
 
 nnc_static void nnc_gen_op_prepare_for_call(const nnc_3a_quad* quad) {
-    nnc_loc call_res_loc = {0};
+    nnc_loc res_loc = {0};
     nnc_bool rax_pushed = false;
     nnc_register* call_res_reg_loc = NULL;
+    // check if call for procedure or function
     if (quad->res.kind != ADDR_NONE) {
-        rax_pushed = nnc_gen_reserve_reg(R_RAX);
-        if (rax_pushed) {
-            call_res_loc = nnc_store(&quad->res, false);
-        }
-        else {
-            call_res_loc.where = L_REG;
-            call_res_loc.reg = R_RAX;
-        }
-        if (call_res_loc.where == L_REG) {
-            call_res_reg_loc = &call_res_loc.reg;
+        gen_note("reserve RAX for function call\n");
+        res_loc = nnc_store(&quad->res, false);
+        if (res_loc.where == L_REG) {
+            call_res_reg_loc = &res_loc.reg;
+            // if allocated storage is not RAX register, preserve it.
+            // it is needed for storing result of a function.
+            if (res_loc.reg != R_RAX) {
+                rax_pushed = nnc_gen_reserve_reg(R_RAX);
+                nnc_gen_xor_reg(&res_loc);
+            }
         }
     }
+    //if (quad->res.kind != ADDR_NONE) {
+    //    gen_note("preserve RAX for call\n");
+    //    rax_pushed = nnc_gen_reserve_reg(R_RAX);
+    //    if (rax_pushed) {
+    //        res_loc = nnc_store(&quad->res, false);
+    //    }
+    //    else {
+    //        res_loc.where = L_REG;
+    //        res_loc.reg = R_RAX;
+    //    }
+    //    if (res_loc.where == L_REG) {
+    //        call_res_reg_loc = &res_loc.reg;
+    //    }
+    //}
     nnc_call_stack_state_init(call_res_reg_loc);
     glob_current_call_state->rax_pushed = rax_pushed;
+    glob_current_call_state->res = &quad->res;
     glob_current_call_state->call_ptr = nnc_get_call_ptr();
     vector(nnc_register) pushed = glob_current_call_state->pushed;
     for (nnc_i64 i = buf_len(pushed); i > 0; i--) {
@@ -1105,7 +1124,8 @@ nnc_static void nnc_gen_op_prepare_for_call(const nnc_3a_quad* quad) {
         // the function, but this appears before the `nnc_call_stack_state_init`,
         // which will think that location (register) is used before call,
         // and will push it, so unpush register where result is stored then.
-        if (call_res_loc.where == L_REG && call_res_loc.reg == reg) {
+        // todo: do i need this check?
+        if (res_loc.where == L_REG && res_loc.reg == reg) {
             nnc_unreserve_reg(reg);
         }
         else {
@@ -1448,7 +1468,7 @@ nnc_static void nnc_callee_clear_loc_map() {
         return;
     }
     nnc_map* prev_loc_map = glob_loc_map;
-    glob_loc_map = map_init_with(16);
+    glob_loc_map = map_init();
     nnc_map_iter(prev_loc_map, nnc_reloc_global_symbol);
     map_fini(prev_loc_map);
 }
