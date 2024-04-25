@@ -73,6 +73,7 @@ nnc_static nnc_bool nnc_can_locate_expr(const nnc_expression* expr) {
         case EXPR_IDENT: {
             const nnc_ident* ident = expr->exact;
             switch (ident->ictx) {
+                case IDENT_GLOBAL:         return true;
                 case IDENT_DEFAULT:        return true;
                 case IDENT_FUNCTION:       return true;
                 case IDENT_FUNCTION_PARAM: return true;
@@ -1489,6 +1490,7 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
         case STMT_WHILE:     nnc_resolve_while_stmt(stmt->exact, st);     break;
         case STMT_BREAK:     nnc_resolve_break_stmt(stmt->exact, st);     break;
         case STMT_RETURN:    nnc_resolve_return_stmt(stmt->exact, st);    break;
+        case STMT_EXT_FN:    nnc_resolve_fn_stmt(stmt->exact, st);        break;
         case STMT_COMPOUND:  nnc_resolve_compound_stmt(stmt->exact, st);  break;
         case STMT_CONTINUE:  nnc_resolve_continue_stmt(stmt->exact, st);  break;
         case STMT_NAMESPACE: nnc_resolve_namespace_stmt(stmt->exact, st); break;

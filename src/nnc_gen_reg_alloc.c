@@ -186,9 +186,7 @@ nnc_static void nnc_make_loc_label(char* buf, const nnc_3a_addr* addr) {
         case ADDR_NAME:   nnc_make_var_loc_label(buf, addr); break;
         case ADDR_SCONST: nnc_make_str_loc_label(buf, addr); break;
         default: {
-            return;
-            //assert(false);
-            //nnc_abort_no_ctx("nnc_make_loc_label\n");
+            buf[0] = '?';
         }
     }
 }
@@ -535,11 +533,11 @@ nnc_static nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
 
 nnc_static nnc_loc nnc_store_var(const nnc_3a_addr* addr, nnc_bool globally) {
     assert(addr->kind == ADDR_NAME);
-    nnc_ident_ctx ictx = addr->exact.name.ictx;;
+    nnc_ident_ctx ictx = addr->exact.name.ictx;
     if (ictx == IDENT_FUNCTION) {
         return nnc_store_fn(addr);
     }
-    if (globally) {
+    if (ictx == IDENT_GLOBAL || globally) {
         return nnc_store_on_data(addr);
     }
     else {

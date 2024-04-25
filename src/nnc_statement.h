@@ -24,6 +24,7 @@ typedef enum _nnc_statement_kind {
 	STMT_SWITCH,
 	STMT_RETURN,
 	STMT_IMPORT,
+	STMT_EXT_FN,
 	STMT_CONTINUE,
 	STMT_COMPOUND,
 	STMT_NAMESPACE,
