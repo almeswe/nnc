@@ -43,6 +43,7 @@ typedef struct _nnc_location {
 } nnc_loc, nnc_location;
 
 typedef struct _nnc_call_stack_state {
+    const nnc_3a_addr* res;
     nnc_u8 alloc_idx;
     nnc_u8 alloc_simd_idx;
     vector(nnc_register) pushed;

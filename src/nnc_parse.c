@@ -971,6 +971,10 @@ nnc_static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc
     nnc_parser_expect(parser, TOK_COLON);
     let_stmt->texpr = nnc_parse_type_expr(parser);
     let_stmt->var->type = let_stmt->texpr->type; 
+    if (parser->st->ctx & ST_CTX_GLOBAL ||
+        parser->st->ctx & ST_CTX_NAMESPACE) {
+        let_stmt->var->ictx = IDENT_GLOBAL;
+    }
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
         nnc_parser_expect(parser, TOK_ASSIGN);
         let_stmt->init = nnc_parse_expr(parser);
@@ -1166,7 +1170,7 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
     if (fn_stmt->storage & FN_ST_EXTERN) {
         nnc_parser_expect(parser, TOK_SEMICOLON);
-        return nnc_stmt_new(STMT_FN, fn_stmt);
+        return nnc_stmt_new(STMT_EXT_FN, fn_stmt);
     }
     fn_stmt->body = nnc_parse_compound_stmt(parser, ST_CTX_FN);
     assert(fn_stmt->body->kind == STMT_COMPOUND);

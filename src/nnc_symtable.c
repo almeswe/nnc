@@ -4,7 +4,8 @@
  * @brief String representation of identifier's context. 
  */
 const static char* ictx_str[] = {
-    [IDENT_DEFAULT]        = "variable",
+    [IDENT_GLOBAL]         = "global",
+    [IDENT_DEFAULT]        = "local",
     [IDENT_FUNCTION]       = "function",
     [IDENT_NAMESPACE]      = "namespace",
     [IDENT_ENUMERATOR]     = "enumerator",
@@ -63,6 +64,27 @@ nnc_bool nnc_st_has(const nnc_st* st, const char* key, nnc_st_sym_kind kind) {
 
 /**
  * @brief Tryes to get symbol from `st` by it's name.
+ *  Performs deep search into `st` branches.
+ * @param st Pointer to `nnc_st` in which to check for symbol.
+ * @param key String representation of symbol.
+ * @return In case when no symbol found, NULL is returned.
+ */
+nnc_static nnc_heap_ptr nnc_st_deep_get(const nnc_st* st, const char* key) {
+    //todo: namespaces support?
+    if (map_has_s(st->syms, key)) {
+        return map_get_s(st->syms, key);
+    }
+    for (nnc_u64 i = 0; i < buf_len(st->branches); i++) {
+        nnc_heap_ptr sym = nnc_st_deep_get(st->branches[i], key);
+        if (sym != NULL) {
+            return sym;
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Tryes to get symbol from `st` by it's name.
  * @param st Pointer to `nnc_st` in which to check for symbol.
  * @param key String representation of symbol.
  * @param kind Kind of symbol.
@@ -98,7 +120,13 @@ nnc_heap_ptr nnc_st_get(const nnc_st* st, const char* key, nnc_st_sym_kind kind)
  * @throw `NNC_NAME_ALREADY_DECLARED` in case when symbol with this name is already inserted.
  */
 nnc_static void nnc_st_put_sym(nnc_st* st, nnc_sym* sym) {
-    nnc_sym* st_sym = nnc_st_get(st, sym->name, ST_SYM_IDENT);
+    nnc_sym* st_sym = NULL;
+    if (sym->ictx == IDENT_GLOBAL) {
+        st_sym = nnc_st_deep_get(st, sym->name);
+    }
+    else {
+        st_sym = nnc_st_get(st, sym->name, ST_SYM_IDENT);
+    }
     if (st_sym != NULL) {
         if (sym->ictx == st_sym->ictx) {
             THROW(NNC_NAME_ALREADY_DECLARED, sformat("%s \'%s\' is already declared.",

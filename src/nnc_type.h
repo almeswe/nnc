@@ -13,6 +13,7 @@ typedef struct _nnc_enumerator          nnc_enumerator;
 typedef struct _nnc_namespace_statement nnc_namespace_statement;
 
 typedef enum _nnc_ident_ctx {
+    IDENT_GLOBAL,
     IDENT_DEFAULT,
     IDENT_FUNCTION,
     IDENT_NAMESPACE,
