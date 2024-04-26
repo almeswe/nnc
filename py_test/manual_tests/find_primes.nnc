@@ -1,0 +1,61 @@
+fn ext write(
+    fd: i32,
+    buf: u8*,
+    size: i32
+): i32;
+
+fn prime(n: u64): i32 {
+    if (n == 0) {
+        return 0;
+    }
+    if (n == 1) {
+        return 1;
+    }
+    if ((n & 1) == 0) {
+        return 0;
+    }
+    let half: u64 = n / 2u64;
+    for (let i: i32 = 2; i < half; i = i + 1) {
+        if (n % i == 0) {
+            return 0;
+        }
+    } 
+    return 1;
+}
+
+let buf: u8[16];
+let stdout: u8 = 1u8;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print_num(val: i32) {
+    let i: i32 = (i32)lengthof(buf);
+    let s: i32 = 0;
+    memset(buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout, buf+i+1, s);
+}
+
+fn print_crlf() {
+    write(stdout, "\r\n", 2);
+}
+
+fn main(): i32 {
+    let amount: i32 = 100 * 1000;
+    let counter: i32 = 0;
+    for (let i: i32 = 0; i < amount; i = i + 1) {
+        if (prime(i)) {
+            counter = counter + 1;
+        }
+    }
+    write(stdout, "Number of primes from 0 to 1mil: ", 35);
+    print_num(counter);
+    print_crlf();
+    return 0;
+}
