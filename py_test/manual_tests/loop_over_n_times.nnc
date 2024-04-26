@@ -1,0 +1,62 @@
+type struct {
+    tv_sec: u64;
+    tv_usec: u64;
+} as timeval;
+
+type struct {
+    tz_minuteswest: i32;
+    tz_dsttime: i32;
+} as timezone;
+
+fn ext write(
+    fd: i32,
+    buf: u8*,
+    size: i32
+): i32;
+
+fn ext sys_gettimeofday(
+    tv: timeval*,
+    tz: timezone* 
+): i32;
+
+let buf: u8[16];
+let stdout: u8 = 1u8;
+
+fn memset(mem: u8*, val: u8, size: i32) {
+    for (let i: u32 = 0; i < size; i = i + 1) {
+        mem[i] = val;
+    }
+}
+
+fn print_num(val: i32) {
+    let i: i32 = (i32)lengthof(buf);
+    let s: i32 = 0;
+    memset(buf, 0u8, i);
+    for (; val && i; i = i - 1, val = val / 10, s = s + 1) {
+        buf[i] = "0123456789"[val % 10];
+    }
+    write(stdout, buf+i+1, s);
+}
+
+fn print_crlf() {
+    write(stdout, "\r\n", 2);
+}
+
+fn main(): i32 {
+    let amount: i32 = 1000 * 1000 * 1000;
+    sys_gettimeofday(&measure_start, (timezone*)0);
+    for (let i: i32 = 0; i < amount; i = i + 1) {
+        ;
+    }
+    sys_gettimeofday(&measure_end, (timezone*)0);
+    print_num(amount);
+    write(stdout, " iterations took (seconds): ", 28);
+    print_num((measure_end.tv_sec - measure_start.tv_sec) as i32);
+    write(stdout, ".", 1);
+    print_num(((measure_end.tv_usec - measure_start.tv_usec) * 1000) as i32);
+    print_crlf();
+    return (measure_end.tv_sec - measure_start.tv_sec) as i32;
+}
+
+let measure_start: timeval;
+let measure_end: timeval;
