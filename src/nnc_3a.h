@@ -206,15 +206,15 @@ typedef struct _nnc_3a_addr {
 } nnc_3a_addr;
 #pragma pack(pop)
 
-#define nnc_3a_mkquad(opv, resv, ...) (nnc_3a_quad){\
+#define nnc_3a_mkquad(opv, resv, ...) (nnc_quad){\
      .op=opv, .res=resv, __VA_ARGS__\
 }
 
-#define nnc_3a_mkquad1(opv, resv, rest, ...) (nnc_3a_quad){\
+#define nnc_3a_mkquad1(opv, resv, rest, ...) (nnc_quad){\
      .op=opv, .res=nnc_3a_mkaddr(resv, rest), __VA_ARGS__  \
 }
 
-#define nnc_3a_mklabel() (nnc_3a_quad){\
+#define nnc_3a_mklabel() (nnc_quad){\
     .label = ++label_cnt\
 }
 
@@ -225,7 +225,7 @@ typedef struct _nnc_3a_quad {
     nnc_3a_addr arg1;
     nnc_3a_addr arg2;
     nnc_heap_ptr hint;
-} nnc_3a_quad;
+} nnc_3a_quad, nnc_quad;
 
 typedef struct _nnc_3a_opt_stat {
     nnc_u64 reduced;
@@ -237,12 +237,6 @@ typedef struct _nnc_3a_opt_stat {
     .id = x, .quads = NULL \
 }
 
-//typedef struct _nnc_3a_storage {
-//    nnc_u32 reg;
-//    nnc_u32 mem_offset;
-//    nnc_3a_storage_type where;
-//} nnc_3a_storage;
-
 typedef struct _nnc_3a_live_range {
     nnc_u32 starts, ends;
     nnc_heap_ptr loc;
@@ -250,7 +244,7 @@ typedef struct _nnc_3a_live_range {
 
 typedef struct _nnc_3a_basic {
     nnc_u32 id;
-    nnc_3a_quad* quads;
+    nnc_quad* quads;
 } nnc_3a_basic;
 
 #define nnc_3a_node_label(x) x->block->quads[0].label
@@ -270,26 +264,34 @@ typedef struct _nnc_3a_cfg {
     _vec_(nnc_3a_cfg_node*) nodes;
 } nnc_3a_cfg;
 
+/**
+ * @brief Represents global let statement
+ *  in form of intermediate representation
+ */
+typedef struct _nnc_3a_var {
+    const char* name;
+    vector(nnc_quad) quads;
+    nnc_3a_opt_stat stat;
+    const nnc_let_statement* let;
+    nnc_3a_addr res;
+} nnc_3a_var;
+
 typedef struct _nnc_3a_proc {
     const char* name;
-    vector(nnc_3a_quad) quads;
+    vector(nnc_quad) quads;
     nnc_3a_cfg cfg;
     nnc_3a_opt_stat stat;
     dictionary(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
     dictionary(const char*, nnc_3a_lr*) lr_var;
     nnc_u64 quad_pointer;
     nnc_u32 stack_usage;
-    //nnc_u32 param_stack_offset;
     nnc_u32 local_stack_offset;
     const vector(nnc_fn_param*) params;
 } nnc_3a_proc;
 
 typedef nnc_3a_proc* nnc_3a_code;
-typedef nnc_3a_proc  nnc_3a_data;
 
 extern nnc_3a_code code;
-extern nnc_3a_data data;
-extern nnc_3a_cgt_cnt cgt_cnt;
 
 void nnc_expr_to_3a(
     const nnc_expression* expr,
@@ -298,11 +300,6 @@ void nnc_expr_to_3a(
 
 void nnc_stmt_to_3a(
     const nnc_statement* stmt,
-    const nnc_st* st
-);
-
-void nnc_ast_to_3a(
-    const nnc_ast* ast,
     const nnc_st* st
 );
 
@@ -315,22 +312,13 @@ void nnc_dump_3a_code_cfg(
     const nnc_3a_code code
 );
 
-void nnc_dump_3a_data_cfg(
-    FILE* to,
-    const nnc_3a_data data
-);
-
-_vec_(nnc_3a_quad) nnc_3a_optimize(
-    _vec_(nnc_3a_quad) quads,
+_vec_(nnc_quad) nnc_3a_optimize(
+    _vec_(nnc_quad) quads,
     nnc_3a_opt_stat* stat
 );
 
 nnc_3a_code nnc_3a_optimize_code(
     nnc_3a_code code
-);
-
-nnc_3a_data nnc_3a_optimize_data(
-    nnc_3a_data data
 );
 
 _vec_(nnc_3a_basic) nnc_3a_get_blocks(
@@ -361,6 +349,10 @@ typedef struct _nnc_ir_glob_sym {
         nnc_ir_proc proc;
     } sym;
 } nnc_ir_glob_sym;
+
+void nnc_dump_ir(
+    const vector(nnc_ir_glob_sym) ir
+);
 
 nnc_ir_glob_sym nnc_gen_ir(
     const nnc_statement* stmt,

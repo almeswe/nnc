@@ -9,6 +9,16 @@ nnc_exception_stack glob_exception_stack = { 0 };
 #define nnc_ms(x) ((glob_v_data.x.tv_sec * 1000000 + glob_v_data.x.tv_usec) / 1000) 
 #define nnc_verbose(...) fprintf(stderr, __VA_ARGS__)
 
+typedef struct _nnc_unit {
+    const char* source;
+    nnc_ast* ast;
+    vector(nnc_ir_glob_sym) ir;
+    nnc_assembly_file impl;
+    vector(nnc_blob_buf) compiled;
+} nnc_unit;
+
+nnc_static nnc_unit glob_current_unit = {0};
+
 typedef struct _nnc_verbose_data {
     struct timeval tv_start;
     struct timeval tv_link;
@@ -79,17 +89,6 @@ nnc_static void nnc_remove_file(const char* path) {
     remove(path);
 }
 
-typedef struct _nnc_unit {
-    const char* source;
-    nnc_ast* ast;
-    nnc_assembly_file impl;
-    vector(nnc_blob_buf) compiled;
-} nnc_unit;
-
-nnc_static nnc_unit glob_current_unit = {0};
-
-#define UNIT (&glob_current_unit)
-
 nnc_static nnc_i32 nnc_shell(const char* desc, const char* what) {
     char errbuf[256] = {0};
     if (system(NULL) == 0) {
@@ -111,6 +110,7 @@ nnc_static nnc_i32 nnc_shell(const char* desc, const char* what) {
 nnc_static void nnc_compile_pass1(const char* source) {
     nnc_check_for_errors();
     glob_current_unit = (nnc_unit){0};
+    glob_current_unit.ir = NULL;
     glob_current_unit.source = source;
     glob_current_unit.ast = nnc_parse(source);
     nnc_check_for_errors();
@@ -144,6 +144,7 @@ nnc_static void nnc_compile_pass2() {
             glob_current_unit.ast->root[i],
             glob_current_unit.ast->st
         );
+        buf_add(glob_current_unit.ir, sym);
         glob_current_unit.impl = nnc_gen2(&sym);
     }
     nnc_check_for_errors();
@@ -161,6 +162,13 @@ nnc_static void nnc_compile() {
         sprintf(dot_s, "%s.s", glob_argv.sources[i]);
         nnc_create_file(dot_s);
         nnc_write_blob(dot_s, &glob_current_unit.compiled[i]);
+        //todo: dump this to separate file
+        if (glob_argv.dump_ast) {
+            nnc_dump_ast(glob_current_unit.ast);
+        }
+        if (glob_argv.dump_ir) {
+            nnc_dump_ir(glob_current_unit.ir);
+        }
     }
     gettimeofday(&glob_v_data.tv_compile, NULL);
 }
@@ -215,7 +223,7 @@ nnc_static void nnc_cleanup() {
         memset(dot_o, 0, sizeof dot_o);
         sprintf(dot_s, "%s.s", glob_argv.sources[i]);
         sprintf(dot_o, "%s.o", glob_argv.sources[i]);
-        if (!glob_argv.compile) {
+        if (!glob_argv.compile && !glob_argv.gen_debug) {
             nnc_remove_file(dot_s);
         }
         nnc_remove_file(dot_o);
@@ -223,7 +231,6 @@ nnc_static void nnc_cleanup() {
 }
 
 nnc_static void nnc_verbose_show() {
-    gettimeofday(&glob_v_data.tv_overall, NULL);
     if (!glob_argv.verbose) {
         return;
     }
@@ -297,7 +304,6 @@ nnc_static nnc_i32 nnc_main(nnc_i32 argc, char* argv[]) {
         NNC_SHOW_CATCHED(&CATCHED.where);
     }
     nnc_check_for_errors();
-    nnc_verbose_show();
     nnc_cleanup();
     return EXIT_SUCCESS;
 }
@@ -307,6 +313,8 @@ nnc_i32 main(nnc_i32 argc, char** argv) {
     nnc_arena_init(&glob_arena);
     gettimeofday(&glob_v_data.tv_start, NULL);
     nnc_i32 status = nnc_main(argc, argv);
+    gettimeofday(&glob_v_data.tv_overall, NULL);
+    nnc_verbose_show();
     nnc_arena_fini(&glob_arena);
     return status;
 }

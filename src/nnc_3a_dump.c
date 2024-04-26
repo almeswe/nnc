@@ -329,28 +329,31 @@ nnc_static void nnc_dump_3a_lr_var(nnc_map_key key, nnc_map_val val) {
     fprintf(stream, "[_%s] lives at (%u:%u)\n", (char*)key, lr->starts+1, lr->ends+1);
 }
 
+nnc_static void nnc_dump_3a_var(const nnc_ir_var* var) {
+    dump_3a("\n@v_%s: (%lu=%d%%)\n", var->name, var->stat.reduced,
+        (nnc_i32)(var->stat.percent * 100));
+    nnc_dump_3a_quads(var->quads);
+}
+
 void nnc_dump_3a_proc(const nnc_3a_proc* unit) {
     dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
         (nnc_i32)(unit->stat.percent * 100));
-    //dump_3a("@_%s:\n", set->name);
-    //nnc_dump_3a_quads(to, set->quads);
-    //for (nnc_u64 i = 0; i < buf_len(set->blocks); i++) {
-    //    dump_3a("=========BLOCK[%u]=========\n", set->blocks[i].id);
-    //    nnc_dump_3a_quads(to, set->blocks[i].quads);
-    //}
-    for (nnc_u64 i = 0; i < buf_len(unit->cfg.nodes); i++) {
-        const nnc_3a_cfg_node* node = unit->cfg.nodes[i];
-        dump_3a("=========BLOCK[%u]=========\n", node->id);
-        nnc_dump_3a_quads(node->block->quads);
-    }
-    nnc_map_iter(unit->lr_cgt, nnc_dump_3a_lr_cgt);
-    nnc_map_iter(unit->lr_var, nnc_dump_3a_lr_var);
-    //nnc_dump_3a_cfg(unit->name, &unit->cfg);
+    nnc_dump_3a_quads(unit->quads);
 }
 
 void nnc_dump_3a_code(const nnc_3a_code code) {
     stream = glob_argv.dump_dest;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
         nnc_dump_3a_proc(&code[i]);
+    }
+}
+
+void nnc_dump_ir(const vector(nnc_ir_glob_sym) ir) {
+    stream = glob_argv.dump_dest;
+    for (nnc_u64 i = 0; i < buf_len(ir); i++) {
+        switch (ir[i].kind) {
+            case STMT_LET: nnc_dump_3a_var(&ir[i].sym.var);   break;
+            case STMT_FN:  nnc_dump_3a_proc(&ir[i].sym.proc); break;
+        }
     }
 }

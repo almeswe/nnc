@@ -490,6 +490,7 @@ nnc_static void nnc_dump_stmt(nnc_dump_data data) {
         [STMT_WHILE]     = nnc_dump_while_stmt,
         [STMT_EMPTY]     = nnc_dump_empty_stmt,
         [STMT_BREAK]     = nnc_dump_break_stmt,
+        [STMT_EXT_FN]    = nnc_dump_fn_stmt,
         [STMT_RETURN]    = nnc_dump_return_stmt,
         [STMT_COMPOUND]  = nnc_dump_compound_stmt,
         [STMT_CONTINUE]  = nnc_dump_continue_stmt,
