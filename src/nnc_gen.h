@@ -39,6 +39,14 @@ nnc_assembly_file nnc_gen(
     vector(nnc_3a_proc) procs
 );
 
+nnc_assembly_file nnc_gen2(
+    nnc_ir_glob_sym* ir
+);
+
+void nnc_gen_stmt(
+    nnc_statement* stmt
+);
+
 nnc_blob_buf nnc_build(
     nnc_assembly_file file
 );

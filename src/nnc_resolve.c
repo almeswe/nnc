@@ -1498,9 +1498,9 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
             nnc_abort_no_ctx("nnc_resolve_stmt: unknown kind.\n");
         }
     }
-    if (!nnc_error_occured()) {
-        nnc_resolved_stmt_to_3a(stmt, st);
-    }
+    //if (!nnc_error_occured()) {
+    //    nnc_resolved_stmt_to_3a(stmt, st);
+    //}
 }
 
 /**

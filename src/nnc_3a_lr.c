@@ -45,51 +45,58 @@ nnc_static void nnc_3a_lr_put_addr(nnc_3a_proc* proc, const nnc_3a_addr* addr, n
     }
 }
 
-void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
+nnc_static void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
     const nnc_3a_quad* quad = &proc->quads[pos];
     nnc_3a_lr_put_addr(proc, &quad->res, pos);
-    // process liverange of certain arguments, depending on quad operator.
-    switch (quad->op) {
-        /* do not consider */
-        case OP_NONE:
-        case OP_RETP:
-        case OP_UJUMP:
-        case OP_HINT_DECL_LOCAL:
-        case OP_HINT_DECL_STRING:
-        case OP_HINT_DECL_GLOBAL:
-        case OP_HINT_PREPARE_CALL: {
-            break;
-        }
-        /* unary operators */
-        case OP_UNARY:
-        /* unary conditional operators */
-        case OP_UNARY_JUMP:
-        /* other operators, that also use only `arg1` */
-        case OP_ARG:
-        case OP_REF:
-        case OP_RETF:
-        case OP_COPY:
-        case OP_CAST:
-        case OP_FCALL:
-        case OP_PCALL: 
-        case OP_DEREF: {
-            nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
-            break;
-        }
-        
-        /* binary operators */
-        case OP_BINARY:
-        /* binary conditional operators */
-        case OP_DEREF_COPY:
-        case OP_BINARY_JUMP: {
-            nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
-            nnc_3a_lr_put_addr(proc, &quad->arg2, pos);
-            break;
-        }
-        default: {
-            nnc_abort_no_ctx("nnc_3a_lr_process_quad: unknown `block->quads[pos].op`\n");
-        }
+    if (quad->arg1.kind != ADDR_NONE) {
+        nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
     }
+    if (quad->arg2.kind != ADDR_NONE) {
+        nnc_3a_lr_put_addr(proc, &quad->arg2, pos);
+    }
+    //return;
+    //// process liverange of certain arguments, depending on quad operator.
+    //switch (quad->op) {
+    //    /* do not consider */
+    //    case OP_NONE:
+    //    case OP_RETP:
+    //    case OP_UJUMP:
+    //    case OP_HINT_DECL_LOCAL:
+    //    case OP_HINT_DECL_STRING:
+    //    case OP_HINT_DECL_GLOBAL:
+    //    case OP_HINT_PREPARE_CALL: {
+    //        break;
+    //    }
+    //    /* unary operators */
+    //    case OP_UNARY:
+    //    /* unary conditional operators */
+    //    case OP_UNARY_JUMP:
+    //    /* other operators, that also use only `arg1` */
+    //    case OP_ARG:
+    //    case OP_REF:
+    //    case OP_RETF:
+    //    case OP_COPY:
+    //    case OP_CAST:
+    //    case OP_FCALL:
+    //    case OP_PCALL: 
+    //    case OP_DEREF: {
+    //        nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
+    //        break;
+    //    }
+    //    
+    //    /* binary operators */
+    //    case OP_BINARY:
+    //    /* binary conditional operators */
+    //    case OP_DEREF_COPY:
+    //    case OP_BINARY_JUMP: {
+    //        nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
+    //        nnc_3a_lr_put_addr(proc, &quad->arg2, pos);
+    //        break;
+    //    }
+    //    default: {
+    //        nnc_abort_no_ctx("nnc_3a_lr_process_quad: unknown `block->quads[pos].op`\n");
+    //    }
+    //}
 }
 
 void nnc_3a_make_lr_for_proc(nnc_3a_proc* proc) {

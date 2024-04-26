@@ -1556,6 +1556,41 @@ nnc_assembly_file nnc_gen(vector(nnc_3a_proc) procs_3a) {
     return glob_current_asm_file;
 }
 
+nnc_assembly_file nnc_gen2(nnc_ir_glob_sym* ir) {
+    if (ir->kind == STMT_FN) {
+        nnc_assembly_proc proc = nnc_gen_proc(&ir->sym.proc);
+        if (nnc_strcmp(proc.code->name, "main")) {
+            glob_current_asm_file.entry_here = true;
+        }
+        buf_add(glob_current_asm_file.procs, proc);
+    }
+    if (ir->kind == STMT_LET) {
+        assert(
+            nnc_get_loc(&ir->sym.var.res) == NULL || 
+            nnc_get_loc(&ir->sym.var.res)->where == L_DATA
+        );
+        nnc_loc loc = nnc_store(&ir->sym.var.res, true);
+        const nnc_type* type = ir->sym.var.let->texpr->type;
+        assert(loc.where == L_DATA);
+        const nnc_expression* e = ir->sym.var.let->init;
+        if (e == NULL) {
+            nnc_gen_memory_zero(loc.ds_name, nnc_sizeof(type));
+        }
+        else {
+            //todo: make expr to memory conversion
+            nnc_i64 value = nnc_evald(e, NULL);
+            nnc_gen_memory_init((char*)(&value), loc.ds_name, nnc_sizeof(type));
+        }
+        // if array is declared on data segment, 
+        // add 8byte padding after it, so there was less
+        // corruption in case of buffer overflow
+        if (nnc_arr_type(type)) {
+            nnc_gen_memory_pad();
+        }
+    }
+    return glob_current_asm_file;
+}
+
 nnc_blob_buf nnc_build(nnc_assembly_file file) {
     nnc_blob_buf impl = (nnc_blob_buf){0};
     nnc_blob_buf_init(&impl);

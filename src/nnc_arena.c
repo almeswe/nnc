@@ -98,6 +98,7 @@ nnc_static void nnc_arena_push(nnc_arena* arena, nnc_arena_entry* entry) {
         }
     }
     arena->alloc_bytes += entry->bytes;
+    arena->overall_alloc_bytes += entry->bytes; 
     arena->entries[arena->metrics.len++] = entry;
 }
 
@@ -168,6 +169,7 @@ void nnc_dispose(nnc_heap_ptr ptr) {
 void nnc_arena_init(nnc_arena* out_arena) {
     *out_arena = (nnc_arena){
         .alloc_bytes = 0,
+        .overall_alloc_bytes = 0,
         .metrics = {
             .len = 0,
             .cap = NNC_ARENA_CAP,

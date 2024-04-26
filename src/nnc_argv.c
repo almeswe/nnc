@@ -1,6 +1,6 @@
 #include "nnc_argv.h"
 
-nnc_argv glob_nnc_argv = {0};
+nnc_argv glob_argv = {0};
 
 static nnc_i32 glob_nnc_opt_idx = 0;
 
@@ -11,14 +11,14 @@ static const char* glob_nnc_short_opt =
 ;
 
 static const struct option glob_nnc_long_opt[] = {
-    { NNC_OPT_HELP_LONG,     no_argument, &glob_nnc_argv.help,     true },
-    { NNC_OPT_VERBOSE_LONG,  no_argument, &glob_nnc_argv.verbose,  true },
+    { NNC_OPT_HELP_LONG,     no_argument, &glob_argv.help,     true },
+    { NNC_OPT_VERBOSE_LONG,  no_argument, &glob_argv.verbose,  true },
     
-    { NNC_OPT_DUMP_IR_LONG,   no_argument,       &glob_nnc_argv.dump_ir,   true },
-    { NNC_OPT_DUMP_AST_LONG,  no_argument,       &glob_nnc_argv.dump_ast,  true },
+    { NNC_OPT_DUMP_IR_LONG,   no_argument,       &glob_argv.dump_ir,   true },
+    { NNC_OPT_DUMP_AST_LONG,  no_argument,       &glob_argv.dump_ast,  true },
 
-    { NNC_OPT_COMPILE_LONG,   no_argument,       &glob_nnc_argv.compile,   NNC_OPT_COMPILE[0]   },
-    { NNC_OPT_GEN_DEBUG_LONG, no_argument,       &glob_nnc_argv.gen_debug, NNC_OPT_GEN_DEBUG[0] },
+    { NNC_OPT_COMPILE_LONG,   no_argument,       &glob_argv.compile,   NNC_OPT_COMPILE[0]   },
+    { NNC_OPT_GEN_DEBUG_LONG, no_argument,       &glob_argv.gen_debug, NNC_OPT_GEN_DEBUG[0] },
 
     { NNC_OPT_OUTPUT_LONG,    required_argument, NULL, NNC_OPT_OUTPUT[0]         },
     { NNC_OPT_DUMP_DEST_LONG, required_argument, NULL, NNC_OPT_DUMP_DEST_LONG[0] },
@@ -30,19 +30,19 @@ nnc_static nnc_bool nnc_treat_unopt_arg(const char* arg) {
     const char* ext = strrchr(arg, '.');
     if (nnc_strcmp(ext, EXT_NNC_SOURCE1) ||
         nnc_strcmp(ext, EXT_NNC_SOURCE2)) {
-        buf_add(glob_nnc_argv.sources, arg);
+        buf_add(glob_argv.sources, arg);
         return true;
     }
     if (nnc_strcmp(ext, EXT_OBJ)) {
-        buf_add(glob_nnc_argv.objects, arg);
+        buf_add(glob_argv.objects, arg);
         return true;
     }
     if (nnc_strcmp(ext, EXT_STATIC_LIB)) {
-        buf_add(glob_nnc_argv.static_libs, arg);
+        buf_add(glob_argv.static_libs, arg);
         return true;
     }
     if (nnc_strcmp(ext, EXT_SHARED_LIB)) {
-        buf_add(glob_nnc_argv.shared_libs, arg);
+        buf_add(glob_argv.shared_libs, arg);
         return true;
     }
     return false;
@@ -51,23 +51,23 @@ nnc_static nnc_bool nnc_treat_unopt_arg(const char* arg) {
 static void nnc_validate_argv() {
     nnc_bool dump_smth = false;
     nnc_bool just_compile = false; 
-    if (glob_nnc_argv.help     || 
-        glob_nnc_argv.dump_ast || 
-        glob_nnc_argv.dump_ir) {
+    if (glob_argv.help     || 
+        glob_argv.dump_ast || 
+        glob_argv.dump_ir) {
         dump_smth = true;
     }
-    if (glob_nnc_argv.compile) {
+    if (glob_argv.compile) {
         just_compile = true;
     }
     if (!just_compile && !dump_smth) {
-        if (buf_len(glob_nnc_argv.sources) < 1) {
+        if (buf_len(glob_argv.sources) < 1) {
             nnc_abort_no_ctx("no source specified.\n");
         }
     }
 }
 
 const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
-    glob_nnc_argv = (nnc_argv) {
+    glob_argv = (nnc_argv) {
         .output = NNC_ARGV_DEF_OUT,
         .sources = NULL,
         .objects = NULL,
@@ -93,17 +93,17 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
             ;
         }
         else if (opt == *NNC_OPT_GEN_DEBUG) {
-            glob_nnc_argv.gen_debug = true;
+            glob_argv.gen_debug = true;
         }
         else if (opt == *NNC_OPT_COMPILE) {
-            glob_nnc_argv.compile = true;
+            glob_argv.compile = true;
         }
         else if (opt == *NNC_OPT_OUTPUT) {
-            glob_nnc_argv.output = optarg;
+            glob_argv.output = optarg;
         }
         else if (opt == *NNC_OPT_DUMP_DEST_LONG) {
-            glob_nnc_argv.dump_dest = fopen(optarg, "w+");
-            if (glob_nnc_argv.dump_dest == NULL) {
+            glob_argv.dump_dest = fopen(optarg, "w+");
+            if (glob_argv.dump_dest == NULL) {
                 nnc_abort_no_ctx(sformat("cannot use `%s` as destination "
                     "for `" NNC_OPT_DUMP_DEST_LONG "`.\n", optarg));
             }
@@ -133,6 +133,6 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
                 "see `--" NNC_OPT_HELP_LONG "`.\n", argv[optind]));
         }
     }
-    nnc_validate_argv(&glob_nnc_argv);
-    return &glob_nnc_argv;
+    nnc_validate_argv(&glob_argv);
+    return &glob_argv;
 }

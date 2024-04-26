@@ -54,7 +54,7 @@ typedef struct _nnc_argv {
     FILE* dump_dest;
 } nnc_argv;
 
-extern nnc_argv glob_nnc_argv;
+extern nnc_argv glob_argv;
 
 const nnc_argv* nnc_parse_argv(
     nnc_i32 argc,

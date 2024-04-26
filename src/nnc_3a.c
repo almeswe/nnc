@@ -4,10 +4,6 @@
 //todo: reduce code size for peephole optimizer.
 
 nnc_3a_code code = NULL;
-nnc_3a_data data = {
-    .name = ".data",
-    .quads = NULL
-};
 
 nnc_3a_cgt_cnt cgt_cnt = 0;
 nnc_3a_label_cnt label_cnt = 0; 
@@ -63,10 +59,6 @@ nnc_static nnc_3a_addr nnc_3a_mkaddr(nnc_3a_addr resv, const nnc_type* rest) {
 nnc_static nnc_u64 nnc_3a_quads_add(const nnc_3a_quad* quad) {
     buf_add(quads, *quad);
     return buf_len(quads) - 1;
-}
-
-nnc_static void nnc_3a_data_quads_add(const nnc_3a_quad* quad) {
-    buf_add(data.quads, *quad);
 }
 
 nnc_static nnc_loop_branches nnc_set_loop_branches(const nnc_3a_quad* b_loop_out,
@@ -727,6 +719,7 @@ nnc_static void nnc_do_stmt_to_3a(const nnc_do_while_statement* do_stmt, const n
 extern void nnc_3a_make_lr_for_proc(nnc_3a_proc* proc);
 
 nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st* st) {
+    assert(false && "deprecated implementation\n");
     cgt_cnt = 0;
     nnc_3a_proc proc = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
@@ -934,15 +927,60 @@ void nnc_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
         case STMT_CONTINUE:  nnc_continue_stmt_to_3a(stmt->exact, st);  break;
         case STMT_COMPOUND:  nnc_compound_stmt_to_3a(stmt->exact, st);  break;
         case STMT_NAMESPACE: nnc_namespace_stmt_to_3a(stmt->exact, st); break;
+        default: {
+            nnc_abort_no_ctx("nnc_stmt_to_3a: unknown statement.\n");
+        }
     }
 }
 
-void nnc_ast_to_3a(const nnc_ast* ast, const nnc_st* st) {
-    #ifdef NNC_SHOW_MEMORY_INFO
-        fprintf(stderr, "size of `nnc_3a_quad`: %lu\n", sizeof(nnc_3a_quad));
-        fprintf(stderr, "`%s` has %lu quads\n", set.name, buf_len(quads));
-    #endif
-    for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {
-        nnc_stmt_to_3a(ast->root[i], ast->st);
+nnc_static vector(nnc_3a_quad) nnc_ir_commit() {
+    vector(nnc_3a_quad) copy = quads;
+    quads = NULL;
+    return copy;
+}
+
+nnc_static nnc_ir_var nnc_gen_ir_var(const nnc_statement* stmt, const nnc_st* st) {
+    nnc_ir_var var = {
+        .let = stmt->exact
+    };
+    var.res = nnc_3a_mkname1(var.let->var);
+    var.name = var.let->var->name;
+    if (var.let->init != NULL) {
+        nnc_expr_to_3a(var.let->init, st);
     }
+    var.quads = nnc_ir_commit();
+    return var;
+} 
+
+nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* st) {
+    assert(stmt->kind == STMT_FN);
+    cgt_cnt = 0;
+    const nnc_fn_statement* fn_stmt = stmt->exact;
+    nnc_stmt_to_3a(fn_stmt->body, st);
+    nnc_3a_proc proc = {
+        .name = nnc_mk_nested_name(fn_stmt->var, st),
+        .quads = nnc_ir_commit(),
+        .lr_var = map_init_with(8),
+        .lr_cgt = map_init_with(32),
+        .quad_pointer = 0,
+        .local_stack_offset = 0,
+        .params = (const nnc_fn_param**)fn_stmt->params
+    };
+    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&proc);
+    //proc.cfg = nnc_3a_get_cfg(blocks);
+    nnc_3a_make_lr_for_proc(&proc);
+    return proc;
+}
+
+nnc_ir_glob_sym nnc_gen_ir(const nnc_statement* stmt, const nnc_st* st) {
+    nnc_ir_glob_sym ir_sym = {
+        .kind = stmt->kind
+    };
+    if (stmt->kind == STMT_FN) {
+        ir_sym.sym.proc = nnc_gen_ir_proc(stmt, st);
+    }
+    if (stmt->kind == STMT_LET) {
+        ir_sym.sym.var = nnc_gen_ir_var(stmt, st);
+    }
+    return ir_sym;
 }

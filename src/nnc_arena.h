@@ -21,6 +21,7 @@ typedef struct _nnc_arena_entry {
 
 typedef struct _nnc_arena {
     nnc_u64 alloc_bytes;
+    nnc_u64 overall_alloc_bytes;
     struct _nnc_arena_metrics {
         nnc_u64 len;
         nnc_u64 cap;
