@@ -501,7 +501,7 @@ nnc_static void nnc_dump_stmt(nnc_dump_data data) {
 }
 
 void nnc_dump_ast(const nnc_ast* ast) {
-    stream = glob_nnc_argv.dump_dest;
+    stream = glob_argv.dump_dest;
     fprintf(stream, _c(BCYN, "%s\n"), "ast");
     nnc_dump_indent(1);
     for (nnc_u64 i = 0; i < buf_len(ast->root); i++) {

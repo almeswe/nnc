@@ -351,4 +351,20 @@ void nnc_dump_3a_cfg(
     const nnc_3a_cfg* cfg
 );
 
+typedef nnc_3a_var  nnc_ir_var;
+typedef nnc_3a_proc nnc_ir_proc;
+
+typedef struct _nnc_ir_glob_sym {
+    nnc_statement_kind kind;
+    union {
+        nnc_ir_var var;
+        nnc_ir_proc proc;
+    } sym;
+} nnc_ir_glob_sym;
+
+nnc_ir_glob_sym nnc_gen_ir(
+    const nnc_statement* stmt,
+    const nnc_st* st
+);
+
 #endif

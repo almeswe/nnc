@@ -349,7 +349,7 @@ void nnc_dump_3a_proc(const nnc_3a_proc* unit) {
 }
 
 void nnc_dump_3a_code(const nnc_3a_code code) {
-    stream = glob_nnc_argv.dump_dest;
+    stream = glob_argv.dump_dest;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
         nnc_dump_3a_proc(&code[i]);
     }
