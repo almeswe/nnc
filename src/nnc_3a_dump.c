@@ -60,7 +60,6 @@ nnc_static void nnc_dump_3a_name(const nnc_3a_addr* addr) {
 
 nnc_static void nnc_dump_3a_sconst(const nnc_3a_addr* addr) {
     memset(internal_buf, 0, sizeof internal_buf);
-    const nnc_3a_sconst* sconst = &addr->exact.sconst;
     const nnc_str str = addr->exact.sconst.sconst;
     const nnc_u64 len = strlen(str);
     internal_buf[0] = '\"';
@@ -79,10 +78,10 @@ nnc_static void nnc_dump_3a_iconst(const nnc_3a_addr* addr) {
     memset(internal_buf, 0, sizeof internal_buf);
     const nnc_3a_iconst* iconst = &addr->exact.iconst;
     if (nnc_signed_type(addr->type)) {
-        sprintf(internal_buf, "%ld", iconst->sconst);
+        sprintf(internal_buf, "0x%lx", iconst->sconst);
     }
     else {
-        sprintf(internal_buf, "%lu", iconst->iconst);
+        sprintf(internal_buf, "0x%lx", iconst->iconst);
     }
 }
 
@@ -295,7 +294,7 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
 void nnc_dump_3a_quads(const nnc_3a_quad* quads) {
     static nnc_u32 quad_counter = 0;
     for (nnc_u64 i = 0; i < buf_len(quads); i++) {
-        fprintf(stream, "%3lu) ", ++quad_counter);
+        fprintf(stream, "%3u) ", ++quad_counter);
         nnc_dump_3a_quad(&quads[i]);
     }
 }

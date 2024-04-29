@@ -3,12 +3,12 @@
 /**
  * @brief Optimized quad set.
 */
-nnc_static _vec_(nnc_3a_quad) opt = NULL;
+nnc_static vector(nnc_3a_quad) opt = NULL;
 
 /**
  * @brief Non-optimized quad set.
 */
-nnc_static _vec_(nnc_3a_quad) unopt = NULL;
+nnc_static vector(nnc_3a_quad) unopt = NULL;
 
 /**
  * @brief Checks if further quads starting from `index` matching
@@ -165,7 +165,6 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part2(nnc_u64 index) {
  * @return `OPT_NONE` if pattern does not match, `OPT_BINARY_CONST_FOLD` otherwise.
  */
 nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part3(nnc_u64 index) {
-
     const nnc_3a_quad* quad1 = &unopt[index];
     const nnc_3a_quad* quad2 = &unopt[index+1];
     const nnc_3a_quad* quad3 = NULL;
@@ -263,15 +262,13 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part5(nnc_u64 index) {
     if (quad3 == NULL) {
         return OPT_NONE;
     }
-    if (quad1->arg1.kind == ADDR_ICONST ||
+    if (quad1->arg1.kind != ADDR_ICONST &&
         quad2->arg1.kind == ADDR_ICONST) {
         if (quad3->op == OP_ADD || quad3->op == OP_MUL) {
-            if (quad1->arg1.exact.iconst.iconst == 0 ||
-                quad2->arg1.exact.iconst.iconst == 0) {
-                if ((quad1->res.exact.cgt == quad3->arg1.exact.cgt) ||
-                    (quad2->res.exact.cgt == quad3->arg2.exact.cgt)) {
-                    return quad3->op == OP_MUL ? 
-                        OPT_ALG_MUL_ZERO : OPT_ALG_ADD_ZERO;
+            if (quad2->arg1.exact.iconst.iconst == 0) {
+                if ((quad2->res.exact.cgt == quad3->arg2.exact.cgt) &&
+                    (quad1->res.exact.cgt == quad3->arg1.exact.cgt)) {
+                    return quad3->op == OP_MUL ? OPT_ALG_MUL_ZERO : OPT_ALG_ADD_ZERO;
                 }
             }
         }
@@ -435,10 +432,9 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat_part8(nnc_u64 index) {
     }
     if (quad1->res.kind == ADDR_CGT) {
         switch (quad2->op) {
-            case OP_ARG:
+            //case OP_ARG:
             case OP_COPY:
             case OP_CAST:
-            case OP_RETF:
             case OP_DEREF:
             case OP_CJUMPE:
             case OP_CJUMPNE:
@@ -470,9 +466,9 @@ nnc_static nnc_3a_peep_pattern nnc_3a_op_copy_pat(nnc_u64 index) {
         nnc_3a_op_copy_pat_part3,
         nnc_3a_op_copy_pat_part4,
         nnc_3a_op_copy_pat_part5,
-        nnc_3a_op_copy_pat_part6,
-        nnc_3a_op_copy_pat_part1,
-        nnc_3a_op_copy_pat_part7,
+        //nnc_3a_op_copy_pat_part6,
+        //nnc_3a_op_copy_pat_part1,
+        //nnc_3a_op_copy_pat_part7,
         nnc_3a_op_copy_pat_part8,
     };
     if (index >= buf_len(unopt)) {
@@ -741,7 +737,8 @@ nnc_static nnc_u64 nnc_3a_opt_unary_iconst_fold(nnc_u64 index) {
         case OP_MINUS:  val = -val; break;
         case OP_BW_NOT: val = ~val; break;
         case OP_CAST: {
-            nnc_f64 fval = op_quad->arg1.exact.fconst.fconst;
+            assert(op_quad->arg1.kind == ADDR_ICONST);
+            nnc_u64 fval = op_quad->arg1.exact.fconst.fconst;
             if (op_quad->arg1.kind == ADDR_ICONST) {
                 fval = op_quad->arg1.exact.iconst.iconst;
             }
@@ -787,7 +784,6 @@ nnc_static nnc_u64 nnc_3a_opt_unary_const_fold(nnc_u64 index) {
     if (nnc_integral_type(un_op_type)) {
         return nnc_3a_opt_unary_iconst_fold(index);
     }
-    nnc_abort_no_ctx("nnc_3a_opt_unary_const_fold: unknown result type.\n");
     return 2;
 }
 
@@ -1150,6 +1146,9 @@ nnc_static nnc_3a_peep_pattern nnc_3a_search_peep_pattern(nnc_u64 index) {
  */
 nnc_static nnc_u64 nnc_3a_optimize_peep(nnc_u64 index) {
     nnc_3a_peep_pattern pat = nnc_3a_search_peep_pattern(index);
+    if (pat != OPT_NONE) {
+        printf("pat: %d\n", pat);
+    }
     switch (pat) {
         /* Redundant cross operator optimizations */
         case OPT_REF_SUBST:            return nnc_3a_opt_ref_subst(index);
@@ -1285,7 +1284,7 @@ nnc_static nnc_u64 nnc_3a_erase_dead_cgts() {
         as OP_NONE, and remove from resulting list.
     */
     nnc_map_iter(unused, nnc_3a_unused_cgts_iter);
-    _vec_(nnc_3a_quad) used = NULL;
+    vector(nnc_3a_quad) used = NULL;
     for (nnc_u64 i = 0; i < size; i++) {
         if (opt[i].op != OP_NONE || opt[i].label != 0) {
             buf_add(used, opt[i]);
@@ -1303,7 +1302,7 @@ nnc_static nnc_u64 nnc_3a_erase_dead_cgts() {
  */
 nnc_static nnc_u64 nnc_3a_zip_quads() {
     nnc_u64 size = buf_len(opt);
-    _vec_(nnc_3a_quad) zipped = NULL;
+    vector(nnc_3a_quad) zipped = NULL;
     for (nnc_u64 i = 0; i < size; i++) {
         const nnc_3a_quad* quad = &opt[i];
         if (quad->op == OP_NONE && quad->label != 0) {
@@ -1352,7 +1351,7 @@ nnc_static void nnc_3a_show_pass(nnc_i32 pass, nnc_3a_quad* quads) {
  * @param stat Out statistics of this optimization routine.
  * @return Optimized quad set.
  */
-_vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* stat) {
+vector(nnc_3a_quad) nnc_3a_optimize(vector(nnc_3a_quad) quads, nnc_3a_opt_stat* stat) {
     opt = NULL, unopt = NULL;
     nnc_i32 pass = 0;
     nnc_u64 reduced = 0;
@@ -1373,8 +1372,8 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
     if (unopt != NULL) {
         buf_free(unopt);
     }
-    reduced += nnc_3a_erase_dead_cgts();
-    reduced += nnc_3a_zip_quads();
+    //reduced += nnc_3a_erase_dead_cgts();
+    //reduced += nnc_3a_zip_quads();
     if (stat != NULL) {
         stat->reduced += reduced;
         stat->percent = stat->reduced / (nnc_f32)stat->initial;
@@ -1383,22 +1382,4 @@ _vec_(nnc_3a_quad) nnc_3a_optimize(_vec_(nnc_3a_quad) quads, nnc_3a_opt_stat* st
         }
     }
     return opt;
-}
-
-/**
- * @brief Performs peephole optimization over data segment quad set.
- * @param data Data segment that must be optimized.
- * @return Optimized data segment.
- */
-nnc_3a_data nnc_3a_optimize_data(nnc_3a_data data) {
-    nnc_3a_opt_stat stat = {0};
-    if (buf_len(data.quads) != 0) {
-    #if _NNC_ENABLE_OPTIMIZATIONS
-        data.quads = nnc_3a_optimize(data.quads, &stat);
-        data.stat = stat;
-    #endif
-        _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&data);
-        data.cfg = nnc_3a_get_cfg(blocks);
-    }
-    return data;
 }

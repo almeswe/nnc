@@ -11,12 +11,12 @@ static const char* glob_nnc_short_opt =
 ;
 
 static const struct option glob_nnc_long_opt[] = {
-    { NNC_OPT_HELP_LONG,     no_argument, &glob_argv.help,     true },
-    { NNC_OPT_VERBOSE_LONG,  no_argument, &glob_argv.verbose,  true },
+    { NNC_OPT_HELP_LONG,     no_argument, &glob_argv.help,     true  },
+    { NNC_OPT_VERBOSE_LONG,  no_argument, &glob_argv.verbose,  true  },
+    { NNC_OPT_NO_OPT_LONG,   no_argument, &glob_argv.optimize, false },
     
     { NNC_OPT_DUMP_IR_LONG,   no_argument,       &glob_argv.dump_ir,   true },
     { NNC_OPT_DUMP_AST_LONG,  no_argument,       &glob_argv.dump_ast,  true },
-
     { NNC_OPT_COMPILE_LONG,   no_argument,       &glob_argv.compile,   NNC_OPT_COMPILE[0]   },
     { NNC_OPT_GEN_DEBUG_LONG, no_argument,       &glob_argv.gen_debug, NNC_OPT_GEN_DEBUG[0] },
 
@@ -80,6 +80,7 @@ const nnc_argv* nnc_parse_argv(nnc_i32 argc, char* const* argv) {
         .dump_ast_pat = NULL,
         .help = false,
         .verbose = false,
+        .optimize = true,
         .dump_with_color = false,
     };
     for (;;) {

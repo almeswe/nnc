@@ -4,6 +4,7 @@
 #define _NNC_ENABLE_PASS_LOGGING 0
 #define _NNC_ENABLE_OPTIMIZATIONS 0
 
+#include "nnc_argv.h"
 #include "nnc_typecheck.h"
 
 #define OP_UNARY    \
@@ -312,8 +313,8 @@ void nnc_dump_3a_code_cfg(
     const nnc_3a_code code
 );
 
-_vec_(nnc_quad) nnc_3a_optimize(
-    _vec_(nnc_quad) quads,
+vector(nnc_quad) nnc_3a_optimize(
+    vector(nnc_quad) quads,
     nnc_3a_opt_stat* stat
 );
 
