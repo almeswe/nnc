@@ -126,7 +126,6 @@ nnc_static void nnc_compile_pass2() {
     nnc_blob_buf_init(&glob_current_asm_file.data_segment_impl);
     nnc_ir_glob_sym sym;
     for (nnc_u64 i = 0; i < buf_len(glob_current_unit.ast->root); i++) {
-        nnc_statement* stmt = glob_current_unit.ast->root[i];
         TRY {
             nnc_resolve_stmt(
                 glob_current_unit.ast->root[i], 

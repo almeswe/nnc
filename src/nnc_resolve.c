@@ -1450,29 +1450,6 @@ nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_st
 }
 
 /**
- * @brief Generates three-address code from resolved statement.
- *  Statement must be STMT_FN or STMT_LET in global or namespace scope.
- * @param stmt Statement to be converted to three-address code.
- * @param st Pointer to `nnc_st` instance.
- */
-nnc_static void nnc_resolved_stmt_to_3a(const nnc_statement* stmt, const nnc_st* st) {
-    nnc_heap_ptr exact = stmt->exact;
-    if (st->ctx != ST_CTX_GLOBAL) {
-        return;
-    }
-    if (stmt->kind == STMT_FN) {
-        nnc_fn_storage storage = ((nnc_fn_statement*)exact)->storage;
-        if (storage != FN_ST_EXTERN) {
-            nnc_stmt_to_3a(stmt, st);
-        }
-    }
-    if (stmt->kind == STMT_LET ||
-        stmt->kind == STMT_NAMESPACE) {
-        nnc_stmt_to_3a(stmt, st);
-    }
-}
-
-/**
  * @brief Resolves statement.
  * @param stmt Statement to be resolved.
  * @param st Pointer to `nnc_st` instance.
@@ -1498,9 +1475,6 @@ void nnc_resolve_stmt(nnc_statement* stmt, nnc_st* st) {
             nnc_abort_no_ctx("nnc_resolve_stmt: unknown kind.\n");
         }
     }
-    //if (!nnc_error_occured()) {
-    //    nnc_resolved_stmt_to_3a(stmt, st);
-    //}
 }
 
 /**
