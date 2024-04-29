@@ -92,11 +92,6 @@ void nnc_call_stack_state_next(
 
 void nnc_call_stack_state_fini();
 
-void nnc_store_at(
-    nnc_loc loc,
-    const nnc_3a_addr* addr
-);
-
 nnc_loc nnc_store_arg(
     const nnc_3a_addr* arg
 );
@@ -111,10 +106,6 @@ nnc_loc nnc_store_param(
 
 const nnc_loc* nnc_get_loc(
     const nnc_3a_addr* addr
-);
-
-nnc_bool nnc_reg_in_use(
-    nnc_register reg
 );
 
 void nnc_push_reg(
