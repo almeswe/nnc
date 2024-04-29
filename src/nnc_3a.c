@@ -217,8 +217,13 @@ nnc_static void nnc_lval_dot_to_3a(const nnc_unary_expression* unary, const nnc_
         offset += nnc_sizeof(m->texpr->type);
     }
     nnc_3a_addr addr = *nnc_3a_quads_res();
-    nnc_3a_quad quad = nnc_3a_mkquad1(
-        OP_ADD, nnc_3a_mkcgt(), nnc_ptr_type_new(member->type), addr, nnc_3a_mki3(offset)
+    nnc_3a_quad quad;
+    quad = nnc_3a_mkquad1(
+        OP_COPY, nnc_3a_mkcgt(), &u32_type, nnc_3a_mki3(offset)
+    );
+    nnc_3a_quads_add(&quad);
+    quad = nnc_3a_mkquad1(
+        OP_ADD, addr, nnc_ptr_type_new(member->type), addr, *nnc_3a_quads_res()
     );
     nnc_3a_quads_add(&quad);
 }
@@ -966,8 +971,9 @@ nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* 
         .local_stack_offset = 0,
         .params = (const nnc_fn_param**)fn_stmt->params
     };
-    _vec_(nnc_3a_basic) blocks = nnc_3a_get_blocks(&proc);
-    //proc.cfg = nnc_3a_get_cfg(blocks);
+    if (glob_argv.optimize) {
+        proc.quads = nnc_3a_optimize(proc.quads, &proc.stat); 
+    }
     nnc_3a_make_lr_for_proc(&proc);
     return proc;
 }

@@ -29,6 +29,7 @@
 #define NNC_OPT_VERBOSE_LONG         "verbose"
 #define NNC_OPT_OUTPUT_LONG          "output"
 #define NNC_OPT_GEN_DEBUG_LONG       "gen-debug"
+#define NNC_OPT_NO_OPT_LONG          "no-opt"
 #define NNC_OPT_COMPILE_LONG         "compile"
 
 #define NNC_OPT_DUMP_DEST_LONG       "dump-dest"
@@ -44,6 +45,7 @@ typedef struct _nnc_argv {
     vector(const char*) shared_libs;
     nnc_i32 help;
     nnc_i32 verbose;
+    nnc_i32 optimize;
     nnc_i32 gen_debug;
     nnc_i32 compile;
     nnc_i32 dump_ir;
