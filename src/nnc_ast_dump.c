@@ -458,7 +458,7 @@ nnc_static void nnc_dump_fn_stmt(nnc_dump_data data) {
         fn_stmt->var->name, buf_len(fn_stmt->params));
     nnc_dump_type(fn_stmt->var->type);
     fprintf(stream, ">\n");
-    if (fn_stmt->storage & FN_ST_EXTERN) {
+    if (FN_IS_EXT(fn_stmt)) {
         return;
     }
     for (nnc_u64 i = 0; i < buf_len(fn_stmt->params); i++) {

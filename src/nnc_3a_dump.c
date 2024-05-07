@@ -284,7 +284,7 @@ void nnc_dump_3a_quad(const nnc_3a_quad* quad) {
         case OP_HINT_DECL_LOCAL:   nnc_dump_3a_declare_local(quad);  break;
         case OP_HINT_DECL_GLOBAL:  nnc_dump_3a_declare_global(quad); break;
         case OP_HINT_DECL_STRING:  nnc_dump_3a_declare_string(quad); break;
-        case OP_HINT_PREPARE_CALL: nnc_dump_3a_prepare_call(quad);   break;
+        case OP_HINT_PREPARE_FOR_CALL: nnc_dump_3a_prepare_call(quad);   break;
         default: { 
             nnc_abort_no_ctx("nnc_dump_3a_quad: unimplemented case met.\n");
         }

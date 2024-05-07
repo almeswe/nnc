@@ -9,7 +9,7 @@
 #include "nnc_gen_reg_alloc.h"
 
 #define SEG_TEXT (&glob_current_asm_proc.impl)
-#define SEG_DATA (&glob_current_asm_file.data_segment_impl)
+#define SEG_DATA (&glob_current_asm_file->data_segment_impl)
 
 #define data_put(...) nnc_blob_buf_putf(SEG_DATA, __VA_ARGS__)
 #define text_put(...) nnc_blob_buf_putf(SEG_TEXT, __VA_ARGS__)
@@ -31,15 +31,11 @@ typedef struct _nnc_executable {
 } nnc_executable;
 
 extern nnc_3a_proc* glob_current_proc;
-extern nnc_assembly_file glob_current_asm_file;
+extern nnc_assembly_file* glob_current_asm_file;
 extern nnc_assembly_proc glob_current_asm_proc;
 extern nnc_ast* glob_current_ast;
 
-nnc_assembly_file nnc_gen(
-    vector(nnc_3a_proc) procs
-);
-
-nnc_assembly_file nnc_gen2(
+nnc_assembly_file* nnc_gen(
     nnc_ir_glob_sym* ir
 );
 

@@ -101,9 +101,14 @@ typedef nnc_struct_member nnc_var_type;
 typedef nnc_struct_member nnc_fn_param;
 typedef nnc_struct_member nnc_union_member;
 
+#define FN_IS_PUB(x) ((x)->storage & FN_ST_PUBLIC)
+#define FN_IS_EXT(x) ((x)->storage & FN_ST_EXTERN)
+#define FN_SET_STORAGE(x, mask) ((x)->storage |= (mask))
+
 typedef enum _nnc_fn_storage {
-	FN_ST_NONE   = 0b0,
-	FN_ST_EXTERN = 0b1
+	FN_ST_NONE   = 0b00,
+	FN_ST_PUBLIC = 0b01,
+	FN_ST_EXTERN = 0b10
 } nnc_fn_storage;
 
 typedef struct _nnc_fn_statement {
