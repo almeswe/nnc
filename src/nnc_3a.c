@@ -394,7 +394,7 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
 }
 
 nnc_static nnc_u64 nnc_call_hint(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_3a_quad hint_quad = { .op = OP_HINT_PREPARE_CALL };
+    nnc_3a_quad hint_quad = { .op = OP_HINT_PREPARE_FOR_CALL };
     hint_quad.hint = (nnc_heap_ptr)unary;
     return nnc_3a_quads_add(&hint_quad);
 }
@@ -793,25 +793,11 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
     nnc_3a_quads_add(&b_true);
 }
 
-nnc_static void nnc_let_stmt_hint(const nnc_let_statement* let_stmt, const nnc_st* st) {
-    nnc_3a_quad hint_quad = nnc_3a_mkquad(
-        OP_HINT_DECL_LOCAL, nnc_3a_mkname1(let_stmt->var)
-    );
-    if (st->ctx == ST_CTX_GLOBAL ||
-        st->ctx == ST_CTX_NAMESPACE) {
-        hint_quad.op = OP_HINT_DECL_GLOBAL;  
-        hint_quad.hint = (nnc_heap_ptr)let_stmt->init;
-    }
-    nnc_3a_quads_add(&hint_quad);
-}
-
 nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
-    nnc_let_stmt_hint(let_stmt, st);
     if (let_stmt->init == NULL) {
         return;
     }
-    if (st->ctx == ST_CTX_GLOBAL ||
-        st->ctx == ST_CTX_NAMESPACE) {
+    if (SCOPE_GLOBAL(st) || SCOPE_NAMESPACE(st)) {
         return;
     }
     nnc_expr_to_3a(let_stmt->init, st);
@@ -964,6 +950,7 @@ nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* 
     nnc_stmt_to_3a(fn_stmt->body, st);
     nnc_3a_proc proc = {
         .name = nnc_mk_nested_name(fn_stmt->var, st),
+        .storage = fn_stmt->storage,
         .quads = nnc_ir_commit(),
         .lr_var = map_init_with(8),
         .lr_cgt = map_init_with(32),

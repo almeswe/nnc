@@ -602,7 +602,7 @@ nnc_static void nnc_add_imp_nesting(nnc_ident* ident, nnc_nesting* nesting) {
 nnc_static nnc_nesting* nnc_get_imp_nesting(nnc_st* st) {
     nnc_st** path = NULL;
     while (st != NULL && st->root != NULL) {
-        if (st->ctx == ST_CTX_NAMESPACE) {
+        if (SCOPE_NAMESPACE(st)) {
             buf_add(path, st);
         }
         st = st->root;
@@ -1230,14 +1230,16 @@ nnc_static void nnc_resolve_do_stmt(nnc_do_while_statement* do_stmt, nnc_st* st)
  * @throw `NNC_SEMANTIC` in case when statement not declared in namespace or global scope. 
  */
 nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
-    if (st->ctx != ST_CTX_GLOBAL &&
-        st->ctx != ST_CTX_NAMESPACE) {
+    if (!SCOPE_GLOBAL(st) && !SCOPE_NAMESPACE(st)) {
         THROW(NNC_SEMANTIC, "cannot declare `fn` in this context.", fn_stmt->var->ctx);
+    }
+    if (FN_IS_PUB(fn_stmt) && FN_IS_EXT(fn_stmt)) {
+        THROW(NNC_SEMANTIC, "excess `pub` spec for `ext` function.", fn_stmt->var->ctx);
     }
     fn_stmt->var->nesting = nnc_get_imp_nesting(st);
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type_expr(fn_stmt->ret, st);
-    if (fn_stmt->storage != FN_ST_EXTERN) {
+    if (!FN_IS_EXT(fn_stmt)) {
         nnc_resolve_stmt(fn_stmt->body, st);
     }
 }
@@ -1303,8 +1305,7 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
     if (let_stmt->init != NULL) {
         nnc_resolve_expr(let_stmt->init, st);
         const nnc_ctx* init_expr_ctx = nnc_expr_get_ctx(let_stmt->init);
-        if (st->ctx == ST_CTX_GLOBAL ||
-            st->ctx == ST_CTX_NAMESPACE) {
+        if (SCOPE_GLOBAL(st) || SCOPE_NAMESPACE(st)) {
             if (!nnc_can_fold_expr(let_stmt->init)) {
                 THROW(NNC_SEMANTIC, "cannot initialize global variable"
                     " with non-constant expression.", *init_expr_ctx);
@@ -1325,8 +1326,7 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
  * @throw `NNC_SEMANTIC` in case when declared not in global scope.
  */
 nnc_static void nnc_resolve_type_stmt(nnc_type_statement* type_stmt, nnc_st* st) {
-    if (st->ctx != ST_CTX_GLOBAL &&
-        st->ctx != ST_CTX_NAMESPACE) {
+    if (!SCOPE_GLOBAL(st) && !SCOPE_NAMESPACE(st)) {
         THROW(NNC_SEMANTIC, "cannot declare `type` in this context.");
     }
     const nnc_ctx* ctx = &type_stmt->texpr_as->ctx;
@@ -1442,8 +1442,7 @@ nnc_static void nnc_resolve_continue_stmt(nnc_continue_statement* continue_stmt,
  * @throw `NNC_SEMANTIC` in case when not declared in global scope. 
  */
 nnc_static void nnc_resolve_namespace_stmt(nnc_namespace_statement* namespace_stmt, nnc_st* st) {
-    if (st->ctx != ST_CTX_GLOBAL &&
-        st->ctx != ST_CTX_NAMESPACE) {
+    if (!SCOPE_GLOBAL(st) && !SCOPE_NAMESPACE(st)) {
         THROW(NNC_SEMANTIC, "cannot declare `namespace` in this context.", namespace_stmt->var->ctx);
     }
     nnc_resolve_stmt(namespace_stmt->body, st);

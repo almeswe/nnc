@@ -55,7 +55,7 @@ nnc_bool nnc_st_has(const nnc_st* st, const char* key, nnc_st_sym_kind kind) {
         }
         // stop from searching if current `st` is namespace
         // this is done for the purpose of isolating scope of namespace.
-        if (st->ctx & ST_CTX_NAMESPACE) {
+        if (SCOPE_NAMESPACE(st)) {
             break;
         }
     }
@@ -106,7 +106,7 @@ nnc_heap_ptr nnc_st_get(const nnc_st* st, const char* key, nnc_st_sym_kind kind)
         }
         // stop from searching if current `st` is namespace
         // this is done for the purpose of isolating scope of namespace.
-        if (st->ctx == ST_CTX_NAMESPACE) {
+        if (SCOPE_NAMESPACE(st)) {
             break;
         }
     }

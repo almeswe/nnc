@@ -14,6 +14,10 @@ typedef enum _nnc_st_sym_kind {
     ST_SYM_IDENT
 } nnc_st_sym_kind;
 
+#define SCOPE_FN(x)        ((x)->ctx & ST_CTX_FN)
+#define SCOPE_GLOBAL(x)    ((x)->ctx & ST_CTX_GLOBAL)
+#define SCOPE_NAMESPACE(x) ((x)->ctx & ST_CTX_NAMESPACE)
+
 typedef enum _nnc_st_ctx {
     ST_CTX_DEFAULT   = 0x00000000,
     ST_CTX_GLOBAL    = 0x00000001,

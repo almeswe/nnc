@@ -970,9 +970,8 @@ nnc_static nnc_statement* nnc_parse_let_stmt_with_opt_st(nnc_parser* parser, nnc
     nnc_parser_expect(parser, TOK_IDENT);
     nnc_parser_expect(parser, TOK_COLON);
     let_stmt->texpr = nnc_parse_type_expr(parser);
-    let_stmt->var->type = let_stmt->texpr->type; 
-    if (parser->st->ctx & ST_CTX_GLOBAL ||
-        parser->st->ctx & ST_CTX_NAMESPACE) {
+    let_stmt->var->type = let_stmt->texpr->type;
+    if (SCOPE_GLOBAL(parser->st) || SCOPE_NAMESPACE(parser->st)) {
         let_stmt->var->ictx = IDENT_GLOBAL;
     }
     if (nnc_parser_match(parser, TOK_ASSIGN)) {
@@ -1028,6 +1027,25 @@ nnc_static nnc_statement* nnc_parse_expr_stmt(nnc_parser* parser) {
     exprstmt->expr = nnc_parse_expr(parser);
     nnc_parser_expect(parser, TOK_SEMICOLON);
     return nnc_stmt_new(STMT_EXPR, exprstmt);
+}
+
+//todo: add to ebnf
+nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser);
+
+nnc_static nnc_statement* nnc_parse_pub_stmt(nnc_parser* parser) {
+    //todo: add context here for errors
+    if (!SCOPE_GLOBAL(parser->st)) {
+        THROW(NNC_SYNTAX, "`pub` not in global scope.\n");
+    }
+    switch (nnc_parser_peek_lookup(parser)) {
+        case TOK_FN: return nnc_parse_fn_stmt(parser);
+        //case TOK_LET:  return nnc_parse_let_stmt(parser);
+        //case TOK_TYPE: return nnc_parse_type_stmt(parser);
+        default: {
+            THROW(NNC_SYNTAX, "invalid statement for `pub`.\n");
+        }
+    }
+    return NULL;
 }
 
 nnc_static nnc_statement* nnc_parse_goto_stmt(nnc_parser* parser) {
@@ -1133,6 +1151,11 @@ nnc_static nnc_statement* nnc_parse_continue_stmt(nnc_parser* parser) {
 
 nnc_static nnc_fn_storage nnc_parse_fn_storage(nnc_parser* parser) {
     nnc_fn_storage storage = FN_ST_NONE;
+    if (nnc_parser_peek(parser) == TOK_PUB) {
+        storage |= FN_ST_PUBLIC;
+        nnc_parser_expect(parser, TOK_PUB);
+    }
+    nnc_parser_expect(parser, TOK_FN);
     if (nnc_parser_peek(parser) == TOK_EXT) {
         storage |= FN_ST_EXTERN;
         nnc_parser_next(parser);
@@ -1141,7 +1164,6 @@ nnc_static nnc_fn_storage nnc_parse_fn_storage(nnc_parser* parser) {
 }
 
 nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
-    nnc_parser_expect(parser, TOK_FN);
     nnc_fn_statement* fn_stmt = nnc_new(nnc_fn_statement);
     fn_stmt->storage = nnc_parse_fn_storage(parser);
     const nnc_tok* tok = nnc_parser_get(parser);
@@ -1168,7 +1190,7 @@ nnc_static nnc_statement* nnc_parse_fn_stmt(nnc_parser* parser) {
     nnc_parser_expect(parser, TOK_CPAREN);
     fn_stmt->ret = nnc_parse_fn_ret_type_expr(parser);
     fn_stmt->var->type->exact.fn.ret = fn_stmt->ret;
-    if (fn_stmt->storage & FN_ST_EXTERN) {
+    if (FN_IS_EXT(fn_stmt)) {
         nnc_parser_expect(parser, TOK_SEMICOLON);
         return nnc_stmt_new(STMT_EXT_FN, fn_stmt);
     }
@@ -1217,6 +1239,7 @@ nnc_statement* nnc_parse_stmt(nnc_parser* parser) {
         case TOK_DO:        return nnc_parse_do_stmt(parser);
         case TOK_LET:       return nnc_parse_let_stmt(parser);
         case TOK_FOR:       return nnc_parse_for_stmt(parser);
+        case TOK_PUB:       return nnc_parse_pub_stmt(parser);
         case TOK_GOTO:      return nnc_parse_goto_stmt(parser);
         case TOK_TYPE:      return nnc_parse_type_stmt(parser);
         case TOK_WHILE:     return nnc_parse_while_stmt(parser);

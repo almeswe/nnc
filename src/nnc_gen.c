@@ -13,7 +13,7 @@
 
 #define nnc_mkloc_reg(r, t) (nnc_loc){ .where = L_REG, .reg = r, .type = t }
 
-nnc_assembly_file glob_current_asm_file = {0};
+nnc_assembly_file* glob_current_asm_file = {0};
 nnc_assembly_proc glob_current_asm_proc = {0};
 
 nnc_3a_proc* glob_current_proc = NULL;
@@ -1097,7 +1097,7 @@ nnc_static nnc_u64 nnc_get_call_ptr() {
     nnc_u64 current_ptr = glob_current_proc->quad_pointer;
     for (; current_ptr < buf_len(glob_current_proc->quads); current_ptr++) {
         const nnc_3a_quad* quad = &glob_current_proc->quads[current_ptr];
-        if (quad->op == OP_HINT_PREPARE_CALL) {
+        if (quad->op == OP_HINT_PREPARE_FOR_CALL) {
             closure_val++;
         }
         if (quad->op == OP_PCALL || quad->op == OP_FCALL) {
@@ -1289,27 +1289,6 @@ nnc_static void nnc_gen_op_decl_local(const nnc_3a_quad* quad) {
     nnc_store(&quad->res, false);
 }
 
-nnc_static void nnc_gen_op_decl_global(const nnc_3a_quad* quad) {
-    assert(nnc_get_loc(&quad->res) == NULL);
-    nnc_loc loc = nnc_store(&quad->res, true);
-    assert(loc.where == L_DATA);
-    const nnc_expression* e = (nnc_expression*)quad->hint;
-    if (e == NULL) {
-        nnc_gen_memory_zero(loc.ds_name, nnc_sizeof(quad->res.type));
-    }
-    else {
-        //todo: make expr to memory conversion
-        nnc_i64 value = nnc_evald(e, NULL);
-        nnc_gen_memory_init((char*)(&value), loc.ds_name, nnc_sizeof(quad->res.type));
-    }
-    // if array is declared on data segment, 
-    // add 8byte padding after it, so there was less
-    // corruption in case of buffer overflow
-    if (nnc_arr_type(quad->res.type)) {
-        nnc_gen_memory_pad();
-    }
-}
-
 nnc_static void nnc_gen_op_decl_string(const nnc_3a_quad* quad) {
     if (nnc_get_loc(&quad->res) != NULL) {
         return;
@@ -1366,10 +1345,9 @@ nnc_static void nnc_gen_quad(const nnc_3a_quad* quad) {
             case OP_CJUMPE:   nnc_gen_op_cjumpe(quad);   break;
             case OP_CJUMPNE:  nnc_gen_op_cjumpne(quad);  break;
             /* Hint operators */
-            case OP_HINT_DECL_LOCAL:   nnc_gen_op_decl_local(quad);  break;
-            case OP_HINT_DECL_GLOBAL:  nnc_gen_op_decl_global(quad); break;
-            case OP_HINT_DECL_STRING:  nnc_gen_op_decl_string(quad); break;
-            case OP_HINT_PREPARE_CALL: nnc_gen_op_prepare_for_call(quad); break;
+            case OP_HINT_DECL_LOCAL:       nnc_gen_op_decl_local(quad);  break;
+            case OP_HINT_DECL_STRING:      nnc_gen_op_decl_string(quad); break;
+            case OP_HINT_PREPARE_FOR_CALL: nnc_gen_op_prepare_for_call(quad); break;
             default: {
                 nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
             }
@@ -1521,8 +1499,9 @@ nnc_static nnc_assembly_proc nnc_build_current_proc(const nnc_blob_buf* code_imp
     #if GEN_DEBUG == 1
         gen_t0(MAG);
     #endif
-    //todo: check if function static or not
-    gen_t0(".global _%s\n", glob_current_asm_proc.code->name);
+    if (FN_IS_PUB(glob_current_asm_proc.code)) {
+        gen_t0(".global _%s\n", glob_current_asm_proc.code->name);
+    }
     gen_t0("_%s:\n", glob_current_asm_proc.code->name);
     #if GEN_DEBUG == 1
         gen_t0(RESET);
@@ -1570,30 +1549,13 @@ nnc_static nnc_assembly_proc nnc_gen_proc(nnc_3a_proc* proc_3a) {
     return glob_current_asm_proc;
 }
 
-nnc_assembly_file nnc_gen(vector(nnc_3a_proc) procs_3a) {
-    glob_current_asm_file = (nnc_assembly_file){
-        .procs = NULL,
-        .entry_here = false,
-        .data_segment_impl = (nnc_blob_buf){0}
-    };
-    nnc_blob_buf_init(&glob_current_asm_file.data_segment_impl);
-    for (nnc_u64 i = 0; i < buf_len(procs_3a); i++) {
-        nnc_assembly_proc proc = nnc_gen_proc(&procs_3a[i]);
-        if (nnc_strcmp(proc.code->name, "main")) {
-            glob_current_asm_file.entry_here = true;
-        }
-        buf_add(glob_current_asm_file.procs, proc);
-    }
-    return glob_current_asm_file;
-}
-
-nnc_assembly_file nnc_gen2(nnc_ir_glob_sym* ir) {
+nnc_assembly_file* nnc_gen(nnc_ir_glob_sym* ir) {
     if (ir->kind == STMT_FN) {
         nnc_assembly_proc proc = nnc_gen_proc(&ir->sym.proc);
         if (nnc_strcmp(proc.code->name, "main")) {
-            glob_current_asm_file.entry_here = true;
+            glob_current_asm_file->entry_here = true;
         }
-        buf_add(glob_current_asm_file.procs, proc);
+        buf_add(glob_current_asm_file->procs, proc);
     }
     if (ir->kind == STMT_LET) {
         assert(

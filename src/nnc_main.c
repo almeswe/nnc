@@ -10,11 +10,10 @@ nnc_exception_stack glob_exception_stack = { 0 };
 #define nnc_verbose(...) fprintf(stderr, __VA_ARGS__)
 
 typedef struct _nnc_unit {
-    const char* source;
     nnc_ast* ast;
-    vector(nnc_ir_glob_sym) ir;
     nnc_assembly_file impl;
-    vector(nnc_blob_buf) compiled;
+    vector(nnc_ir_glob_sym) ir;
+    vector(nnc_blob_buf) compiled
 } nnc_unit;
 
 nnc_static nnc_unit glob_current_unit = {0};
@@ -109,21 +108,15 @@ nnc_static nnc_i32 nnc_shell(const char* desc, const char* what) {
 
 nnc_static void nnc_compile_pass1(const char* source) {
     nnc_check_for_errors();
-    glob_current_unit = (nnc_unit){0};
     glob_current_unit.ir = NULL;
-    glob_current_unit.source = source;
+    glob_current_unit.impl = (nnc_assembly_file){0};
     glob_current_unit.ast = nnc_parse(source);
+    glob_current_asm_file = &glob_current_unit.impl;
+    nnc_blob_buf_init(&glob_current_asm_file->data_segment_impl);
     nnc_check_for_errors();
 }
 
 nnc_static void nnc_compile_pass2() {
-    //todo: make initialization prettier
-    glob_current_asm_file = (nnc_assembly_file){
-        .procs = NULL,
-        .entry_here = false,
-        .data_segment_impl = (nnc_blob_buf){0}
-    };
-    nnc_blob_buf_init(&glob_current_asm_file.data_segment_impl);
     nnc_ir_glob_sym sym;
     for (nnc_u64 i = 0; i < buf_len(glob_current_unit.ast->root); i++) {
         TRY {
@@ -144,20 +137,24 @@ nnc_static void nnc_compile_pass2() {
             glob_current_unit.ast->st
         );
         buf_add(glob_current_unit.ir, sym);
-        glob_current_unit.impl = nnc_gen2(&sym);
+        nnc_gen(&sym);
     }
     nnc_check_for_errors();
+}
+
+nnc_static void nnc_compilation_fini() {
+    //todo: free ast
+    //todo: free ir syms
 }
 
 nnc_static void nnc_compile() {
     char dot_s[MAX_PATH] = {0};
     nnc_u64 size = buf_len(glob_argv.sources);
-    glob_current_unit.compiled = NULL;
+    glob_current_unit = (nnc_unit){0};
     for (nnc_u64 i = 0; i < size; i++) {
         nnc_compile_pass1(glob_argv.sources[i]);
         nnc_compile_pass2();
-        buf_add(glob_current_unit.compiled,
-            nnc_build(glob_current_unit.impl));
+        buf_add(glob_current_unit.compiled, nnc_build(glob_current_unit.impl));
         sprintf(dot_s, "%s.s", glob_argv.sources[i]);
         nnc_create_file(dot_s);
         nnc_write_blob(dot_s, &glob_current_unit.compiled[i]);
@@ -168,6 +165,7 @@ nnc_static void nnc_compile() {
         if (glob_argv.dump_ir) {
             nnc_dump_ir(glob_current_unit.ir);
         }
+        nnc_compilation_fini();
     }
     gettimeofday(&glob_v_data.tv_compile, NULL);
 }
