@@ -1083,10 +1083,13 @@ nnc_static void nnc_resolve_bitwise_expr(nnc_binary_expression* binary, nnc_st* 
  */
 nnc_static void nnc_resolve_assign_expr(nnc_binary_expression* binary, nnc_st* st) {
     if (!nnc_can_locate_expr(binary->lexpr)) {
-        THROW(NNC_CANNOT_ASSIGN_EXPR, "left expression "
-            "must be locatable.", binary->ctx);
+        THROW(NNC_CANNOT_ASSIGN_EXPR, "left expression must be locatable.", binary->ctx);
     }
     nnc_resolve_binary_expr_type(binary, st);
+    // todo: add ability to copy structs or unions.
+    if (nnc_struct_or_union_type(binary->type)) {
+        THROW(NNC_SEMANTIC, "cannot copy struct or union.", binary->ctx);
+    }
 }
 
 /**
@@ -1200,6 +1203,10 @@ nnc_static void nnc_resolve_params(nnc_fn_param** params, nnc_st* st) {
     for (nnc_u64 i = 0; i < buf_len(params); i++) {
         TRY {
             nnc_resolve_type_expr(params[i]->texpr, st);
+            // todo: add ability to pass structs or unions later
+            if (nnc_struct_or_union_type(params[i]->texpr->type)) {
+                THROW(NNC_SEMANTIC, "cannot pass struct or union as parameter.", params[i]->texpr->ctx);
+            }
             params[i]->var->type = params[i]->texpr->type;
             ETRY;
         }
@@ -1239,6 +1246,10 @@ nnc_static void nnc_resolve_fn_stmt(nnc_fn_statement* fn_stmt, nnc_st* st) {
     fn_stmt->var->nesting = nnc_get_imp_nesting(st);
     nnc_resolve_params(fn_stmt->params, st);
     nnc_resolve_type_expr(fn_stmt->ret, st);
+    // todo: add ability to pass structs or unions later
+    if (nnc_struct_or_union_type(fn_stmt->ret->type)) {
+        THROW(NNC_SEMANTIC, "cannot return struct or union.", fn_stmt->ret->ctx);
+    }
     if (!FN_IS_EXT(fn_stmt)) {
         nnc_resolve_stmt(fn_stmt->body, st);
     }
@@ -1315,6 +1326,10 @@ nnc_static void nnc_resolve_let_stmt(nnc_let_statement* let_stmt, nnc_st* st) {
         if (!nnc_can_imp_cast_assign(t_init, let_stmt->texpr->type)) {
             THROW(NNC_SEMANTIC, sformat("cannot initialize variable "
                 "with expression of `%s` type.", nnc_type_tostr(t_init)), *init_expr_ctx);
+        }
+        // todo: add ability to init with struct or union.
+        if (nnc_struct_or_union_type(t_init)) {
+            THROW(NNC_SEMANTIC, "cannot init with struct or union.", *init_expr_ctx);
         }
     }
 }
