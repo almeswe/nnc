@@ -13,7 +13,7 @@ typedef struct _nnc_unit {
     nnc_ast* ast;
     nnc_assembly_file impl;
     vector(nnc_ir_glob_sym) ir;
-    vector(nnc_blob_buf) compiled
+    vector(nnc_blob_buf) compiled;
 } nnc_unit;
 
 nnc_static nnc_unit glob_current_unit = {0};
@@ -117,7 +117,6 @@ nnc_static void nnc_compile_pass1(const char* source) {
 }
 
 nnc_static void nnc_compile_pass2() {
-    nnc_ir_glob_sym sym;
     for (nnc_u64 i = 0; i < buf_len(glob_current_unit.ast->root); i++) {
         TRY {
             nnc_resolve_stmt(
@@ -129,15 +128,14 @@ nnc_static void nnc_compile_pass2() {
         CATCHALL {
             NNC_SHOW_CATCHED(&CATCHED.where);
         }
-        if (nnc_error_occured()) {
-            continue;
+        if (!nnc_error_occured()) {
+            nnc_ir_glob_sym sym = nnc_gen_ir(
+                glob_current_unit.ast->root[i],
+                glob_current_unit.ast->st
+            );
+            buf_add(glob_current_unit.ir, sym);
+            nnc_gen(&sym);
         }
-        sym = nnc_gen_ir(
-            glob_current_unit.ast->root[i],
-            glob_current_unit.ast->st
-        );
-        buf_add(glob_current_unit.ir, sym);
-        nnc_gen(&sym);
     }
     nnc_check_for_errors();
 }
