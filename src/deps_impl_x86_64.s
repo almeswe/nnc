@@ -69,9 +69,11 @@ _sys_lseek:
 
 .global _sys_mmap
 _sys_mmap:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 9
     syscall
+    pop r10
     ret
 
 .global _sys_mprotect
@@ -94,16 +96,20 @@ _sys_brk:
 
 .global _sys_rt_sigaction
 _sys_rt_sigaction:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 13
     syscall
+    pop r10
     ret
 
 .global _sys_rt_sigprocmask
 _sys_rt_sigprocmask:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 14
     syscall
+    pop r10
     ret
 
 .global _sys_rt_sigreturn
@@ -120,16 +126,20 @@ _sys_ioctl:
 
 .global _sys_pread64
 _sys_pread64:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 17
     syscall
+    pop r10
     ret
 
 .global _sys_pwrite64
 _sys_pwrite64:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 18
     syscall
+    pop r10
     ret
 
 .global _sys_readv
@@ -158,9 +168,11 @@ _sys_pipe:
 
 .global _sys_select
 _sys_select:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 23
     syscall
+    pop r10
     ret
 
 .global _sys_sched_yield
@@ -171,9 +183,11 @@ _sys_sched_yield:
 
 .global _sys_mremap
 _sys_mremap:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 25
     syscall
+    pop r10
     ret
 
 .global _sys_msync
@@ -262,9 +276,11 @@ _sys_getpid:
 
 .global _sys_sendfile
 _sys_sendfile:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 40
     syscall
+    pop r10
     ret
 
 .global _sys_socket
@@ -287,16 +303,20 @@ _sys_accept:
 
 .global _sys_sendto
 _sys_sendto:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 44
     syscall
+    pop r10
     ret
 
 .global _sys_recvfrom
 _sys_recvfrom:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 45
     syscall
+    pop r10
     ret
 
 .global _sys_sendmsg
@@ -343,30 +363,38 @@ _sys_getpeername:
 
 .global _sys_socketpair
 _sys_socketpair:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 53
     syscall
+    pop r10
     ret
 
 .global _sys_setsockopt
 _sys_setsockopt:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 54
     syscall
+    pop r10
     ret
 
 .global _sys_getsockopt
 _sys_getsockopt:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 55
     syscall
+    pop r10
     ret
 
 .global _sys_clone
 _sys_clone:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 56
     syscall
+    pop r10
     ret
 
 .global _sys_fork
@@ -395,9 +423,11 @@ _sys_exit:
 
 .global _sys_wait4
 _sys_wait4:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 61
     syscall
+    pop r10
     ret
 
 .global _sys_kill
@@ -426,9 +456,11 @@ _sys_semop:
 
 .global _sys_semctl
 _sys_semctl:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 66
     syscall
+    pop r10
     ret
 
 .global _sys_shmdt
@@ -445,16 +477,20 @@ _sys_msgget:
 
 .global _sys_msgsnd
 _sys_msgsnd:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 69
     syscall
+    pop r10
     ret
 
 .global _sys_msgrcv
 _sys_msgrcv:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 70
     syscall
+    pop r10
     ret
 
 .global _sys_msgctl
@@ -639,9 +675,11 @@ _sys_times:
 
 .global _sys_ptrace
 _sys_ptrace:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 101
     syscall
+    pop r10
     ret
 
 .global _sys_getuid
@@ -802,9 +840,11 @@ _sys_rt_sigpending:
 
 .global _sys_rt_sigtimedwait
 _sys_rt_sigtimedwait:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 128
     syscall
+    pop r10
     ret
 
 .global _sys_rt_sigqueueinfo
@@ -977,9 +1017,11 @@ _sys__sysctl:
 
 .global _sys_prctl
 _sys_prctl:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 157
     syscall
+    pop r10
     ret
 
 .global _sys_arch_prctl
@@ -1026,9 +1068,11 @@ _sys_settimeofday:
 
 .global _sys_mount
 _sys_mount:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 165
     syscall
+    pop r10
     ret
 
 .global _sys_umount2
@@ -1051,9 +1095,11 @@ _sys_swapoff:
 
 .global _sys_reboot
 _sys_reboot:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 169
     syscall
+    pop r10
     ret
 
 .global _sys_sethostname
@@ -1112,9 +1158,11 @@ _sys_query_module:
 
 .global _sys_quotactl
 _sys_quotactl:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 179
     syscall
+    pop r10
     ret
 
 .global _sys_nfsservctl
@@ -1167,44 +1215,56 @@ _sys_readahead:
 
 .global _sys_setxattr
 _sys_setxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 188
     syscall
+    pop r10
     ret
 
 .global _sys_lsetxattr
 _sys_lsetxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 189
     syscall
+    pop r10
     ret
 
 .global _sys_fsetxattr
 _sys_fsetxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 190
     syscall
+    pop r10
     ret
 
 .global _sys_getxattr
 _sys_getxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 191
     syscall
+    pop r10
     ret
 
 .global _sys_lgetxattr
 _sys_lgetxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 192
     syscall
+    pop r10
     ret
 
 .global _sys_fgetxattr
 _sys_fgetxattr:
-    mov r10, rcx
+    push r10
+	mov r10, rcx
     mov rax, 193
     syscall
+    pop r10
     ret
 
 .global _sys_listxattr
