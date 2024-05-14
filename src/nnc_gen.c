@@ -1063,8 +1063,9 @@ nnc_static void nnc_gen_call(const nnc_3a_addr* call) {
         nnc_gen_operand(call, &u64_type);
     }
     else {
+        assert(glob_ast != NULL);
         const char* fn = call->exact.name.name;
-        nnc_sym* sym = nnc_st_get_sym(glob_current_ast->st, fn);
+        nnc_sym* sym = nnc_st_get_sym(glob_ast->st, fn);
         if (sym == NULL) {
             nnc_gen_operand(call, &u64_type);
         }

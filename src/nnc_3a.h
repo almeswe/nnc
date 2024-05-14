@@ -353,6 +353,7 @@ typedef struct _nnc_ir_glob_sym {
 } nnc_ir_glob_sym;
 
 void nnc_dump_ir(
+    FILE* fp,
     const vector(nnc_ir_glob_sym) ir
 );
 

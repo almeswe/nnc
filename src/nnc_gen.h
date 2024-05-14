@@ -33,7 +33,7 @@ typedef struct _nnc_executable {
 extern nnc_3a_proc* glob_current_proc;
 extern nnc_assembly_file* glob_current_asm_file;
 extern nnc_assembly_proc glob_current_asm_proc;
-extern nnc_ast* glob_current_ast;
+extern nnc_ast* glob_ast;
 
 nnc_assembly_file* nnc_gen(
     nnc_ir_glob_sym* ir

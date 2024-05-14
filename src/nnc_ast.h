@@ -10,7 +10,13 @@ typedef struct _nnc_ast {
     const char* file;
 } nnc_ast;
 
-void nnc_dump_ast(const nnc_ast* ast);
-nnc_ast* nnc_ast_new(const char* file);
+void nnc_dump_ast(
+    FILE* fp,
+    const nnc_ast* ast
+);
+
+nnc_ast* nnc_ast_new(
+    const char* file
+);
 
 #endif
