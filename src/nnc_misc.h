@@ -1,7 +1,11 @@
 #ifndef __NNC_MISCELLANEOUS_H__
 #define __NNC_MISCELLANEOUS_H__
 
-#define _c(c, ...) c __VA_ARGS__ RESET
+#if 0
+    #define _c(c, ...) c __VA_ARGS__ RESET
+#else
+    #define _c(c, ...) __VA_ARGS__
+#endif
 
 #ifdef __linux__
 

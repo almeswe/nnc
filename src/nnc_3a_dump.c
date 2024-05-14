@@ -341,14 +341,13 @@ void nnc_dump_3a_proc(const nnc_3a_proc* unit) {
 }
 
 void nnc_dump_3a_code(const nnc_3a_code code) {
-    stream = glob_argv.dump_dest;
     for (nnc_u64 i = 0; i < buf_len(code); i++) {
         nnc_dump_3a_proc(&code[i]);
     }
 }
 
-void nnc_dump_ir(const vector(nnc_ir_glob_sym) ir) {
-    stream = glob_argv.dump_dest;
+void nnc_dump_ir(FILE* fp, const vector(nnc_ir_glob_sym) ir) {
+    stream = fp;
     for (nnc_u64 i = 0; i < buf_len(ir); i++) {
         switch (ir[i].kind) {
             case STMT_LET: nnc_dump_3a_var(&ir[i].sym.var);   break;
