@@ -1,16 +1,10 @@
-#ifndef __NNC_CMD_ARGUMENTS_H__
-#define __NNC_CMD_ARGUMENTS_H__
+#ifndef __NNC_ARGV_H__
+#define __NNC_ARGV_H__
 
-#define _GNU_SOURCE
-
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <getopt.h>
+#include <sys/time.h>
 
 #include "nnc_buf.h"
 #include "nnc_format.h"
-#include "nnc_arena.h"
 
 #define EXT_OBJ         ".o"
 #define EXT_SHARED_LIB  ".so"
@@ -18,24 +12,48 @@
 #define EXT_NNC_SOURCE1 ".nnc"
 #define EXT_NNC_SOURCE2 ".source"
 
-#define NNC_ARGV_DEF_OUT "out"
-#define NNC_ARGV_DEF_FILE stderr
+#define O_NO_ARG  0
+#define O_ONE_ARG 1
+#define O_OUT_DEF "out"
+#define O_HELP_STR \
+    "nnc:   Not Named x86_64 Compiler (see more: https://github.com/almeswe/nnc)\n"                             \
+    "usage: ./nnc [options] [sources] [objects] [libs] \n\n"                                                    \
+    "sources:                  `.nnc` or `.source` files\n"                                                     \
+    "objects:                  `.o` compiled & assembled files\n"                                               \
+    "libs:                     `.a` for nnc_static libs\n"                                                      \
+    "                          `.so` for shared libs \n"                                                        \
+    "options (short):\n"                                                                                        \
+    "  -o <file>               Set path for output file\n"                                                      \
+    "  -c                      Compile only; do not assemble or link \n"                                        \
+    "  -g                      Generates debug symbols when assembling.\n"                                      \
+    "options (long):\n"                                                                                         \
+    "  --help                  Display this information\n"                                                      \
+    "  --gen-debug             Generates debug symbols when assembling.\n"                                      \
+    "  --compile               Compile only; do not assemble or link \n"                                        \
+    "  --output <file>         Set path for output file\n"                                                      \
+    "  --dump-ast              Display abstract syntax tree of the program.\n"                                  \
+    "  --dump-ir               Display intermediate representation of the program.\n"
 
-#define NNC_OPT_OUTPUT    "o"
-#define NNC_OPT_COMPILE   "c"
-#define NNC_OPT_GEN_DEBUG "g"
+typedef enum _nnc_option_id {
+    O_NONE       = 0,
+    O_HELP       = 1,
+    O_VERBOSE    = 2,
+    O_OPTIMIZE   = 3,
+    O_DEBUG      = 4,
+    O_COMPILE    = 5,
+    O_OUT        = 6,
+    O_OUT_IR     = 7,
+    O_OUT_AST    = 8
+} nnc_option_id;
 
-#define NNC_OPT_HELP_LONG            "help"
-#define NNC_OPT_VERBOSE_LONG         "verbose"
-#define NNC_OPT_OUTPUT_LONG          "output"
-#define NNC_OPT_GEN_DEBUG_LONG       "gen-debug"
-#define NNC_OPT_NO_OPT_LONG          "no-opt"
-#define NNC_OPT_COMPILE_LONG         "compile"
-
-#define NNC_OPT_DUMP_DEST_LONG       "dump-dest"
-#define NNC_OPT_DUMP_IR_LONG         "dump-ir"
-#define NNC_OPT_DUMP_AST_LONG        "dump-ast"
-#define NNC_OPT_DUMP_WITH_COLOR_LONG "dump-with-color"
+typedef struct _nnc_option {
+    nnc_option_id id;
+    const char* opt;
+    nnc_u8 opt_arg;
+    nnc_i32* flag;
+    nnc_u8 flag_value;
+    const char* arg;
+} nnc_option;
 
 typedef struct _nnc_argv {
     const char* output;
@@ -50,17 +68,31 @@ typedef struct _nnc_argv {
     nnc_i32 compile;
     nnc_i32 dump_ir;
     nnc_i32 dump_ast;
-    nnc_i32 dump_with_color;
-    const char* dump_ir_pat;
-    const char* dump_ast_pat;
-    FILE* dump_dest;
 } nnc_argv;
 
-extern nnc_argv glob_argv;
+#define tv_us(x) (glob_verbose.x.tv_sec * 1000000 + glob_verbose.x.tv_usec)
+#define tv_ms(x) (tv_us(x) / 1000) 
 
-const nnc_argv* nnc_parse_argv(
+typedef struct _nnc_verbose {
+    struct timeval tv_start;
+    struct timeval tv_link;
+    struct timeval tv_compile;
+    struct timeval tv_assemble;
+    struct timeval tv_overall;
+    nnc_i32 as_code;
+    nnc_i32 ld_code;
+    char* ld_params;
+    char* as_params;
+} nnc_verbose;
+
+extern nnc_argv glob_argv;
+extern nnc_verbose glob_verbose;
+
+void nnc_glob_argv_init(
     nnc_i32 argc,
     char* const* argv
 );
+
+void nnc_glob_argv_fini();
 
 #endif

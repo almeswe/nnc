@@ -49,3 +49,35 @@ void nnc_blob_buf_putf(nnc_blob_buf* buf, const char* format, ...) {
     memcpy(buf->blob + buf->len, formatbuf, written);
     buf->len += written;
 }
+
+void nnc_create_file(const char* path) {
+    FILE* file = fopen(path, "w+");
+    if (file == NULL) {
+        nnc_abort_no_ctx(sformat("cannot create `%s`. "
+            "[errno %d] %s.\n", path, errno, strerror(errno)));
+    }
+    fclose(file);
+}
+
+FILE* nnc_create_file2(const char* path) {
+    FILE* file = fopen(path, "w+");
+    if (file == NULL) {
+        nnc_abort_no_ctx(sformat("cannot create `%s`. "
+            "[errno %d] %s.\n", path, errno, strerror(errno)));
+    }
+    return file;
+}
+
+void nnc_write_blob(const char* path, const nnc_blob_buf* blob) {
+    FILE* file = fopen(path, "w+");
+    size_t written = fwrite(blob->blob, 1, blob->len, file);
+    if (written != blob->len || errno != 0) {
+        nnc_abort_no_ctx(sformat("cannot write data to `%s`. "
+            "[errno %d] %s.\n", path, errno, strerror(errno)));
+    }
+    fclose(file);
+}
+
+void nnc_remove_file(const char* path) {
+    remove(path);
+}
