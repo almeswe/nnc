@@ -1,4 +1,4 @@
-#include "nnc_gen_instr_set.h"
+#include "nnc_gen.h"
 
 const char* nnc_asm_instr_str[] = {
     [I_NOP]       = "nop", 

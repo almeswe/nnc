@@ -1,4 +1,4 @@
-#include "nnc_gen_reg_alloc.h"
+#include "nnc_gen_sa.h"
 
 /**
  * @brief Priority array for allocation SSE registers.

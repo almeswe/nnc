@@ -47,6 +47,7 @@ nnc_static void nnc_3a_lr_put_addr(nnc_3a_proc* proc, const nnc_3a_addr* addr, n
 
 nnc_static void nnc_3a_lr_process_quad(nnc_3a_proc* proc, nnc_i32 pos) {
     const nnc_3a_quad* quad = &proc->quads[pos];
+    //todo: res can be ADDR_NONE too??
     nnc_3a_lr_put_addr(proc, &quad->res, pos);
     if (quad->arg1.kind != ADDR_NONE) {
         nnc_3a_lr_put_addr(proc, &quad->arg1, pos);
