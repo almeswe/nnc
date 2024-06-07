@@ -1,4 +1,5 @@
 #include "nnc_try_catch.h"
+#include "nnc_state.h"
 
 /**
  * @brief Performs behaviour as `try` statement has. 

@@ -1,4 +1,5 @@
 #include "nnc_3a.h"
+#include "nnc_state.h"
 
 //todo: change data structure for quads to linked list
 //todo: reduce code size for peephole optimizer.
@@ -949,7 +950,7 @@ nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* 
     const nnc_fn_statement* fn_stmt = stmt->exact;
     nnc_stmt_to_3a(fn_stmt->body, st);
     nnc_3a_proc proc = {
-        .name = nnc_mk_nested_name(fn_stmt->var, st),
+        .name = nnc_strdup(fn_stmt->var->name), //nnc_mk_nested_name(fn_stmt->var, st),
         .storage = fn_stmt->storage,
         .quads = nnc_ir_commit(),
         .lr_var = map_init_with(8),

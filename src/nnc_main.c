@@ -1,18 +1,8 @@
-#include "nnc_core.h"
+#include "nnc_state.h"
 
-nnc_ast* glob_ast = NULL;
-nnc_arena glob_arena = { 0 };
-nnc_error_canarie glob_error_canarie = 0;
-nnc_exception_stack glob_exception_stack = { 0 };
+//todo: combine all `.a` files with `ar`
 
-typedef struct _nnc_unit {
-    nnc_ast* ast;
-    nnc_assembly_file impl;
-    vector(nnc_ir_glob_sym) ir;
-    vector(nnc_blob_buf) compiled;
-} nnc_unit;
-
-nnc_static nnc_unit glob_current_unit = {0};
+nnc_cstate glob_state = {0};
 
 nnc_static void nnc_help() {
     fprintf(stderr, O_HELP_STR);
@@ -23,7 +13,7 @@ nnc_static void nnc_help() {
 nnc_static void nnc_check_for_errors() {
     if (nnc_error_occured()) {
         nnc_arena_fini(&glob_arena);
-        nnc_abort_no_ctx(sformat("%ld error(s) detected.\n", glob_error_canarie));
+        nnc_abort_no_ctx(sformat("%ld error(s) detected.\n", glob_canarie));
     }
     nnc_reset_canarie();
 }
@@ -48,33 +38,25 @@ nnc_static nnc_i32 nnc_shell(const char* desc, const char* what) {
 
 nnc_static void nnc_compile_pass1(const char* source) {
     nnc_check_for_errors();
-    glob_current_unit.ir = NULL;
-    glob_current_unit.impl = (nnc_assembly_file){0};
-    glob_current_unit.ast = nnc_parse(source);
-    glob_current_asm_file = &glob_current_unit.impl;
-    nnc_blob_buf_init(&glob_current_asm_file->data_segment_impl);
+    glob_ir = NULL, glob_compiled = NULL;
+    glob_ast = nnc_parse(source);
+    glob_asm_file = (nnc_asm_file){0};
+    nnc_blob_buf_init(&glob_asm_file.ds_impl);
     nnc_check_for_errors();
 }
 
 nnc_static void nnc_compile_pass2() {
-    for (nnc_u64 i = 0; i < buf_len(glob_current_unit.ast->root); i++) {
+    nnc_u64 len = buf_len(glob_ast->root);
+    for (nnc_u64 i = 0; i < len; i++) {
         TRY {
-            nnc_resolve_stmt(
-                glob_current_unit.ast->root[i], 
-                glob_current_unit.ast->st
-            );
+            nnc_resolve_stmt(glob_ast->root[i], glob_ast->st);
             ETRY;
         }
         CATCHALL {
             NNC_SHOW_CATCHED(&CATCHED.where);
         }
         if (!nnc_error_occured()) {
-            nnc_ir_glob_sym sym = nnc_gen_ir(
-                glob_current_unit.ast->root[i],
-                glob_current_unit.ast->st
-            );
-            buf_add(glob_current_unit.ir, sym);
-            nnc_gen(&sym);
+            nnc_gen(nnc_gen_ir(glob_ast->root[i], glob_ast->st));
         }
     }
     nnc_check_for_errors();
@@ -87,21 +69,20 @@ nnc_static void nnc_compilation_fini() {
 
 nnc_static void nnc_compile() {
     char dot_star[MAX_PATH] = {0};
-    glob_current_unit = (nnc_unit){0};
     for (nnc_u64 i = 0; i < buf_len(glob_argv.sources); i++) {
         nnc_compile_pass1(glob_argv.sources[i]);
         nnc_compile_pass2();
-        buf_add(glob_current_unit.compiled, nnc_build(glob_current_unit.impl));
+        buf_add(glob_compiled, nnc_build(&glob_asm_file));
         sprintf(dot_star, "%s.s", glob_argv.sources[i]);
         nnc_create_file(dot_star);
-        nnc_write_blob(dot_star, &glob_current_unit.compiled[i]);
+        nnc_write_blob(dot_star, &glob_compiled[i]);
         if (glob_argv.dump_ir) {
             sprintf(dot_star, "%s.ir", glob_argv.sources[i]);
-            nnc_dump_ir(nnc_create_file2(dot_star), glob_current_unit.ir);
+            nnc_dump_ir(nnc_create_file2(dot_star), glob_ir);
         }
         if (glob_argv.dump_ast) {
             sprintf(dot_star, "%s.ast", glob_argv.sources[i]);
-            nnc_dump_ast(nnc_create_file2(dot_star), glob_current_unit.ast);
+            nnc_dump_ast(nnc_create_file2(dot_star), glob_ast);
         }
         nnc_compilation_fini();
     }
@@ -127,7 +108,7 @@ nnc_static void nnc_assemble() {
 }
 
 nnc_static void nnc_link() {
-    char* ld_params = " ";
+    char* ld_params = " --dynamic-linker=/lib64/ld-linux-x86-64.so.2 ";
     char dot_o[MAX_PATH] = {0};
     nnc_u64 size = buf_len(glob_argv.sources);
     for (nnc_u64 i = 0; i < size; i++) {

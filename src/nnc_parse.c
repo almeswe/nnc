@@ -1,4 +1,5 @@
 #include "nnc_parse.h"
+#include "nnc_state.h"
 
 void nnc_parser_init(nnc_parser* out_parser, const char* file) {
     nnc_lex_init(&out_parser->lex, file);

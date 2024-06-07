@@ -95,8 +95,6 @@ typedef struct _nnc_exception_stack {
     nnc_exception thrown;                           // represents last thrown exception, this field is used by `CATCHED` macro.
 } nnc_exception_stack;
 
-extern nnc_exception_stack glob_exception_stack;
-
 /**
  * @brief Performs behaviour as `try` statement has. 
  * @param state Returned value from `setjmp` call. If 0, try statement was executed first time,

@@ -22,8 +22,6 @@ typedef struct _nnc_error {
     char placeholder;
 } _nnc_error;
 
-extern nnc_error_canarie glob_error_canarie;
-
 void nnc_warning(const char* what, const nnc_ctx* ctx);
 void nnc_error(const char* what, const nnc_ctx* ctx);
 void nnc_abort(const char* what, const nnc_ctx* ctx);

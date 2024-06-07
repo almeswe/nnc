@@ -86,7 +86,6 @@ typedef struct _nnc_verbose {
     char* as_params;
 } nnc_verbose;
 
-extern nnc_argv glob_argv;
 extern nnc_verbose glob_verbose;
 
 void nnc_glob_argv_init(

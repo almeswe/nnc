@@ -1,4 +1,5 @@
 #include "nnc_arena.h"
+#include "nnc_state.h"
 
 /**
  * @brief Allocates & initializes arena entry instance.

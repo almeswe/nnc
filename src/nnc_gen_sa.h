@@ -3,22 +3,30 @@
 
 #include "nnc_3a.h"
 
-#define LOCATION_MEM (L_DATA | L_LOCAL_STACK | L_PARAM_STACK)
-#define IS_LOCATION_MEM(x) ((x & LOCATION_MEM) > 0)
+extern const char* glob_reg_str[];
 
-typedef enum _nnc_location_type {
-    L_NONE        = 0b000001,
-    L_REG         = 0b000010,
-    L_DATA        = 0b000100,
-    //todo: make just stack, not param or local (wtf)
-    L_LOCAL_STACK = 0b001000,
-    L_PARAM_STACK = 0b010000,
-    L_IMM         = 0b100000
-} nnc_loc_type, nnc_location_type;
+/**
+ * @brief Readable type for describing memory offset.
+ */
+typedef nnc_i16 nnc_mem;
 
-typedef nnc_i64 nnc_memory;
+/**
+ * @brief Readable type for describing Data Segment Label.
+ */
+typedef char* nnc_dsl;
 
-typedef enum _nnc_x86_64_register {
+/**
+ * @brief Readable type for describing immediate value.
+ */
+typedef union _nnc_imm {
+    nnc_u64 u;
+    nnc_i64 d;
+} nnc_imm;
+
+/**
+ * @brief x86_64 Registers.
+ */
+typedef enum _nnc_x86_64_reg {
     /* General purpose x86_64 (used) registers */
     R_RAX, R_RBX,
     R_RCX, R_RDX,
@@ -30,99 +38,140 @@ typedef enum _nnc_x86_64_register {
     /* SIMD extension registers */
     R_XMM0, R_XMM1, R_XMM2, R_XMM3,
     R_XMM4, R_XMM5, R_XMM6, R_XMM7
-} nnc_register;
+} nnc_reg;
 
-typedef struct _nnc_location {
-    nnc_memory offset;
-    nnc_register reg;
-    char* ds_name;
-    nnc_loc_type where;
-    nnc_u64 imm;
-    const nnc_type* type;
-    nnc_bool dereference;
+/**
+ * @brief Location kind. 
+ */
+typedef enum _nnc_loc_where {
+    L_IMM   = 0b00001, // Immediate location, represents 
+                       // operand as contant value.
+    L_REG   = 0b00010, // Register.
+    L_DATA  = 0b00100, // Data segment. Strings and global
+                       // variables are stored here.
+    L_NONE  = 0b01000, // No location. Indicator for exceptional situation.
+    L_STACK = 0b10000, // Stack memory.
+
+    L_MEM   = L_STACK | L_DATA // General memory location.
+} nnc_loc_where;
+
+/**
+ * @brief Location. Represents placement of the 
+ *  quad address as assembly instruction operand.
+ */
+typedef struct _nnc_loc {
+    nnc_bool deref; // Indicates if this location 
+                    // should be dereferenced.
+    nnc_bool has_offset; // Indicates if this location
+                         // has `offset` keyword
+    union _nnc_loc_exact {
+        nnc_mem mem; // Exact offset in stack memory. 
+                     // Can be positive or negative.
+        nnc_reg reg; // Exact register.
+        nnc_dsl dsl; // Exact data segment label.
+        nnc_imm imm; // Exact immediate value.
+    } exact;
+    nnc_loc_where where;  // where location is presented
+    const nnc_type* type; // type of the address
 } nnc_loc, nnc_location;
 
-typedef struct _nnc_call_stack_state {
-    const nnc_3a_addr* res;
-    nnc_u8 alloc_idx;
-    nnc_u8 alloc_simd_idx;
-    vector(nnc_register) pushed;
-    nnc_u32 offset;
-    nnc_bool rax_pushed;
-    nnc_bool xmm0_pushed;
-    nnc_u64 call_ptr;
-} nnc_call_stack_state;
+/**
+ * @brief Class of the function parameter according
+ *  to x86_64 System V ABI.
+ */
+typedef enum _nnc_pclass {
+    C_NONE,
+    C_INTEGER,
+    C_SSE,
+    C_SSEUP,
+    C_x87,
+    C_x87UP,
+    C_COMPLEX_x87,
+    C_NO_CLASS,
+    C_MEMORY
+} nnc_pclass;
 
-typedef struct _nnc_caller_state {
-    nnc_u8 alloc_int_reg_idx;
-    nnc_u8 alloc_sse_reg_idx;
-    vector(nnc_register) reg_preserved;
-    nnc_u32 stack_ptr;
-    nnc_bool rax_preserved;
-    nnc_bool xmm_preserved;
-} nnc_caller_state;
+/**
+ * @brief Structure that holds state for allocating 
+ *  parameter classes for function parameters.
+ * todo: Only INTEGER and MEMORY classes are supported.
+ */
+typedef struct _nnc_pclass_state {
+    nnc_u8 int_iter;
+    nnc_u8 sse_iter;
+    nnc_bool was_init;
+    // ...
+} nnc_pclass_state;
 
-typedef struct _nnc_callee_state {
-    // callee preserved registers
-    // possible values according to x86_64 ABI: 
-    //  rbx, rsp, rbp, r12 - r15.
-    vector(nnc_register) reg_preserved;
-    // live range information for each register
-    vector(nnc_3a_lr*) reg_lr[21];
-    // junk level information for each register
-    nnc_u8 reg_junk[21];
-    // size of stack used by callee
-    nnc_u32 stack_size;
-} nnc_callee_state;
-
-#define glob_current_call_state (&buf_last(glob_call_stack))
-
-extern vector(nnc_call_stack_state) glob_call_stack;
-
-extern nnc_3a_proc* glob_current_proc;
-extern const char* glob_reg_str[];
-
-void nnc_call_stack_state_init(
-    const nnc_register* do_not_touch
+/**
+ * @brief Pushes register. It means that from this moment it can be allocated for use.
+ * @param reg Register to be pushed.
+ */
+void nnc_push_reg(
+    const nnc_reg reg
 );
 
-void nnc_call_stack_state_next(
-    const nnc_3a_addr* param
+/**
+ * @brief Reserves register. If specified register is in use, pushes it.
+ * To unreserve register, call `nnc_unreserve_reg`.
+ * @param reg Register to be reserved.
+ * @return Register was pushed or not.
+ */
+nnc_bool nnc_reserve_reg(
+    const nnc_reg reg
 );
 
-void nnc_call_stack_state_fini();
-
-nnc_loc nnc_store_arg(
-    const nnc_3a_addr* arg
+/**
+ * @brief Unreserves register.
+ * @param reg Register to be unreserved.
+ */
+void nnc_unreserve_reg(
+    const nnc_reg reg
 );
 
-nnc_loc nnc_spill_param(
-    const nnc_3a_addr* param
-);
-
-nnc_loc nnc_store_param(
-    const nnc_3a_addr* param
-);
-
+/**
+ * @brief Gets associated location with some address.
+ * @param addr Address for which to search.
+ * @return Some location or `NULL`.
+ */
 const nnc_loc* nnc_get_loc(
     const nnc_3a_addr* addr
 );
 
-void nnc_push_reg(
-    nnc_register reg
+/**
+ * @brief Gets parameter class of the parameter's type.
+ *  Can be used for generating function call and storing function
+ *  parameters inside callee function. 
+ * @param p_type Type of the parameter.
+ * @param state State used accross different `nnc_get_pclass` calls.
+ * @return Class of the parameter.
+ */
+nnc_pclass nnc_get_pclass(
+    const nnc_type* p_type,
+    nnc_pclass_state* state
 );
 
-nnc_bool nnc_reserve_reg(
-    nnc_register reg
-);
-
-void nnc_unreserve_reg(
-    nnc_register reg
-);
-
+/**
+ * @brief Stores any kind of address in some location.
+ * @param addr Address to be stored.
+ * @return Location. If `.where` is L_NONE, nothing happened.
+ *  (but see the implementation, may be this is a bug)
+ */
 nnc_loc nnc_store(
-    const nnc_3a_addr* addr,
-    nnc_bool globally
+    const nnc_3a_addr* addr
 );
 
-#endif 
+/**
+ * @brief Stores function parameter (or argument in a call) 
+ * @param addr Address to be stored.
+ * @param pclass Class of the parameter. 
+ *  Helps to correctly store the address.  
+ * @return Location. If `.where` is L_NONE, nothing happened.
+ *  (but see the implementation, may be this is a bug)
+ */
+nnc_loc nnc_store_param(
+    const nnc_3a_addr* addr,
+    const nnc_pclass pclass
+);
+
+#endif
