@@ -30,7 +30,6 @@ typedef struct _nnc_arena {
     nnc_arena_entry** entries;
 } nnc_arena;
 
-extern nnc_arena glob_arena;
 extern void nnc_abort_no_ctx(const char* what);
 
 void nnc_arena_init(nnc_arena* out_arena);

@@ -350,7 +350,7 @@ typedef struct _nnc_ir_glob_sym {
         nnc_ir_var var;
         nnc_ir_proc proc;
     } sym;
-} nnc_ir_glob_sym;
+} nnc_ir_glob_sym, nnc_ir_sym;
 
 void nnc_dump_ir(
     FILE* fp,

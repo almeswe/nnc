@@ -1,6 +1,6 @@
 #include "nnc_argv.h"
+#include "nnc_state.h"
 
-nnc_argv glob_argv = {0};
 nnc_verbose glob_verbose = {0};
 
 nnc_static nnc_option glob_nnc_opts[] = {

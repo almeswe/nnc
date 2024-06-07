@@ -1,4 +1,5 @@
 #include "nnc_lex.h"
+#include "nnc_state.h"
 
 #define NNC_LEX_MATCH(c)     (lex->cc == c)
 #define NNC_LEX_NOT_MATCH(c) (lex->cc != c)

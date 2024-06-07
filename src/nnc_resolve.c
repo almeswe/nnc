@@ -1,7 +1,5 @@
 #include "nnc_resolve.h"
-#include "nnc_typecheck.h"
-#include "nnc_expression.h"
-#include "nnc_3a.h"
+#include "nnc_state.h"
 
 /**
  * @brief Resolves & determines size of specified type. (in bytes)
