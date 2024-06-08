@@ -269,16 +269,16 @@ nnc_static void nnc_put_loc(const nnc_loc* loc, const nnc_3a_addr* addr) {
     //printf("-- %s::nnc_put_loc::map_put_s %p len: %u cap: %u\n", glob_current_proc->name, glob_loc_map, glob_loc_map->len, glob_loc_map->cap);
 }
 
-nnc_static nnc_loc nnc_make_reg_loc(const nnc_reg reg, const nnc_3a_addr* addr) {
+nnc_static nnc_loc* nnc_make_reg_loc(const nnc_reg reg, const nnc_3a_addr* addr) {
     nnc_loc* loc = nnc_new(nnc_loc);
     loc->where = L_REG;
     loc->type = addr->type;
     loc->exact.reg = reg;
     nnc_put_loc(loc, addr);
-    return *loc;
+    return loc;
 }
 
-nnc_static nnc_loc nnc_make_ds_loc(const nnc_3a_addr* addr) {
+nnc_static nnc_loc* nnc_make_ds_loc(const nnc_3a_addr* addr) {
     char internal_buf[LOC_LABEL_SIZE] = {0};
     nnc_make_loc_label(internal_buf, addr);
     nnc_loc* loc = nnc_new(nnc_loc);
@@ -286,17 +286,17 @@ nnc_static nnc_loc nnc_make_ds_loc(const nnc_3a_addr* addr) {
     loc->type = addr->type;
     loc->exact.dsl = nnc_strdup(internal_buf);
     nnc_put_loc(loc, addr);
-    return *loc;
+    return loc;
 }
 
-nnc_static nnc_loc nnc_make_ss_loc(const nnc_3a_addr* addr) {
+nnc_static nnc_loc* nnc_make_ss_loc(const nnc_3a_addr* addr) {
     nnc_loc* loc = nnc_new(nnc_loc);
     glob_asm_proc->local_stack_offset += nnc_sizeof(addr->type);
     loc->where = L_STACK;
     loc->type = addr->type;
     loc->exact.mem = -glob_asm_proc->local_stack_offset;
     nnc_put_loc(loc, addr);
-    return *loc;
+    return loc;
 }
 
 /**
@@ -343,13 +343,19 @@ nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
         const nnc_3a_lr* top_lr = nnc_peek_reg(p_vec[i]);
         // if current register's live range does not intersects
         // with specified live range, allocate this register
-        if (nnc_lr_intersects(lr, top_lr)) {
-            continue;
+        if (!nnc_lr_intersects(lr, top_lr)) {
+            nnc_update_reg(p_vec[i], lr);
+            loc = nnc_make_reg_loc(p_vec[i], addr);
+            break;
         }
-        nnc_update_reg(p_vec[i], lr);
-        return nnc_make_reg_loc(p_vec[i], addr);
     }
-    return nnc_make_ss_loc(addr);
+    // if loc is NULL it means it was not allocated in register,
+    // so it must be allocated on stack.
+    if (loc == NULL) {
+        loc = nnc_make_ss_loc(addr);
+    }
+    assert(loc != NULL);
+    return *loc;
 }
 
 /**
@@ -360,18 +366,20 @@ nnc_loc nnc_store_cgt(const nnc_3a_addr* addr) {
  */
 nnc_loc nnc_store_var(const nnc_3a_addr* addr) {
     assert(addr && addr->kind == ADDR_NAME);
+    nnc_loc* loc = NULL;
     nnc_ident_ctx ictx = addr->exact.name.ictx;
     if (ictx == IDENT_GLOBAL ||
         ictx == IDENT_FUNCTION) {
-        nnc_loc loc = nnc_make_ds_loc(addr);
+        loc = nnc_make_ds_loc(addr);
         if (ictx == IDENT_FUNCTION) {
-            loc.has_offset = true;
+            loc->has_offset = true;
         }
-        return loc;
     }
     else {
-        return nnc_make_ss_loc(addr);
+        loc = nnc_make_ss_loc(addr);
     }
+    assert(loc != NULL);
+    return *loc;
 }
 
 /**
@@ -382,9 +390,9 @@ nnc_loc nnc_store_var(const nnc_3a_addr* addr) {
  */
 nnc_loc nnc_store_str(const nnc_3a_addr* addr) {
     assert(addr->kind == ADDR_SCONST);
-    nnc_loc loc = nnc_make_ds_loc(addr);
-    loc.has_offset = true;
-    return loc;
+    nnc_loc* loc = nnc_make_ds_loc(addr);
+    loc->has_offset = true;
+    return *loc;
 }
 
 /**
