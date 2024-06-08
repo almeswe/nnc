@@ -794,11 +794,18 @@ nnc_static void nnc_if_stmt_to_3a(const nnc_if_statement* if_stmt, const nnc_st*
     nnc_3a_quads_add(&b_true);
 }
 
+nnc_static void nnc_let_stmt_hint(const nnc_let_statement* let_stmt, const nnc_st* st) {
+    nnc_3a_quad hint_quad = { .op = OP_HINT_DECL_LOCAL };
+    hint_quad.res = nnc_3a_mkname1(let_stmt->var);
+    nnc_3a_quads_add(&hint_quad);
+}
+
 nnc_static void nnc_let_stmt_to_3a(const nnc_let_statement* let_stmt, const nnc_st* st) {
-    if (let_stmt->init == NULL) {
+    if (SCOPE_GLOBAL(st) || SCOPE_NAMESPACE(st)) {
         return;
     }
-    if (SCOPE_GLOBAL(st) || SCOPE_NAMESPACE(st)) {
+    nnc_let_stmt_hint(let_stmt, st);
+    if (let_stmt->init == NULL) {
         return;
     }
     nnc_expr_to_3a(let_stmt->init, st);

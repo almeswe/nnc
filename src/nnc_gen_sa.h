@@ -36,8 +36,10 @@ typedef enum _nnc_x86_64_reg {
     R_R12, R_R13,
     R_R14, R_R15,
     /* SIMD extension registers */
-    R_XMM0, R_XMM1, R_XMM2, R_XMM3,
-    R_XMM4, R_XMM5, R_XMM6, R_XMM7
+    R_XMM0, R_XMM1, 
+    R_XMM2, R_XMM3,
+    R_XMM4, R_XMM5,
+    R_XMM6, R_XMM7
 } nnc_reg;
 
 /**
