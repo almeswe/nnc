@@ -33,7 +33,7 @@ fn println_nums(val1: u32, val2: u32) {
     println_num(val2);
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
     let a: i32 = 12;
     let b: i32 = 34;
     let c: i32 = 56;

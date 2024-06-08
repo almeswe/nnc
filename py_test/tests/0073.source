@@ -6,7 +6,7 @@ type struct {
     s1: S1;
 } as S2;
 
-fn main(): i32 {
+pub fn main(): i32 {
     let s2: S2;
     s2.s1.x = 1;
     return s2.s1.x - 1;

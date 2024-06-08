@@ -1,8 +1,6 @@
 let c: i32;
 
-fn
-main(): i32
-{
+pub fn main(): i32 {
 	if(0) {
 		return 1;
 	} 

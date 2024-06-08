@@ -1,12 +1,8 @@
-fn
-voidfn()
-{
+pub fn voidfn() {
     return;
 }
 
-fn
-main(): i32
-{
+pub fn main(): i32 {
     voidfn();
     return 0;
 }

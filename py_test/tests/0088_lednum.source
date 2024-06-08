@@ -178,7 +178,7 @@ fn print_led(x: u32, buf: u8*) {
  }
 
 
-fn main(argc: i32, argv: u8**): i32 {
+pub fn main(argc: i32, argv: u8**): i32 {
     let buf: u8[5*MAX_DIGITS];
     memset(buf, 0u8, (i32)lengthof(buf));
     print_led(1234567, buf);

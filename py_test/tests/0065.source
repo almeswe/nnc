@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     a[0] = 5;
     a[2] = 2;
     a[3] = 3;

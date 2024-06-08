@@ -3,6 +3,6 @@ type i32 as myint;
 //evaluation problem
 let x: myint = (myint)0xffffffffffffffffu64;
 
-fn main(): i32 {
+pub fn main(): i32 {
     return x - (i32)(0 - 1);
 }

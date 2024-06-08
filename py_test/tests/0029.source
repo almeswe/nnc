@@ -2,7 +2,7 @@ fn f(): i32 {
     return 100;
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
 	if (f() > 1000) {
 		return 1;
     }

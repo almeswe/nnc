@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     let v_u8: u8 = 255u8;
     let v_i8: i8 = 0i8 - 1i8;
     if ((u8)v_u8 != 0xffu8) {

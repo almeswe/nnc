@@ -7,7 +7,7 @@ type struct {
 } as s;
 
 
-fn main(): i32 {
+pub fn main(): i32 {
     let v: s;
     v.x = 1;
     v.nest.y = 2;

@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     let p: u8*;
     p = "hello";
     return p[0] - 104;
