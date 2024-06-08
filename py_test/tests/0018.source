@@ -3,7 +3,7 @@ type struct {
     x: i32;
 } as s_t;
 
-fn main(): i32 {
+pub fn main(): i32 {
     let s: s_t;
     s.x = 0;
     s.p = &s;

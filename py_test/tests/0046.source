@@ -2,7 +2,7 @@ let x: i32 = 5;
 let y: i64 = 6;
 let p: i32*;
 
-fn main(): i32 {
+pub fn main(): i32 {
     p = &x;
     if (x != 5) {
 		return 1;

@@ -36,7 +36,7 @@ fn factorial(i: u32): u32 {
     }
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
     for (let count: i32 = 1; count <= 10; count = count + 1) {
         println_num(factorial(count));
     }

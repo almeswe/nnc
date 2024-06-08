@@ -2,16 +2,12 @@ type struct {
     fptr: fn(): i32;
 } as S;
 
-fn
-main(): i32
-{
+pub fn main(): i32 {
 	let v: S;
 	v.fptr = foo;
 	return v.fptr();
 }
 
-fn
-foo(): i32
-{
+fn foo(): i32 {
 	return 0;
 }

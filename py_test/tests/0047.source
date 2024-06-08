@@ -16,7 +16,7 @@ type struct {
     };
 } as s;
 
-fn main(): i32 {
+pub fn main(): i32 {
     let v: s;
     v.a = 1;
     v.b._1 = 2;

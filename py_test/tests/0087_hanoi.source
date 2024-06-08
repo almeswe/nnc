@@ -121,7 +121,7 @@ fn Hanoi(n: i32, source: i32*, dest: i32*, spare: i32*) {
     return;
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
    let i: i32;
 
    ///* initialize the towers */

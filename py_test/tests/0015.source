@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     let arr: i32[2];
     let p: i32*;
     p = &arr[1];

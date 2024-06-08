@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     let n: i32;
     let t: i32;
     let c: i32;

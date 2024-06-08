@@ -6,6 +6,6 @@ fn t1(a: i32, b: i32, c: i32): i32 {
     return t2(b, c, a);
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
     return t1(1, 2, 3);
 }

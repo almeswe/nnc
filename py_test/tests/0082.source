@@ -31,7 +31,7 @@ fn print_crlf() {
     write(stdout, "\r\n", 2u32);
 }
 
-fn main(): u64 {
+pub fn main(): u64 {
     let buflen: i32 = (i32)lengthof(buf);
     if (checksum(buf, buflen) != 0) {
         return 1;

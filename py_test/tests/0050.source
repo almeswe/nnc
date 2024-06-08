@@ -1,4 +1,4 @@
-fn main(): i32 {
+pub fn main(): i32 {
     let s: u8*;
     s = "abc" "def" "";
     if(s[0] != 'a') {return 1;}

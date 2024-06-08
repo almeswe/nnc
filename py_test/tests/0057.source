@@ -1,6 +1,6 @@
 type fn(u8*): i32 as f1;
 
-fn main(): i32 {
+pub fn main(): i32 {
     let fnc: f1 = f;
     let s: u8 = 1u8;
     let v: i32[1000];

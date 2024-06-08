@@ -3,7 +3,7 @@ type union {
     b: i32;
 } as u_t;
 
-fn main(): i32 {
+pub fn main(): i32 {
     let u: u_t;
     u.a = 1;
     u.b = 3;

@@ -6,7 +6,7 @@ fn strlen(p: u8*): i32 {
     return len;
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
     let p: u8*;
     p = "hello";
     return strlen(p) - 5;

@@ -6,7 +6,7 @@ fn one(): i32 {
     return 1;
 }
 
-fn main(): i32 {
+pub fn main(): i32 {
     let x: i32;
     let y: i32;
 
