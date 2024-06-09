@@ -35,7 +35,4 @@ typedef struct _nnc_cstate {
 
 extern nnc_cstate glob_state;
 
-void nnc_reset_glob_state();
-void nnc_reset_curr_state();
-
 #endif
