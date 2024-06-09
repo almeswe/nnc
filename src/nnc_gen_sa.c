@@ -114,6 +114,11 @@ nnc_static void nnc_update_reg(nnc_reg reg, nnc_3a_lr* by) {
     }
 }
 
+void nnc_pop_reg(nnc_reg reg) {
+    assert(!nnc_reg_lr_empty(reg));
+    buf_pop(glob_lr_vec[reg]);
+}
+
 void nnc_push_reg(nnc_reg reg) {
     vector(nnc_3a_lr*) lr = glob_lr_vec[reg];
     assert(buf_last(lr) != NULL);
@@ -299,6 +304,57 @@ nnc_static nnc_loc* nnc_make_ss_loc(const nnc_3a_addr* addr) {
     return loc;
 }
 
+nnc_static void nnc_pclass_state_push_regs(nnc_pclass_state* state) {
+    assert(state->pushed == NULL);
+    const vector(nnc_reg) p_vec = _int_p_param;
+    nnc_u64 p_len = nnc_arr_size(_int_p_param);
+    for (nnc_u64 i = 0; i < p_len; i++) {
+        const nnc_reg reg = p_vec[i];
+        if (nnc_reg_in_use(reg)) {
+            nnc_push_reg(reg);
+            buf_add(state->pushed, reg);
+        }
+    }
+}
+
+/**
+ * @brief Resets vector which contains all live-range information.
+ */
+void nnc_reset_lr_vec() {
+    for (nnc_u64 i = 0; i < nnc_arr_size(glob_lr_vec); i++) {
+        buf_free(glob_lr_vec[i]);
+    }
+    memset(glob_lr_vec, 0, sizeof(glob_lr_vec));
+}
+
+/**
+ * @brief Callback function for relocating global scope symbols to new map.
+ */
+nnc_static void nnc_reloc_glob_sym(nnc_map_key key, nnc_map_val val) {
+    const char* label = (char*)key;
+    const nnc_loc* loc = (nnc_loc*)val;
+    if (loc->where != L_DATA) {
+        nnc_dispose((nnc_heap_ptr)key);
+        nnc_dispose((nnc_heap_ptr)val);
+    }
+    else {
+        map_put_s(glob_loc_map, label, loc);
+    }
+}
+
+/**
+ * @brief Resets map of address (`nnc_3a_addr`) to location (`nnc_loc`) association map.
+ */
+void nnc_reset_loc_map() {
+    if (glob_loc_map == NULL) {
+        return;
+    }
+    nnc_map* prev_loc_map = glob_loc_map;
+    glob_loc_map = map_init();
+    nnc_map_iter(prev_loc_map, nnc_reloc_glob_sym);
+    map_fini(prev_loc_map);
+}
+
 /**
  * @brief Gets parameter class of the parameter's type.
  *  Can be used for generating function call and storing function
@@ -311,9 +367,7 @@ nnc_pclass nnc_get_pclass(const nnc_type* p_type, nnc_pclass_state* state) {
     assert(state != NULL);
     nnc_type* u_type = nnc_unalias(p_type);
     if (!state->was_init) {
-        state->was_init = true;
-        state->int_iter = 0;
-        state->sse_iter = 0;
+        nnc_pclass_state_init(state);
     }
     assert(!nnc_real_type(u_type));
     assert(!nnc_incomplete_type(u_type));
@@ -323,6 +377,32 @@ nnc_pclass nnc_get_pclass(const nnc_type* p_type, nnc_pclass_state* state) {
         return C_INTEGER;
     }
     return C_MEMORY;
+}
+
+/**
+ * @brief Initializes new state for function parameter/argument location allocator.
+ * @param state Pointer to uninitialized state.
+ */
+void nnc_pclass_state_init(nnc_pclass_state* state) {
+    assert(!state->was_init);
+    state->was_init = true;
+    state->int_iter = 0;
+    state->sse_iter = 0;
+    state->pushed = NULL;
+    nnc_pclass_state_push_regs(state);
+}
+
+/**
+ * @brief Finalizes state for function parameter/argument location allocator.
+ * @param state Pointer to initialized state.
+ */
+void nnc_pclass_state_fini(nnc_pclass_state* state) {
+    const vector(nnc_reg) p_vec = state->pushed;
+    nnc_u64 p_len = buf_len(p_vec);
+    for (nnc_u64 i = 0; i < p_len; i++) {
+        nnc_pop_reg(p_vec[i]);
+    }
+    buf_free(state->pushed);
 }
 
 /**
@@ -442,4 +522,33 @@ nnc_loc nnc_store(const nnc_3a_addr* addr) {
         }
     }
     return (nnc_loc){ .where = L_NONE };
+}
+
+nnc_static nnc_loc nnc_store_int_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
+    const vector(nnc_reg) p_vec = _int_p_param;
+    nnc_u64 p_len = nnc_arr_size(_int_p_param);
+    const nnc_reg reg = p_vec[state->int_iter-1]; 
+    nnc_reserve_reg(reg);
+    return (nnc_loc){ .type = addr->type, .where = L_REG, .exact.reg = reg };
+}
+
+nnc_static nnc_loc nnc_store_mem_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
+    // PS_QWORD specified because parameters will be pushed on stack
+    assert(nnc_sizeof(addr->type) <= PS_QWORD);
+    state->on_stack += PS_QWORD;
+    return (nnc_loc){ .type = addr->type, .where = L_STACK };
+}
+
+nnc_loc nnc_store_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
+    assert(addr != NULL);
+    assert(state != NULL && state->was_init);
+    nnc_pclass pclass = nnc_get_pclass(addr->type, state);
+    switch (pclass) {
+        case C_MEMORY:  return nnc_store_mem_param(addr, state);
+        case C_INTEGER: return nnc_store_int_param(addr, state); 
+        default: {
+            nnc_abort_no_ctx("nnc_store_param: unknown pclass.\n");
+        }
+    }
+    return (nnc_loc){0};
 }

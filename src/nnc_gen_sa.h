@@ -101,8 +101,12 @@ typedef enum _nnc_pclass {
 typedef struct _nnc_pclass_state {
     nnc_u8 int_iter;
     nnc_u8 sse_iter;
+    nnc_u32 on_stack;
     nnc_bool was_init;
+    nnc_bool was_res_pushed;
     // ...
+    const nnc_3a_addr* res;
+    vector(nnc_reg) pushed;
 } nnc_pclass_state;
 
 /**
@@ -141,6 +145,16 @@ const nnc_loc* nnc_get_loc(
 );
 
 /**
+ * @brief Resets vector which contains all live-range information.
+ */
+void nnc_reset_lr_vec();
+
+/**
+ * @brief Resets map of addr to loc association map.
+ */
+void nnc_reset_loc_map();
+
+/**
  * @brief Gets parameter class of the parameter's type.
  *  Can be used for generating function call and storing function
  *  parameters inside callee function. 
@@ -150,6 +164,22 @@ const nnc_loc* nnc_get_loc(
  */
 nnc_pclass nnc_get_pclass(
     const nnc_type* p_type,
+    nnc_pclass_state* state
+);
+
+/**
+ * @brief Initializes new state for function parameter/argument location allocator.
+ * @param state Pointer to uninitialized state.
+ */
+void nnc_pclass_state_init(
+    nnc_pclass_state* state
+);
+
+/**
+ * @brief Finalizes state for function parameter/argument location allocator.
+ * @param state Pointer to initialized state.
+ */
+void nnc_pclass_state_fini(
     nnc_pclass_state* state
 );
 
@@ -166,14 +196,12 @@ nnc_loc nnc_store(
 /**
  * @brief Stores function parameter (or argument in a call) 
  * @param addr Address to be stored.
- * @param pclass Class of the parameter. 
- *  Helps to correctly store the address.  
  * @return Location. If `.where` is L_NONE, nothing happened.
  *  (but see the implementation, may be this is a bug)
  */
 nnc_loc nnc_store_param(
     const nnc_3a_addr* addr,
-    const nnc_pclass pclass
+    nnc_pclass_state* state
 );
 
 #endif

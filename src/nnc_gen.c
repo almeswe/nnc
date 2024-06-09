@@ -3,6 +3,7 @@
 
 //todo: cfi or .loc directives??
 // https://sourceware.org/binutils/docs/as/
+// https://docs.oracle.com/cd/E53394_01/html/E54851/eoiyg.html
 
 #define nnc_mkloc_reg(r, t) (nnc_loc){ .where = L_REG, .exact.reg = r, .type = t }
 
@@ -12,11 +13,6 @@
 #define REG_HAS_JUNK_32 (4)
 #define REG_HAS_JUNK_64 (8)
 
-#define S_QWORD 8
-#define S_DWORD 4
-#define S_WORD  2
-#define S_BYTE  1
-
 #define NNC_STACK_ALIGN 16
 
 #define NNC_RT_PATH   "nnc_rt.o"
@@ -25,9 +21,6 @@
 #define NNC_CRTn_PATH "crtn.o"
 
 #define NNC_MEM_PAD_SIZE 8
-
-#define NNC_LABEL_PREFIX     ".l"
-#define NNC_RET_LABEL_PREFIX ".fini_"
 
 #define glob_quad glob_asm_proc->quads[glob_asm_proc->quad_pointer]
 
@@ -39,17 +32,19 @@
 #else
 #define GEN_NOTE(...)
 #endif
-nnc_static nnc_u8 glob_reg_junk_level[21] = {0};
+
+nnc_static nnc_u8 glob_junk_vec[21] = {0};
+nnc_static vector(nnc_pclass_state) glob_call_states = NULL;
 
 nnc_static const char* nnc_get_ptr_size(const nnc_type* type) {
     if (nnc_arr_or_ptr_type(type)) {
-        return "qword";
+        return P_QWORD;
     }
     switch (nnc_sizeof(type)) {
-        case S_BYTE:  return "byte";
-        case S_WORD:  return "word";
-        case S_DWORD: return "dword";
-        case S_QWORD: return "qword";
+        case PS_BYTE:  return P_BYTE;
+        case PS_WORD:  return P_WORD;
+        case PS_DWORD: return P_DWORD;
+        case PS_QWORD: return P_QWORD;
         default: {
             nnc_abort_no_ctx("nnc_get_ptr_size: unsupported size.\n");
         }
@@ -89,10 +84,10 @@ nnc_static const char* nnc_get_reg_of_size(nnc_reg reg, nnc_u64 size) {
     }
     else {
         switch (size) {
-            case S_BYTE:  return _int[reg][0];
-            case S_WORD:  return _int[reg][1];
-            case S_DWORD: return _int[reg][2];
-            case S_QWORD: return _int[reg][3];
+            case PS_BYTE:  return _int[reg][0];
+            case PS_WORD:  return _int[reg][1];
+            case PS_DWORD: return _int[reg][2];
+            case PS_QWORD: return _int[reg][3];
             default: {
                 nnc_abort_no_ctx("nnc_get_reg_of_size: unsupported size.\n");
             }
@@ -103,10 +98,10 @@ nnc_static const char* nnc_get_reg_of_size(nnc_reg reg, nnc_u64 size) {
 
 nnc_static const char* nnc_get_reg_of_type(nnc_reg reg, const nnc_type* type) {
     if (nnc_arr_or_ptr_type(type)) {
-        return nnc_get_reg_of_size(reg, S_QWORD);
+        return nnc_get_reg_of_size(reg, PS_QWORD);
     }
     if (nnc_real_type(type)) {
-        return nnc_get_reg_of_size(reg, S_QWORD);
+        return nnc_get_reg_of_size(reg, PS_QWORD);
     }
     else {
         return nnc_get_reg_of_size(reg, nnc_sizeof(type));
@@ -134,13 +129,13 @@ nnc_static void nnc_pollute(nnc_reg reg, nnc_u8 amount) {
         amount == 4 ||
         amount == 8
     );
-    glob_reg_junk_level[reg] = amount;
+    glob_junk_vec[reg] = amount;
 }
 
 nnc_static nnc_bool nnc_gen_reserve_reg(nnc_reg reg) {
     nnc_bool need_push = nnc_reserve_reg(reg);
     if (need_push) {
-        GEN_INST("push");
+        GEN_INST(I_PUSH);
         GEN_TEXT("%s\n", glob_reg_str[reg]);
     }
     return need_push;
@@ -149,7 +144,7 @@ nnc_static nnc_bool nnc_gen_reserve_reg(nnc_reg reg) {
 nnc_static void nnc_gen_pop_reg(nnc_reg reg, nnc_bool pushed) {
     nnc_unreserve_reg(reg);
     if (pushed) {
-        GEN_INST("pop");
+        GEN_INST(I_POP);
         GEN_TEXT("%s\n", glob_reg_str[reg]);
         nnc_pollute(reg, REG_HAS_JUNK_64);
     }
@@ -207,10 +202,10 @@ nnc_static void nnc_gen_operand(const nnc_3a_addr* addr, const nnc_type* type) {
 
 nnc_static void nnc_gen_xor_reg(const nnc_loc* at) {
     assert(at && at->where == L_REG);
-    nnc_u64 junk = glob_reg_junk_level[at->exact.reg];
+    nnc_u64 junk = glob_junk_vec[at->exact.reg];
     if (junk != REG_HAS_JUNK_0) {
         const char* reg_str = nnc_get_reg_of_size(at->exact.reg, junk);
-        GEN_INST("xor");
+        GEN_INST(I_XOR);
         GEN_TEXT("%s,%s\n", reg_str, reg_str);
     }
     nnc_pollute(at->exact.reg, REG_HAS_JUNK_0);
@@ -219,13 +214,13 @@ nnc_static void nnc_gen_xor_reg(const nnc_loc* at) {
 nnc_static void nnc_gen_erase_reg(const nnc_loc* at) {
     assert(at && at->where == L_REG);
     nnc_u64 size = REG_HAS_JUNK_64;
-    nnc_u64 junk = glob_reg_junk_level[at->exact.reg];
+    nnc_u64 junk = glob_junk_vec[at->exact.reg];
     if (!nnc_arr_type(at->type)) {
         size = nnc_sizeof(at->type);
     }
     // make it not generate xor when trashed by 64bits, but write 32bits.
     if (junk != REG_HAS_JUNK_0  &&
-        junk == REG_HAS_JUNK_64 && size == S_DWORD) {
+        junk == REG_HAS_JUNK_64 && size == PS_DWORD) {
         nnc_pollute(at->exact.reg, REG_HAS_JUNK_32);
     }
     else {
@@ -238,7 +233,7 @@ nnc_static void nnc_gen_erase_reg(const nnc_loc* at) {
 }
 
 nnc_static nnc_bool nnc_gen_int_conv(const nnc_loc* dst_loc, const nnc_loc* src_loc) {
-    const char* i_mov = "mov";
+    nnc_asm_inst i_mov = I_MOV;
     nnc_u64 dst_type_size = nnc_sizeof(dst_loc->type);
     nnc_u64 src_type_size = nnc_sizeof(src_loc->type);
     nnc_bool is_u = nnc_unsigned_type(dst_loc->type);
@@ -246,33 +241,33 @@ nnc_static nnc_bool nnc_gen_int_conv(const nnc_loc* dst_loc, const nnc_loc* src_
         return false;
     }
     switch (dst_type_size) {
-        case S_BYTE: {
-            i_mov = "mov";
+        case PS_BYTE: {
+            i_mov = I_MOV;
             break;
         }
-        case S_WORD: {
+        case PS_WORD: {
             switch (src_type_size) {
-                case S_BYTE: i_mov = is_u ? "movzx" : "movsx";  break;
-                case S_WORD: i_mov = "mov"; break;
+                case PS_BYTE: i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case PS_WORD: i_mov = I_MOV; break;
                 default: assert(false);
             }
             break;
         }
-        case S_DWORD: {
+        case PS_DWORD: {
             switch (src_type_size) {
-                case S_BYTE:  i_mov = is_u ? "movzx" : "movsx"; break;
-                case S_WORD:  i_mov = is_u ? "movzx" : "movsx"; break; 
-                case S_DWORD: i_mov = "mov"; break;
+                case PS_BYTE:  i_mov = is_u ? I_MOVZX : I_MOVSX; break;
+                case PS_WORD:  i_mov = is_u ? I_MOVZX : I_MOVSX; break; 
+                case PS_DWORD: i_mov = I_MOV; break;
                 default: assert(false);
             }
             break;
         }
-        case S_QWORD: {
+        case PS_QWORD: {
             switch (src_type_size) {
-                case S_BYTE:  i_mov = is_u ? "movzx" : "movsx";  break;
-                case S_WORD:  i_mov = is_u ? "movzx" : "movsx";  break;
-                case S_DWORD: i_mov = is_u ? "mov"   : "movsxd"; break;
-                case S_QWORD: i_mov = "mov"; break;
+                case PS_BYTE:  i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case PS_WORD:  i_mov = is_u ? I_MOVZX : I_MOVSX;  break;
+                case PS_DWORD: i_mov = is_u ? I_MOV   : I_MOVSXD; break;
+                case PS_QWORD: i_mov = I_MOV; break;
                 default: assert(false);
             }
             break;
@@ -282,7 +277,7 @@ nnc_static nnc_bool nnc_gen_int_conv(const nnc_loc* dst_loc, const nnc_loc* src_
     const nnc_type* dst_type = dst_loc->type;
     const nnc_type* src_type = src_loc->type;
     // special case for unsigned extension of r64 with r/m32
-    if (is_u && dst_type_size == S_QWORD && src_type_size == S_DWORD) {
+    if (is_u && dst_type_size == PS_QWORD && src_type_size == PS_DWORD) {
         dst_type = src_type;
     }
     if (dst_loc->where == L_REG) {
@@ -311,7 +306,7 @@ nnc_static void nnc_gen_mov_mem_to_reg(const nnc_loc* reg, const nnc_loc* mem) {
     nnc_loc dst_loc = *reg;
     nnc_loc src_loc = *mem;
     GEN_NOTE("--- mov memory to reg:\n");
-    const char* i_mov = "mov";
+    const char* i_mov = I_MOV;
     if (glob_quad.op == OP_CAST) {
         if (nnc_gen_conv(&dst_loc, &src_loc)) {
             return;
@@ -322,7 +317,7 @@ nnc_static void nnc_gen_mov_mem_to_reg(const nnc_loc* reg, const nnc_loc* mem) {
             src_loc.has_offset = true;
         }
         else {
-            i_mov = "lea";
+            i_mov = I_LEA;
         }
     }
     nnc_gen_erase_reg(&dst_loc);
@@ -338,7 +333,7 @@ nnc_static void nnc_gen_reg_to_mem_mov(const nnc_loc* reg, const nnc_loc* mem) {
     assert(mem->where & L_MEM);
     GEN_NOTE("--- mov reg to memory:\n");
     //todo: maybe not regular mov?
-    GEN_INST("mov");
+    GEN_INST(I_MOV);
     nnc_gen_loc(mem, reg->type);
     GEN_TEXT(",%s\r\n", nnc_get_reg_of_type(reg->exact.reg, reg->type));
 }
@@ -348,7 +343,7 @@ nnc_static void nnc_gen_mov_reg_to_reg(const nnc_loc* dst_reg, const nnc_loc* sr
     nnc_loc src_loc = *src_reg;
     nnc_loc dst_loc = *dst_reg;
     GEN_NOTE("--- mov reg to reg:\n");
-    GEN_NOTE("----- dst reg junked by %d:\n", glob_reg_junk_level[dst_loc.reg]);
+    GEN_NOTE("----- dst reg junked by %d:\n", glob_junk_vec[dst_loc.reg]);
     if (glob_quad.op == OP_CAST) {
         if (nnc_gen_conv(&dst_loc, &src_loc)) {
             return;
@@ -367,7 +362,7 @@ nnc_static void nnc_gen_mov_reg_to_reg(const nnc_loc* dst_reg, const nnc_loc* sr
             src_loc.deref = false;
         }
     }
-    GEN_INST("mov");
+    GEN_INST(I_MOV);
     nnc_gen_loc(&dst_loc, dst_loc.type);
     GEN_TEXT(",");
     nnc_gen_loc(&src_loc, dst_loc.type);
@@ -379,7 +374,7 @@ nnc_static void nnc_gen_mov_imm_to_reg(const nnc_loc* reg, const nnc_loc* imm) {
     assert(imm->where == L_IMM);
     GEN_NOTE("--- mov imm to reg:\n");
     nnc_gen_erase_reg(reg);
-    GEN_INST("mov");
+    GEN_INST(I_MOV);
     nnc_gen_loc(reg, reg->type);
     GEN_TEXT(",");
     nnc_gen_loc(imm, reg->type);
@@ -390,7 +385,7 @@ nnc_static void nnc_gen_mov_reg_to_mem(const nnc_loc* mem, const nnc_loc* reg) {
     assert(reg->where == L_REG);
     assert(mem->where & L_MEM);
     GEN_NOTE("--- mov reg to memory:\n");
-    GEN_INST("mov");
+    GEN_INST(I_MOV);
     nnc_gen_loc(mem, mem->type);
     GEN_TEXT(",");
     nnc_gen_loc(reg, mem->type);
@@ -416,7 +411,7 @@ nnc_static void nnc_gen_mov_imm_to_mem(const nnc_loc* mem, const nnc_loc* imm) {
     assert(imm->where == L_IMM);
     assert(mem->where & L_MEM);
     assert(imm->exact.imm.u <= UINT32_MAX);
-    GEN_INST("mov");
+    GEN_INST(I_MOV);
     nnc_gen_loc(mem, mem->type);
     GEN_TEXT(",");
     nnc_gen_loc(imm, mem->type);
@@ -515,7 +510,8 @@ nnc_static nnc_bool nnc_cmp_addr(const nnc_3a_addr* addr1, const nnc_3a_addr* ad
 }
 
 /**
- * @brief Generates initialized memory on data segment. 
+ * @brief Generates initialized memory on data segment.
+ *  //todo: apply .rept?
  * @param mem Memory for initialization.
  * @param name Name of the memory span.
  * @param size Size of memory span in bytes.
@@ -598,19 +594,19 @@ nnc_static void nnc_gen_var(nnc_ir_var* var) {
 
 nnc_static void nnc_gen_label(const nnc_3a_addr* addr) {
     assert(addr->kind == ADDR_ICONST);
-    GEN_TEXT(NNC_LABEL_PREFIX"%lu\n", addr->exact.iconst.iconst);
+    GEN_TEXT(DR_LABEL"%lu\n", addr->exact.iconst.iconst);
 }
 
 nnc_static void nnc_gen_label_decl(const nnc_quad* quad) {
     assert(quad->label != 0);
-    GEN_TEXT(NNC_LABEL_PREFIX"%u:\n", quad->label);
+    GEN_TEXT(DR_LABEL"%u:\n", quad->label);
 }
 
 nnc_static void nnc_gen_op_ref(const nnc_3a_quad* quad) {
     //todo: fix the case when lea has r/r operands
     nnc_loc dst_loc = nnc_store(&quad->res);
     nnc_gen_erase_reg(&dst_loc);
-    GEN_INST("lea");
+    GEN_INST(I_LEA);
     nnc_gen_loc(&dst_loc, quad->res.type);
     GEN_TEXT(",");
     nnc_gen_operand(&quad->arg1, quad->res.type);
@@ -645,7 +641,7 @@ nnc_static void nnc_gen_op_deref_copy(const nnc_3a_quad* quad) {
     nnc_gen_mov_operand_to_operand(&quad->res, &quad->arg1);
 }
 
-nnc_static void nnc_gen_op_unary(const nnc_3a_quad* quad, const char* inst) {
+nnc_static void nnc_gen_op_unary(const nnc_3a_quad* quad, nnc_asm_inst inst) {
     GEN_INST(inst);
     //todo: come back here when optimizations will be presented
     assert(
@@ -668,15 +664,15 @@ nnc_static void nnc_gen_op_plus(const nnc_3a_quad* quad) {
 nnc_static void nnc_gen_op_minus(const nnc_3a_quad* quad) {
     //todo: float type extension
     assert(!nnc_real_type(quad->res.type));
-    nnc_gen_op_unary(quad, "neg");
+    nnc_gen_op_unary(quad, I_NEG);
 }
 
 // https://www.felixcloutier.com/x86/not
 nnc_static void nnc_gen_op_not(const nnc_3a_quad* quad) {
-    nnc_gen_op_unary(quad, "not");
+    nnc_gen_op_unary(quad, I_NOT);
 }
 
-nnc_static void nnc_gen_op_binary(const nnc_3a_quad* quad, const char* inst) {
+nnc_static void nnc_gen_op_binary(const nnc_3a_quad* quad, nnc_asm_inst inst) {
     GEN_INST(inst);
     assert(
         quad->arg1.kind == ADDR_CGT &&
@@ -709,7 +705,7 @@ nnc_static void nnc_gen_op_add(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_op_binary(quad, "add");
+    nnc_gen_op_binary(quad, I_ADD);
 }
 
 // https://www.felixcloutier.com/x86/sub
@@ -718,7 +714,7 @@ nnc_static void nnc_gen_op_add(const nnc_3a_quad* quad) {
 nnc_static void nnc_gen_op_sub(const nnc_3a_quad* quad) {
     //todo: float type extension
     assert(!nnc_real_type(quad->res.type));
-    nnc_gen_op_binary(quad, "sub");
+    nnc_gen_op_binary(quad, I_SUB);
 }
 
 /**
@@ -730,7 +726,7 @@ nnc_static void nnc_gen_op_sub(const nnc_3a_quad* quad) {
  * @param res_in_rdx When remainder is needed as a result, set it to true.
  * @return 
  */
-nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, const char* mul) {
+nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, nnc_asm_inst mul) {
     nnc_bool rax_pushed = false;
     nnc_bool rdx_pushed = nnc_gen_reserve_reg(R_RDX);
     nnc_loc rax_loc = nnc_mkloc_reg(R_RAX, quad->arg1.type);
@@ -759,7 +755,7 @@ nnc_static void nnc_gen_one_op_mul(const nnc_3a_quad* quad, const char* mul) {
  * @param mul 
  * @return 
  */
-nnc_static void nnc_gen_two_op_mul(const nnc_3a_quad* quad, const char* mul) {
+nnc_static void nnc_gen_two_op_mul(const nnc_3a_quad* quad, nnc_asm_inst mul) {
     nnc_gen_op_binary(quad, mul);
 }
 
@@ -770,7 +766,7 @@ nnc_static void nnc_gen_two_op_mul(const nnc_3a_quad* quad, const char* mul) {
  * @param mul 
  * @return 
  */
-nnc_static void nnc_gen_three_op_mul(const nnc_3a_quad* quad, const char* mul) {
+nnc_static void nnc_gen_three_op_mul(const nnc_3a_quad* quad, nnc_asm_inst mul) {
     GEN_INST(mul);
     nnc_gen_operand(&quad->res, quad->res.type);
     GEN_TEXT(",");
@@ -817,19 +813,19 @@ nnc_static nnc_bool nnc_is_three_op_mul(const nnc_3a_quad* quad) {
 
 // https://www.felixcloutier.com/x86/mul
 nnc_static void nnc_gen_mul(const nnc_3a_quad* quad) {
-    nnc_gen_one_op_mul(quad, "mul");
+    nnc_gen_one_op_mul(quad, I_MUL);
 }
 
 // https://www.felixcloutier.com/x86/imul
 nnc_static void nnc_gen_imul(const nnc_3a_quad* quad) {
     if (nnc_is_three_op_mul(quad)) {
-        nnc_gen_three_op_mul(quad, "imul");
+        nnc_gen_three_op_mul(quad, I_IMUL);
     }
     else if (nnc_is_two_op_mul(quad)) {
-        nnc_gen_two_op_mul(quad, "imul");
+        nnc_gen_two_op_mul(quad, I_IMUL);
     }
     else {
-        nnc_gen_one_op_mul(quad, "imul");
+        nnc_gen_one_op_mul(quad, I_IMUL);
     }
 }
 
@@ -846,9 +842,9 @@ nnc_static void nnc_gen_op_mul(const nnc_3a_quad* quad) {
 
 nnc_static void nnc_gen_rdx_extend(const nnc_3a_quad* quad) {
     switch (nnc_sizeof(quad->res.type)) {
-        case S_WORD:  GEN_INST("cwd"); break;
-        case S_DWORD: GEN_INST("cdq"); break;
-        case S_QWORD: GEN_INST("cqo"); break;
+        case PS_WORD:  GEN_INST(I_CWD); break;
+        case PS_DWORD: GEN_INST(I_CDQ); break;
+        case PS_QWORD: GEN_INST(I_CQO); break;
         default: {
             nnc_abort_no_ctx("nnc_GEN_INST_idiv: bad size of res.");
         }
@@ -856,7 +852,7 @@ nnc_static void nnc_gen_rdx_extend(const nnc_3a_quad* quad) {
     GEN_TEXT("\r\n");
 }
 
-nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, const char* div, nnc_bool mod) {
+nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, nnc_asm_inst div, nnc_bool mod) {
     assert(!nnc_real_type(quad->res.type));
     nnc_bool rax_pushed = false;
     nnc_bool rdx_pushed = nnc_gen_reserve_reg(R_RDX);
@@ -867,7 +863,7 @@ nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, const char* div, nnc
         rax_pushed = nnc_gen_reserve_reg(R_RAX);
         nnc_gen_mov_operand_to_reg(&rax_loc, &quad->arg1);
     }
-    if (glob_reg_junk_level[R_RDX] != REG_HAS_JUNK_0) {
+    if (glob_junk_vec[R_RDX] != REG_HAS_JUNK_0) {
         nnc_gen_xor_reg(&rdx_loc);
     }
     if (nnc_signed_type(quad->res.type)) {
@@ -891,12 +887,12 @@ nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, const char* div, nnc
 
 // https://www.felixcloutier.com/x86/div
 nnc_static void nnc_gen_div(const nnc_3a_quad* quad, nnc_bool mod) {
-    nnc_gen_one_op_div(quad, "div", mod);
+    nnc_gen_one_op_div(quad, I_DIV, mod);
 }
 
 // https://www.felixcloutier.com/x86/idiv
 nnc_static void nnc_gen_idiv(const nnc_3a_quad* quad, nnc_bool mod) {
-    nnc_gen_one_op_div(quad, "idiv", mod);
+    nnc_gen_one_op_div(quad, I_IDIV, mod);
 }
 
 nnc_static void nnc_gen_op_div(const nnc_3a_quad* quad) {
@@ -928,7 +924,7 @@ nnc_static void nnc_gen_op_mod(const nnc_3a_quad* quad) {
     }
 }
 
-nnc_static void nnc_gen_inst_shift(const nnc_3a_quad* quad, const char* shift) {
+nnc_static void nnc_gen_inst_shift(const nnc_3a_quad* quad, nnc_asm_inst shift) {
     nnc_bool rcx_pushed = false;
     nnc_bool arg1_inside_rcx = nnc_addr_inside_reg(&quad->arg1, R_RCX);
     nnc_bool arg2_inside_rcx = nnc_addr_inside_reg(&quad->arg2, R_RCX);
@@ -964,7 +960,7 @@ nnc_static void nnc_gen_op_shr(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_inst_shift(quad, "shr");
+    nnc_gen_inst_shift(quad, I_SHR);
 }
 
 nnc_static void nnc_gen_op_shl(const nnc_3a_quad* quad) {
@@ -973,7 +969,7 @@ nnc_static void nnc_gen_op_shl(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_inst_shift(quad, "shl");
+    nnc_gen_inst_shift(quad, I_SHL);
 }
 
 nnc_static void nnc_gen_op_sal(const nnc_3a_quad* quad) {
@@ -982,7 +978,7 @@ nnc_static void nnc_gen_op_sal(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_inst_shift(quad, "sal");
+    nnc_gen_inst_shift(quad, I_SAL);
 }
 
 nnc_static void nnc_gen_op_sar(const nnc_3a_quad* quad) {
@@ -991,7 +987,7 @@ nnc_static void nnc_gen_op_sar(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_inst_shift(quad, "sar");
+    nnc_gen_inst_shift(quad, I_SAR);
 }
 
 // https://www.felixcloutier.com/x86/or
@@ -1001,7 +997,7 @@ nnc_static void nnc_gen_op_or(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_op_binary(quad, "or");
+    nnc_gen_op_binary(quad, I_OR);
 }
 
 // https://www.felixcloutier.com/x86/and
@@ -1011,7 +1007,7 @@ nnc_static void nnc_gen_op_and(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_op_binary(quad, "and");
+    nnc_gen_op_binary(quad, I_AND);
 }
 
 // https://www.felixcloutier.com/x86/xor
@@ -1021,13 +1017,33 @@ nnc_static void nnc_gen_op_xor(const nnc_3a_quad* quad) {
         quad->arg1.kind == ADDR_CGT ||
         quad->arg2.kind == ADDR_CGT
     );
-    nnc_gen_op_binary(quad, "xor");
+    nnc_gen_op_binary(quad, I_XOR);
+}
+
+nnc_static void nnc_gen_op_arg(const nnc_3a_quad* quad) {
+    assert(!nnc_real_type(quad->arg1.type));
+    assert(!nnc_struct_or_union_type(quad->arg1.type));
+    assert(quad->arg1.kind == ADDR_CGT);
+    nnc_pclass_state* state = &buf_last(glob_call_states);
+    // this is argument location, where the exact value stored
+    nnc_loc loc = nnc_store(&quad->arg1);
+    // this is the location where it is must be placed, according to ABI
+    nnc_loc abi_loc = nnc_store_param(&quad->arg1, state);
+    if (abi_loc.where == L_REG) {
+        nnc_gen_mov_operand_to_reg(&abi_loc, &quad->arg1);            
+    }
+    if (abi_loc.where == L_STACK) {
+        assert(loc.where == L_REG);
+        GEN_INST(I_PUSH);
+        nnc_gen_loc(&loc, &u64_type); 
+        GEN_TEXT("\r\n");
+    }
 }
 
 // https://www.felixcloutier.com/x86/ret
 nnc_static void nnc_gen_op_retp(const nnc_3a_quad* quad) {
-    GEN_INST("jmp");
-    GEN_TEXT(NNC_RET_LABEL_PREFIX"%s\n", glob_asm_proc->name);
+    GEN_INST(I_JMP);
+    GEN_TEXT(DR_RLABEL"%s\n", glob_asm_proc->name);
 }
 
 // https://www.felixcloutier.com/x86/ret
@@ -1037,8 +1053,122 @@ nnc_static void nnc_gen_op_retf(const nnc_3a_quad* quad) {
     assert(quad->arg1.kind == ADDR_CGT);
     nnc_loc rax_loc = nnc_mkloc_reg(R_RAX, quad->res.type);
     nnc_gen_mov_operand_to_reg(&rax_loc, &quad->arg1);
-    GEN_INST("jmp");
-    GEN_TEXT(NNC_RET_LABEL_PREFIX"%s\n", glob_asm_proc->name);
+    GEN_INST(I_JMP);
+    GEN_TEXT(DR_RLABEL"%s\n", glob_asm_proc->name);
+}
+
+nnc_static void nnc_gen_call(const nnc_3a_addr* addr) {
+    GEN_INST(I_CALL);
+    if (addr->kind != ADDR_NAME) {
+        nnc_gen_operand(addr, &u64_type);
+    }
+    else {
+        assert(glob_ast != NULL);
+        const char* fn = addr->exact.name.name;
+        nnc_sym* sym = nnc_st_get_sym(glob_ast->st, fn);
+        if (sym == NULL) {
+            nnc_gen_operand(addr, &u64_type);
+        }
+        else {
+            GEN_TEXT("%s", fn);
+        }
+    }
+    GEN_TEXT("\r\n");
+}
+
+nnc_static void nnc_gen_alloc_stack(nnc_u32 bytes) {
+    assert(bytes % NNC_STACK_ALIGN == 0);
+    if (bytes != 0) {
+        GEN_INST(I_SUB);
+        GEN_TEXT("rsp,%u\n", bytes);
+    }
+}
+
+nnc_static void nnc_gen_dealloc_stack(nnc_u32 bytes) {
+    assert(bytes % NNC_STACK_ALIGN == 0);
+    if (bytes != 0) {
+        GEN_INST(I_ADD);
+        GEN_TEXT("rsp,%u\n", bytes);
+    }
+}
+
+nnc_static void nnc_gen_res_alloc(const nnc_3a_quad* quad, nnc_pclass_state* state) {
+    // if it is procedure (no result), skip.
+    if (quad->res.kind == ADDR_NONE) {
+        return;
+    }
+    // otherwise reserve RAX
+    state->res = &quad->res;
+    nnc_loc loc = nnc_store(state->res);
+    if (loc.where == L_REG) {
+        // if allocated storage is not RAX register, preserve it.
+        // it is needed for storing result of a function.
+        if (loc.exact.reg != R_RAX) {
+            state->was_res_pushed = nnc_gen_reserve_reg(R_RAX);
+            nnc_gen_xor_reg(&loc);
+        }
+    }
+}
+
+nnc_static void nnc_gen_res_dealloc(nnc_pclass_state* state) {
+    if (state->res == NULL) {
+        return;
+    }
+    if (!nnc_addr_inside_reg(state->res, R_RAX)) {
+        nnc_gen_pop_reg(R_RAX, state->was_res_pushed);
+    }
+}
+
+nnc_static nnc_u32 nnc_get_stack_pad(nnc_u32 bytes) {
+    // calculate amount of stack space to be added
+    // for performing 16byte stack alignment required by the ABI
+    nnc_u32 pad = bytes % NNC_STACK_ALIGN;
+    if (pad != 0) {
+        pad = (NNC_STACK_ALIGN - pad) % NNC_STACK_ALIGN;
+    }
+    return pad;
+}
+
+nnc_static nnc_u32 nnc_gen_align_stack(nnc_u32 bytes) {
+    nnc_u32 pad = nnc_get_stack_pad(bytes);
+    if (pad != 0) {
+        if (pad == PS_QWORD) {
+            GEN_INST(I_PUSH), GEN_TEXT("r15");
+        }
+        else {
+            GEN_INST(I_AND), GEN_TEXT("rsp,0xfffffffffffffff0");
+        }
+        GEN_TEXT("\r\n");
+    }
+    return pad;
+}
+
+nnc_static void nnc_gen_caller_prepare() {
+    nnc_pclass_state* state = &buf_last(glob_call_states);
+    state->on_stack += nnc_gen_align_stack(state->on_stack);
+}
+
+nnc_static void nnc_gen_caller_restore() {
+    nnc_pclass_state* state = &buf_last(glob_call_states);
+    nnc_gen_dealloc_stack(state->on_stack);
+    for (nnc_u64 i = 0; i < buf_len(state->pushed); i++) {
+        GEN_INST(I_POP), GEN_TEXT("%s\n", state->pushed[i]);
+    }
+    nnc_gen_res_dealloc(state);
+    nnc_pclass_state_fini(state);
+    buf_pop(glob_call_states);
+}
+
+nnc_static void nnc_gen_op_pcall(const nnc_3a_quad* quad) {
+    nnc_gen_caller_prepare();
+    nnc_gen_call(&quad->arg1);
+    nnc_gen_caller_restore();
+}
+
+nnc_static void nnc_gen_op_fcall(const nnc_3a_quad* quad) {
+    nnc_gen_caller_prepare();
+    nnc_gen_call(&quad->arg1);
+    nnc_gen_caller_restore();
 }
 
 nnc_static void nnc_gen_cmp(const nnc_3a_quad* quad) {
@@ -1050,26 +1180,22 @@ nnc_static void nnc_gen_cmp(const nnc_3a_quad* quad) {
     if (nnc_sizeof(type) < nnc_sizeof(quad->arg2.type)) {
         type = quad->arg2.type;
     }
-    GEN_INST("cmp");
+    GEN_INST(I_CMP);
     nnc_gen_operand(&quad->arg1, type);
     GEN_TEXT(",");
     nnc_gen_operand(&quad->arg2, type);
     GEN_TEXT("\r\n");
 }
 
-nnc_static void nnc_gen_cmp_x(const nnc_3a_quad* quad, nnc_u32 with_x) {
+nnc_static void nnc_gen_test(const nnc_3a_quad* quad) {
     assert(
         quad->arg1.kind == ADDR_CGT || 
         nnc_addr_inside(&quad->arg1, L_REG | L_MEM)
     );
-    GEN_INST("cmp");
-    if (nnc_addr_inside(&quad->arg1, L_REG)) {
-        nnc_gen_operand(&quad->arg1, quad->arg1.type);
-    }
-    else {
-        nnc_gen_operand(&quad->arg1, quad->arg1.type);
-    }
-    GEN_TEXT(",%u", with_x);
+    GEN_INST(I_TEST);
+    nnc_gen_operand(&quad->arg1, quad->arg1.type);
+    GEN_TEXT(",");
+    nnc_gen_operand(&quad->arg1, quad->arg1.type);
     GEN_TEXT("\r\n");
 }
 
@@ -1079,51 +1205,78 @@ nnc_static void nnc_gen_inst_jump(const nnc_3a_quad* quad, const char* jump) {
 }
 
 nnc_static void nnc_gen_op_ujump(const nnc_3a_quad* quad) {
-    nnc_gen_inst_jump(quad, "jmp");
+    nnc_gen_inst_jump(quad, I_JMP);
 }
 
 nnc_static void nnc_gen_op_cjumpt(const nnc_3a_quad* quad) {
-    nnc_gen_cmp_x(quad, 0);
-    nnc_gen_inst_jump(quad, "jnz");
+    nnc_gen_test(quad);
+    nnc_gen_inst_jump(quad, I_JNZ);
 }
 
 nnc_static void nnc_gen_op_cjumpf(const nnc_3a_quad* quad) {
-    nnc_gen_cmp_x(quad, 0);
-    nnc_gen_inst_jump(quad, "jz");
+    nnc_gen_test(quad);
+    nnc_gen_inst_jump(quad, I_JZ);
 }
 
 nnc_static void nnc_gen_op_cjumplt(const nnc_3a_quad* quad) {
     nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? "jl" : "jb");
+    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? I_JL : I_JB);
 }
 
 nnc_static void nnc_gen_op_cjumpgt(const nnc_3a_quad* quad) {
     nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? "jg" : "ja");
+    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? I_JG : I_JA);
 }
 
 nnc_static void nnc_gen_op_cjumplte(const nnc_3a_quad* quad) {
     nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? "jle" : "jbe");
+    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? I_JLE : I_JBE);
 }
 
 nnc_static void nnc_gen_op_cjumpgte(const nnc_3a_quad* quad) {
     nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? "jge" : "jae");
+    nnc_gen_inst_jump(quad, nnc_signed_type(quad->res.type) ? I_JGE : I_JAE);
 }
 
 nnc_static void nnc_gen_op_cjumpe(const nnc_3a_quad* quad) {
-    nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, "je");
+    if (quad->arg2.kind == ADDR_ICONST &&
+        quad->arg2.exact.iconst.iconst == 0) {
+        nnc_gen_test(quad);
+    }
+    else {
+        nnc_gen_cmp(quad);
+    }
+    nnc_gen_inst_jump(quad, I_JE);
 }
 
 nnc_static void nnc_gen_op_cjumpne(const nnc_3a_quad* quad) {
-    nnc_gen_cmp(quad);
-    nnc_gen_inst_jump(quad, "jne");
+    if (quad->arg2.kind == ADDR_ICONST &&
+        quad->arg2.exact.iconst.iconst == 0) {
+        nnc_gen_test(quad);
+    }
+    else {
+        nnc_gen_cmp(quad);
+    }
+    nnc_gen_inst_jump(quad, I_JNE);
+}
+
+nnc_static void nnc_gen_op_decl_call(const nnc_3a_quad* quad) {
+    nnc_pclass_state state = { .was_init = false };
+    nnc_pclass_state_init(&state);
+    nnc_gen_res_alloc(quad, &state);
+    buf_add(glob_call_states, state);
 }
 
 nnc_static void nnc_gen_op_decl_local(const nnc_3a_quad* quad) {
     nnc_store(&quad->res);
+    assert(nnc_get_loc(&quad->res)->where == L_STACK);
+    assert(quad->res.exact.name.ictx == IDENT_DEFAULT);
+}
+
+nnc_static void nnc_gen_op_decl_global(const nnc_3a_quad* quad) {
+    nnc_store(&quad->res);
+    assert(nnc_get_loc(&quad->res)->where == L_DATA);
+    assert(quad->res.exact.name.ictx == IDENT_GLOBAL);
 }
 
 nnc_static void nnc_gen_op_decl_string(const nnc_3a_quad* quad) {
@@ -1136,23 +1289,18 @@ nnc_static void nnc_gen_op_decl_string(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_gen_proc_prologue(nnc_3a_proc* proc) {
-    // calculate amount of stack space to be added
-    // for performing 16byte stack alignment required by the ABI
-    nnc_u32 pad = proc->local_stack_offset % NNC_STACK_ALIGN;
-    if (pad != 0) {
-        pad = (NNC_STACK_ALIGN - pad) % NNC_STACK_ALIGN;
-    }
+    nnc_u32 pad = nnc_get_stack_pad(proc->local_stack_offset);
     nnc_u32 num = proc->local_stack_offset + pad;
     GEN_TEXT("# stack size: %u;\n", proc->local_stack_offset);
     GEN_TEXT("# aligned   : +%u;\n", pad);
     if (proc->local_stack_offset == 0) {
         // do not generate `enter` here because it will
         // contain `sub rsp, N` in it
-        GEN_INST("push"), GEN_TEXT("rbp\n");
-        GEN_INST("mov"),  GEN_TEXT("rbp,rsp\n");
+        GEN_INST(I_PUSH), GEN_TEXT("rbp\n");
+        GEN_INST(I_MOV),  GEN_TEXT("rbp,rsp\n");
     }
     else {
-        GEN_INST("enter"), GEN_TEXT("0x%x,0x0\n", num);
+        GEN_INST(I_ENTER), GEN_TEXT("0x%x,0x0\n", num);
     }
 }
 
@@ -1161,25 +1309,41 @@ nnc_static void nnc_gen_callee_prepare() {
 }
 
 nnc_static void nnc_gen_proc_epilogue(nnc_3a_proc* proc) {
-    GEN_INST("leave"), GEN_TEXT("\n");
+    GEN_INST(I_LEAVE), GEN_TEXT("\n");
 }
 
 nnc_static void nnc_gen_callee_restore() {
-    GEN_TEXT(NNC_RET_LABEL_PREFIX"%s:\n", glob_asm_proc->name);
+    GEN_TEXT(DR_RLABEL"%s:\n", glob_asm_proc->name);
     nnc_gen_proc_epilogue(glob_asm_proc);
-    GEN_INST("ret"), GEN_TEXT("\n\n");
+    GEN_INST(I_RET), GEN_TEXT("\n\n");
 }
 
 nnc_static nnc_asm_proc nnc_build_proc(const nnc_blob_buf* code_impl) {
     nnc_asm_proc* proc = &glob_state.curr.asm_proc;
     if (FN_IS_PUB(glob_asm_proc)) {
-        GEN_TEXT(".global %s\n", glob_asm_proc->name);
+        GEN_TEXT(DR_GLOBAL" %s\n", glob_asm_proc->name);
     }
     GEN_TEXT("%s:\n", glob_asm_proc->name);
     nnc_gen_callee_prepare();
     nnc_blob_buf_append(&proc->impl, code_impl);
     nnc_gen_callee_restore();
     return *proc;
+}
+
+nnc_static void nnc_reset_junk_vec() {
+    memset(glob_junk_vec, REG_HAS_JUNK_64, sizeof(glob_junk_vec));
+}
+
+nnc_static nnc_u32 nnc_callee_stack_usage() {
+    //todo: check if function has nested calls, to avoid useless spill
+    assert(false);
+    // Due to the fact that all parameters are spilled 
+    // to the stack at the beginning, allocated space
+    return buf_len(glob_asm_proc->params) * PS_QWORD;
+} 
+
+nnc_static void nnc_gen_store_params() {
+    glob_asm_proc->stack_usage = nnc_callee_stack_usage();
 }
 
 /**
@@ -1195,9 +1359,12 @@ nnc_static void nnc_gen_proc(nnc_ir_proc* proc) {
     // initialize implementation of the procedure
     // this is done just by initializing it's blob buffer
     nnc_blob_buf_init(&glob_state.curr.asm_proc.impl);
-    // todo: callee reset...
-    // todo: store params...
-    // todo: spill params...
+    // reset callee
+    nnc_reset_lr_vec();
+    nnc_reset_loc_map();
+    nnc_reset_junk_vec();
+    // store and spill params
+    nnc_gen_store_params();
     nnc_u64 q_len = buf_len(proc->quads);
     for (nnc_u64 i = 0; i < q_len; i++) {
         const nnc_quad* quad = &proc->quads[i];
@@ -1232,11 +1399,11 @@ nnc_static void nnc_gen_proc(nnc_ir_proc* proc) {
                 case OP_BW_AND: nnc_gen_op_and(quad); break;
                 case OP_BW_XOR: nnc_gen_op_xor(quad); break;
                 /* Other operators */
-                //case OP_ARG:   nnc_gen_op_arg(quad);   break;
+                case OP_ARG:   nnc_gen_op_arg(quad);   break;
                 case OP_RETP:  nnc_gen_op_retp(quad);  break;
                 case OP_RETF:  nnc_gen_op_retf(quad);  break;
-                //case OP_PCALL: nnc_gen_op_pcall(quad); break;
-                //case OP_FCALL: nnc_gen_op_fcall(quad); break;
+                case OP_PCALL: nnc_gen_op_pcall(quad); break;
+                case OP_FCALL: nnc_gen_op_fcall(quad); break;
                 /* Conditional operators */
                 case OP_UJUMP:    nnc_gen_op_ujump(quad);    break;
                 case OP_CJUMPT:   nnc_gen_op_cjumpt(quad);   break;
@@ -1253,7 +1420,7 @@ nnc_static void nnc_gen_proc(nnc_ir_proc* proc) {
                 case OP_HINT_DECL_GLOBAL: nnc_gen_op_decl_global(quad); break;
                 case OP_HINT_DECL_STRING: nnc_gen_op_decl_string(quad); break;
                 default: {
-                    nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
+                   nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
                 }
             }
         }
@@ -1288,9 +1455,9 @@ nnc_blob_buf nnc_build(nnc_asm_file* file) {
     nnc_blob_buf impl = (nnc_blob_buf){0};
     nnc_blob_buf_init(&impl);
     nnc_blob_buf_putf(&impl,
-        ".intel_syntax noprefix \n"
+        DR_ISYNTAX" noprefix \n"
         "\n"
-        ".text\n"
+        DR_TEXT"\n"
         "\n"
     );
     for (nnc_u64 i = 0; i < buf_len(glob_asm_file.procs); i++) {
@@ -1298,7 +1465,7 @@ nnc_blob_buf nnc_build(nnc_asm_file* file) {
         nnc_blob_buf_fini(&glob_asm_file.procs[i].impl);
     }
     if (glob_asm_file.ds_impl.len != 0) {
-        nnc_blob_buf_putf(&impl, "\n.data\n\n");
+        nnc_blob_buf_putf(&impl, "\n"DR_DATA"\n\n");
         nnc_blob_buf_append(&impl, &glob_asm_file.ds_impl);
         nnc_blob_buf_fini(&glob_asm_file.ds_impl);
     }
