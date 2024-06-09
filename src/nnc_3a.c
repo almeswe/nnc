@@ -395,7 +395,7 @@ nnc_static void nnc_dot_to_3a(const nnc_unary_expression* unary, const nnc_st* s
 }
 
 nnc_static nnc_u64 nnc_call_hint(const nnc_unary_expression* unary, const nnc_st* st) {
-    nnc_3a_quad hint_quad = { .op = OP_HINT_PREPARE_FOR_CALL };
+    nnc_3a_quad hint_quad = { .op = OP_HINT_DECL_CALL };
     hint_quad.hint = (nnc_heap_ptr)unary;
     return nnc_3a_quads_add(&hint_quad);
 }
@@ -973,8 +973,8 @@ nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* 
     return proc;
 }
 
-nnc_ir_glob_sym nnc_gen_ir(const nnc_statement* stmt, const nnc_st* st) {
-    nnc_ir_glob_sym ir_sym = {
+nnc_ir_sym nnc_gen_ir(const nnc_statement* stmt, const nnc_st* st) {
+    nnc_ir_sym ir_sym = {
         .kind = stmt->kind
     };
     if (stmt->kind == STMT_FN) {
@@ -983,5 +983,6 @@ nnc_ir_glob_sym nnc_gen_ir(const nnc_statement* stmt, const nnc_st* st) {
     if (stmt->kind == STMT_LET) {
         ir_sym.sym.var = nnc_gen_ir_var(stmt, st);
     }
+    buf_add(glob_ir, ir_sym);
     return ir_sym;
 }
