@@ -105,7 +105,7 @@ typedef enum _nnc_3a_op_kind {
     OP_DEREF,
     OP_DEREF_COPY,
     /* hint operators */
-    OP_HINT_PREPARE_FOR_CALL,
+    OP_HINT_DECL_CALL,
     OP_HINT_DECL_LOCAL,
     OP_HINT_DECL_GLOBAL,
     OP_HINT_DECL_STRING,

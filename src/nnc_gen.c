@@ -1247,10 +1247,11 @@ nnc_static void nnc_gen_proc(nnc_ir_proc* proc) {
                 case OP_CJUMPGTE: nnc_gen_op_cjumpgte(quad); break;
                 case OP_CJUMPE:   nnc_gen_op_cjumpe(quad);   break;
                 case OP_CJUMPNE:  nnc_gen_op_cjumpne(quad);  break;
-                ///* Hint operators */
-                case OP_HINT_DECL_LOCAL:       nnc_gen_op_decl_local(quad);  break;
-                case OP_HINT_DECL_STRING:      nnc_gen_op_decl_string(quad); break;
-                //case OP_HINT_PREPARE_FOR_CALL: nnc_gen_op_prepare_for_call(quad); break;
+                /* Hint operators */
+                case OP_HINT_DECL_CALL:   nnc_gen_op_decl_call(quad);   break;
+                case OP_HINT_DECL_LOCAL:  nnc_gen_op_decl_local(quad);  break;
+                case OP_HINT_DECL_GLOBAL: nnc_gen_op_decl_global(quad); break;
+                case OP_HINT_DECL_STRING: nnc_gen_op_decl_string(quad); break;
                 default: {
                     nnc_abort_no_ctx("nnc_gen_op: unknown operator.\n");
                 }
