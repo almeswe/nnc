@@ -1,6 +1,8 @@
 #ifndef __NNC_x86_64_GEN_H__
 #define __NNC_x86_64_GEN_H__
 
+#include "nnc_isa.h"
+
 #include "nnc_blob.h"
 #include "nnc_misc.h"
 #include "nnc_gen_sa.h"
