@@ -1,0 +1,304 @@
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
+bin_digit = "0" | "1" .
+oct_digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" .
+
+dec_digit = digit .
+
+hex_digit = digit | "A" | "B" | "C" | "D" | "E" | "F" 
+                  | "a" | "b" | "c" | "d" | "e" | "f" .
+
+letter = "A" | "B" | "C" | "D" | "E" | "F" | "G"
+		   | "H" | "I" | "J" | "K" | "L" | "M" | "N"
+		   | "O" | "P" | "Q" | "R" | "S" | "T" | "U"
+		   | "V" | "W" | "X" | "Y" | "Z" | "a" | "b"
+		   | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+		   | "j" | "k" | "l" | "m" | "n" | "o" | "p"
+		   | "q" | "r" | "s" | "t" | "u" | "v" | "w"
+		   | "x" | "y" | "z" .
+
+escape = "\0" | "\a" | "\b" | "\f" | "\t" | "\v" |
+		 "\r" | "\n" | "\\" | "\'" | "\"" .
+
+character = "*" | "@" | "}" | "]" | "^" | "," | ")" |
+			"$" | "." | "`" | "-" | "{" | "[" | "(" |
+			"%" | "+" | "?" | ";" | "#" | "~" | "<" |
+			">" | ":" | "=" | "!" | "&" | "|" | "_" |
+			digit | escape | letter .
+
+letter_or_underscore = letter | "_" .
+letter_or_digit      = letter | digit .
+letter_digit_or_underscore = letter_or_digit | "_" .
+
+bin_format = "b" | "B" .
+oct_format = "o" | "O" .
+hex_format = "x" | "X" .
+
+num_suffix_u = "u" | "U" .
+num_suffix_i = "i" | "I" .
+
+num_suffix = ( num_suffix_u "8" ) |
+             ( num_suffix_i "8" )  |
+             ( num_suffix_u "16" ) |
+             ( num_suffix_i "16" ) |
+             ( num_suffix_u "32" ) |
+             ( num_suffix_i "32" ) |
+             ( num_suffix_u "64" ) |
+             ( num_suffix_i "64" ) .
+
+hex_num_literal = "0" hex_format hex_digit { hex_digit } .
+dec_num_literal = dec_digit { dec_digit } .
+oct_num_literal = "0" oct_format oct_digit { oct_digit } .
+bin_num_literal = "0" bin_format bin_digit { bin_digit } .
+
+num_literal = ( dec_num_literal | hex_num_literal | oct_num_literal | bin_num_literal ) [ num_suffix ] .
+
+str_literal = """ { character } """ .
+chr_literal = "'" character "'" .
+
+identifier = letter_or_underscore { letter_digit_or_underscore } .
+
+kw_as = "as" .
+kw_break = "break" .
+kw_continue = "continue" .
+kw_enum = "enum" .
+kw_elif = "elif" .
+kw_ext = "ext" .
+kw_for = "for" .
+kw_fn = "fn" .
+kw_if = "if" .
+kw_i8 = "i8" .
+kw_i16 = "i16" .
+kw_i32 = "i32" .
+kw_i64 = "i64" .
+kw_return = "return" .
+kw_struct = "struct" .
+kw_sizeof = "sizeof" .
+kw_type = "type" .
+kw_union = "union" .
+kw_u8 = "u8" .
+kw_u16 = "u16" .
+kw_u32 = "u32" .
+kw_u64 = "u64" .
+kw_let = "let" .
+kw_lengthof = "lengthof" .
+kw_void = "void" .
+kw_while = "while" .
+kw_do = "do" .
+kw_else = "else" .
+
+tok_ampersand = "&" .
+tok_and       = "&&" .
+tok_assign = "=" .
+tok_asterisk = "*" .
+tok_atpersand = "@" .
+tok_cbrace = "}" .
+tok_cbracket = "]" .
+tok_chr = chr_literal .
+tok_circumflex = "^" .
+tok_colon = ":" .
+tok_comma = "," .
+tok_cparen = ")" .
+tok_dollar = "$" .
+tok_dot = "." .
+tok_dcolon = "::" .
+tok_eof = <<eof>>.
+tok_eq = "==" .
+tok_excmark = "!" .
+tok_grave = "`" .
+tok_gt = ">" .
+tok_gte = ">=" .
+tok_ident = identifier .
+tok_lshift = "<<" .
+tok_lt = "<" .
+tok_lte = "<=" .
+tok_minus = "-" .
+tok_neq = "!=" .
+tok_number = num_literal .
+tok_obrace = "{" .
+tok_obracket = "[" .
+tok_oparen = "(" .
+tok_or = "||" .
+tok_percent = "%" .
+tok_plus = "+" .
+tok_question = "?" .
+tok_quote = "'" .
+tok_quotes = "\"" .
+tok_rshift = "" .
+tok_semicolon = ";" .
+tok_sign = "#" .
+tok_slash = "/" .
+tok_str = str_literal .
+tok_tilde = "~" .
+tok_underscore = "_" .
+tok_vline = "|" .
+
+tok_as = kw_as .
+tok_break = kw_break .
+tok_continue = kw_continue .
+tok_enum = kw_enum .
+tok_elif = kw_elif .
+tok_ext = kw_ext .
+tok_for = kw_for .
+tok_fn = kw_fn .
+tok_f32 = kw_f32 .
+tok_f64 = kw_f64 .
+tok_if = kw_if .
+tok_i8 = kw_i8 .
+tok_i16 = kw_i16 .
+tok_i32 = kw_i32 .
+tok_i64 = kw_i64 .
+tok_return = kw_return .
+tok_struct = kw_struct .
+tok_sizeof = kw_sizeof .
+tok_type = kw_type .
+tok_union = kw_union .
+tok_u8 = kw_u8 .
+tok_u16 = kw_u16 .
+tok_u32 = kw_u32 .
+tok_u64 = kw_u64 .
+tok_let = kw_let .
+tok_lengthof = kw_lengthof .
+tok_void = kw_void .
+tok_while = kw_while .
+tok_do = kw_do .
+tok_else = kw_else .
+
+translation_unit = global_declaration { global_declaration } .
+
+global_declaration = global_type_stmt | global_let_stmt | global_fn_stmt .
+
+global_type_stmt = type_stmt .
+global_fn_stmt = fn_stmt | ext_fn_stmt .
+global_let_stmt = let_stmt .
+
+type_stmt = tok_type type_expr tok_as tok_ident .
+
+type_expr = type .
+
+basic_type = tok_i8 | tok_i16 | tok_i32 | tok_i64 | 
+                 tok_u8 | tok_u16 | tok_u32 | tok_u64 .
+
+arr_type_declarator = tok_obracket expr_reduced tok_cbracket .
+ptr_type_declarator = tok_asterisk .
+
+type_declarator = arr_type_declarator | ptr_type_declarator .
+type_declarator_list = type_declarator { type_declarator } .
+
+type = ( basic_type | fn_type | user_type | enum_type | struct_type | union_type ) [ type_declarator_list ] .
+
+fn_type = tok_fn tok_oparen { type } tok_cparen tok_colon type  .
+user_type = tok_ident .
+
+enumerator = tok_ident tok_assign expr_reduced .
+enumerator_list = enumerator { tok_comma enumerator } .
+enum_type = tok_enum tok_obrace [ enumerator_list ] tok_cbrace  .
+
+var_type = tok_ident tok_colon type .
+
+member      = var_type .
+member_list = { member tok_semicolon } .
+
+struct_type = tok_struct tok_obrace [ member_list ] tok_cbrace .
+union_type = tok_struct tok_obrace [ member_list ] tok_cbrace .
+
+let_stmt = tok_let tok_ident tok_colon [ tok_assign expr ] .
+
+fn_param = var_type .
+fn_param_list = fn_param { tok_comma fn_param } .
+fn_return_type = tok_colon type .
+
+ext_fn_stmt = tok_fn tok_ext tok_ident tok_oparen [ fn_param_list ] tok_cparen [ fn_return_type ] tok_semicolon   .
+
+fn_stmt = tok_fn tok_ident tok_oparen [ fn_param_list ] tok_cparen [ fn_return_type ] compound_stmt .
+
+compound_stmt = tok_obrace { stmt } tok_cbrace .
+
+paren_expr = tok_oparen expr tok_cparen .
+
+else_stmt = tok_else compound_stmt .
+elif_stmt = tok_elif paren_expr compound_stmt .
+elif_stmt_list = elif_stmt { elif_stmt } .
+if_stmt = tok_if paren_expr compound_stmt [ elif_stmt_list ] [ else_stmt ] .
+
+do_stmt = tok_do compound_stmt tok_while paren_expr tok_semicolon .
+for_stmt = tok_for tok_oparen ( let_stmt | expr ) tok_semicolon [ expr ] tok_semicolon [ expr ] tok_cparen compound_stmt .
+while_stmt = tok_while paren_expr compound_stmt .
+break_stmt = tok_break tok_semicolon .
+return_stmt = tok_return [ expr ] tok_semicolon .
+continue_stmt = tok_continue tok_semicolon .
+expr_stmt = [ expr ] tok_semicolon .
+
+stmt = if_stmt |
+       fn_stmt |
+       do_stmt |
+       let_stmt |
+       for_stmt |
+       type_stmt |
+       while_stmt |
+       break_stmt |
+       return_stmt |
+       continue_stmt |
+       expr_stmt .
+
+expr = comma_expr .
+expr_reduced = assignment_expr .
+
+assignment = tok_assign .
+equality = tok_eq | tok_neq .
+relation = tok_lt | tok_gt | tok_lte | tok_gte .
+shift = tok_lshift | tok_rshift .
+addition = tok_plus | tok_minus .
+multiplication = tok_slash | tok_percent | tok_asterisk .
+
+comma_expr = assignment_expr { tok_colon assignment_expr } .
+assignment_expr = ternary_expr { assignment ternary_expr } .
+ternary_expr = or_expr { tok_question or_expr } .
+or_expr = and_expr { tok_or and_expr } .
+and_expr = bitwise_or_expr { tok_and bitwise_or_expr } .
+bitwise_or_expr = bitwise_xor_expr { tok_vline bitwise_xor_expr } .
+bitwise_xor_expr = bitwise_and_expr { tok_circumflex bitwise_and_expr } .
+bitwise_and_expr = equality_expr { tok_ampersand equality_expr } .
+equality_expr = relation_expr { equality relation_expr } .
+relation_expr = shift_expr { relation shift_expr } .
+shift_expr = arith_addition_expr { shift arith_addition_expr } .
+arith_addition_expr = arith_multiplication_expr { addition arith_multiplication_expr } .
+arith_multiplication_expr = unary_expr { multiplication unary_expr } .
+
+unary_expr = cast_expr |
+             plus_expr |
+             minus_expr |
+             bitwise_not_expr |
+             sizeof_expr |
+             not_expr |
+             lengthof_expr |
+             dereference_expr |
+             reference_expr |
+             as_expr |
+             ( primary_expr { postfix_expr } ) .
+
+cast_expr = tok_oparen type_expr tok_cparen unary_expr .
+plus_expr = tok_plus unary_expr .
+minus_expr = tok_minus unary_expr .
+bitwise_not_expr = tok_tilde unary_expr .
+dereference_expr = tok_asterisk unary_expr .
+reference_expr = tok_ampersand unary_expr .
+not_expr = tok_excmark unary_expr .
+sizeof_expr = tok_sizeof tok_oparen type_expr tok_cparen .
+lengthof_expr = tok_lengthof paren_expr .
+
+as_expr = primary_expr tok_as type_expr .
+primary_expr = tok_str |
+			   tok_chr |
+			   tok_ident |
+			   tok_number |
+  			   paren_expr .
+
+postfix_expr = dot_expr |
+               call_expr |
+               index_expr .
+
+dot_expr = tok_dot tok_ident .
+
+argument_list = expr { tok_comma expr } .
+call_expr = tok_oparen [ argument_list ] tok_cparen .
+index_expr = tok_obracket expr tok_cbracket .
