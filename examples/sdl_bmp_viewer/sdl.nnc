@@ -1,0 +1,212 @@
+// compile: nnc --no-opt sdl.nnc libSDL2-2.0.so /usr/lib/x86_64-linux-gnu/libc.so /usr/lib/x86_64-linux-gnu/crt1.o -o sdl_example
+
+// **** SDL declarations ****
+type u32 as UInt32;
+type i32 as int;
+
+type union {
+    kind: UInt32;
+    _pad: u8[56];
+} as SDL_Event;
+
+type struct {
+    x: int;
+    y: int;
+    w: int;
+    h: int;
+} as SDL_Rect;
+
+type struct {
+    _data: u8[96];
+    //flags: UInt32;
+    ////format: SDL_PixelFormat*;
+    //format: void*;
+    //w: int;
+    //h: int;
+    //pitch: int;
+    //pixels: void*;
+    //userdata: void*;
+    //locked: int;
+    //list_blitmap: void*;
+    //clip_rect: SDL_Rect;
+    //// map: SDL_BlitMap*;
+    //map: void*;
+    //refcount: int;
+} as SDL_Surface;
+
+type struct {
+    _data: u8[8];
+} as SDL_Window;
+
+type struct {
+    _data: u8[8];
+} as SDL_Renderer;
+
+type struct {
+    _data: u8[8];
+} as SDL_Texture;
+
+type struct {
+    _data: u8[72];
+} as SDL_RWops;
+
+fn ext SDL_Init(
+    flags: UInt32
+): int;
+
+fn ext SDL_GetError(): u8*;
+
+fn ext SDL_PollEvent(
+    event: SDL_Event*
+): int;
+
+fn ext SDL_CreateWindow(
+    title: u8*,
+    x: int,
+    y: int, 
+    w: int,
+    h: int,
+    flags: UInt32
+): SDL_Window*;
+
+fn ext SDL_DestroyWindow(
+    window: SDL_Window*
+);
+
+fn ext SDL_CreateRenderer(
+    window: SDL_Window*,
+    index: int,
+    flags: UInt32
+): SDL_Renderer*;
+
+fn ext SDL_DestroyRenderer(
+    renderer: SDL_Renderer*
+);
+
+fn ext SDL_LoadBMP_RW(
+    src: SDL_RWops*,
+    freesrc: int
+): SDL_Surface*;
+
+fn ext SDL_RWFromFile(
+    file: u8*,
+    mode: u8*
+): SDL_RWops*;
+
+fn ext SDL_FreeSurface(
+    surface: SDL_Surface*
+);
+
+fn ext SDL_CreateTextureFromSurface(
+    renderer: SDL_Renderer*,
+    surface: SDL_Surface*
+): SDL_Texture*;
+
+fn ext SDL_DestroyTexture(
+    texture: SDL_Texture*
+);
+
+fn ext SDL_RenderClear(
+    renderer: SDL_Renderer*
+);
+
+fn ext SDL_RenderCopy(
+    renderer: SDL_Renderer*,
+    texture: SDL_Texture*,
+    srcrect: SDL_Rect*,
+    dstrect: SDL_Rect*
+);
+
+fn ext SDL_RenderPresent(
+    renderer: SDL_Renderer*
+);
+
+fn ext SDL_Delay(
+    ms: UInt32
+);
+
+fn ext SDL_Quit();
+// **************************
+
+// **** libc declarations ****
+fn ext exit(code: i32);
+fn ext printf(s: u8*, x: void*);
+// **************************
+
+let NULL: void* = (void*)0;
+let EXIT_FAILURE: u8 = 1u8;
+let EXIT_SUCCESS: u8 = 0u8;
+
+let SDL_SWSURFACE: u32  = 0x00000000;
+let SDL_INIT_VIDEO: u32 = 0x00000020;
+let SDL_QUIT: u32 = 256;
+ 
+fn print(s: u8*)     { printf("%s", (void*)s); }
+fn print_num(x: i64) { printf("%d", (void*)x); }
+
+fn l_log(s: u8*) { print("[sdl]: ");      print(s); }
+fn l_err(s: u8*) { print("[sdl] error: "); print(s); exit(1); }
+
+pub fn main(argc: i32, argv: u8**): i32 {
+    if (argc != 2) {
+        l_err("You need to specify path to BMP image!\n");
+    }
+    l_log("SDL_Init\n");
+    if (SDL_Init(0xffffffffu32) != 0) {
+        l_err(SDL_GetError());
+    }
+    l_log("SDL_CreateWindow\n");
+	let win: SDL_Window* = SDL_CreateWindow("bmp viewer", 100, 100, 640, 420, 4);
+	if (!win) {
+		SDL_Quit();
+        l_err(SDL_GetError());
+	}
+
+    l_log("SDL_CreateRenderer\n");
+	let ren: SDL_Renderer* = SDL_CreateRenderer(win, -1, 2 | 4);
+	if (!ren) {
+		SDL_DestroyWindow(win);
+		SDL_Quit();
+        l_err(SDL_GetError());
+	}
+
+    l_log("SDL_LoadBMP\n");
+	let bmp: SDL_Surface* = SDL_LoadBMP_RW(SDL_RWFromFile(argv[1], "rb"), 1);
+	if (!bmp) {
+		SDL_DestroyRenderer(ren);
+		SDL_DestroyWindow(win);
+		SDL_Quit();
+        l_err(SDL_GetError());
+	}
+
+    l_log("SDL_CreateTextureFromSurface\n");
+    let tex: SDL_Texture* = SDL_CreateTextureFromSurface(ren, bmp);
+	if (!tex) {
+		SDL_FreeSurface(bmp);
+		SDL_DestroyRenderer(ren);
+		SDL_DestroyWindow(win);
+		SDL_Quit();
+        l_err(SDL_GetError());
+	}
+	SDL_FreeSurface(bmp);
+
+    let quit: i32 = 0;
+    let event: SDL_Event;
+    while (!quit) {
+        while (SDL_PollEvent(&event)) {
+            if (event.kind == SDL_QUIT) {
+                quit = 1;
+            }
+            else {
+                SDL_RenderClear(ren);
+                SDL_RenderCopy(ren, tex, NULL, NULL);
+                SDL_RenderPresent(ren);
+            }
+        }
+    }
+    SDL_DestroyTexture(tex);
+	SDL_DestroyRenderer(ren);
+	SDL_DestroyWindow(win);
+	SDL_Quit();
+    return EXIT_SUCCESS;
+}
