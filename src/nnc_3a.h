@@ -286,9 +286,14 @@ typedef struct _nnc_3a_proc {
     dictionary(nnc_3a_cgt,  nnc_3a_lr*) lr_cgt;
     dictionary(const char*, nnc_3a_lr*) lr_var;
     nnc_u64 quad_pointer;
-    nnc_u32 stack_usage;
-    nnc_u32 local_stack_offset;
+    nnc_u32 p_stack;     // amount of stack needed for function parameters.
+    nnc_u16 p_stack_pad; // pad value to align parameter stack to 16-byte boundary.
+    nnc_u32 l_stack;     // amount of stack needed for local variables.
     const vector(nnc_fn_param*) params;
+    nnc_i32 stack_alloc; // records amount of allocated bytes on stack,
+                         // to make proper 16-byte align when needed.
+                         // this value does not record amount of stack needed
+                         // for local variables or function arguments.
 } nnc_3a_proc;
 
 typedef nnc_3a_proc* nnc_3a_code;

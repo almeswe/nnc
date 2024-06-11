@@ -573,7 +573,7 @@ nnc_static void nnc_add_or_sub_to_3a(const nnc_binary_expression* binary, const 
         !nnc_arr_or_ptr_type(arg2.type)) {
         // apply pointer arithmetic here
         nnc_3a_quad quad = nnc_3a_mkquad1(
-            OP_MUL, arg2, arg2.type, arg2, nnc_3a_mki3(nnc_sizeof(arg1.type->base))
+            OP_MUL, arg2, &i64_type, arg2, nnc_3a_mki3(nnc_sizeof(arg1.type->base))
         );
         nnc_3a_quads_add(&quad);
     }
@@ -733,7 +733,7 @@ nnc_static void nnc_fn_stmt_to_3a(const nnc_fn_statement* fn_stmt, const nnc_st*
         .lr_var = map_init_with(8),
         .lr_cgt = map_init_with(32),
         .quad_pointer = 0,
-        .local_stack_offset = 0,
+        .l_stack = 0,
         //.param_stack_offset = 0,
         .params = fn_stmt->params
     };
@@ -963,7 +963,7 @@ nnc_static nnc_ir_proc nnc_gen_ir_proc(const nnc_statement* stmt, const nnc_st* 
         .lr_var = map_init_with(8),
         .lr_cgt = map_init_with(32),
         .quad_pointer = 0,
-        .local_stack_offset = 0,
+        .l_stack = 0,
         .params = (const nnc_fn_param**)fn_stmt->params
     };
     if (glob_argv.optimize) {

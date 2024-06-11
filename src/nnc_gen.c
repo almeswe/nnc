@@ -7,6 +7,8 @@
 
 #define nnc_mkloc_reg(r, t) (nnc_loc){ .where = L_REG, .exact.reg = r, .type = t }
 
+#define REG_LOC(r) (nnc_loc) { .where = L_REG, .exact.reg = r }
+
 #define REG_HAS_JUNK_0  (0)
 #define REG_HAS_JUNK_8  (1)
 #define REG_HAS_JUNK_16 (2)
@@ -35,6 +37,71 @@
 
 nnc_static nnc_u8 glob_junk_vec[21] = {0};
 nnc_static vector(nnc_pclass_state) glob_call_states = NULL;
+
+nnc_static void nnc_reset_junk_vec() {
+    memset(glob_junk_vec, REG_HAS_JUNK_64, sizeof(glob_junk_vec));
+}
+
+nnc_static void nnc_gen_push(const nnc_loc* loc) {
+    assert(loc->where == L_REG);
+    GEN_INST(I_PUSH);
+    GEN_TEXT(glob_reg_str[loc->exact.reg]);
+    GEN_TEXT("\r\n");
+    glob_asm_proc->stack_alloc += 8;
+}
+
+nnc_static void nnc_gen_pop(const nnc_loc* loc) {
+    assert(loc->where == L_REG);
+    GEN_INST(I_POP);
+    GEN_TEXT(glob_reg_str[loc->exact.reg]);
+    GEN_TEXT("\r\n");
+    glob_asm_proc->stack_alloc -= 8;
+    assert(glob_asm_proc->stack_alloc >= 0);
+}
+
+nnc_static void nnc_gen_alloc_stack(nnc_u32 bytes) {
+    if (bytes != 0) {
+        GEN_INST(I_SUB);
+        GEN_TEXT("rsp,%u\n", bytes);
+        glob_asm_proc->stack_alloc += bytes;
+    }
+}
+
+nnc_static void nnc_gen_dealloc_stack(nnc_u32 bytes) {
+    if (bytes != 0) {
+        GEN_INST(I_ADD);
+        GEN_TEXT("rsp,%u\n", bytes);
+        glob_asm_proc->stack_alloc -= bytes;
+    }
+    assert(glob_asm_proc->stack_alloc >= 0);
+}
+
+nnc_static nnc_u32 nnc_get_stack_pad(nnc_u32 bytes) {
+    // calculate amount of stack space to be added
+    // for performing 16byte stack alignment required by the ABI
+    nnc_u32 pad = bytes % NNC_STACK_ALIGN;
+    if (pad != 0) {
+        pad = (NNC_STACK_ALIGN - pad) % NNC_STACK_ALIGN;
+    }
+    return pad;
+}
+
+nnc_static nnc_u32 nnc_gen_align_stack(nnc_u32 bytes) {
+    nnc_u32 pad = nnc_get_stack_pad(bytes);
+    if (pad != 0) {
+        GEN_TEXT("# alignment\n");
+        if (pad == PS_QWORD) {
+            nnc_gen_push(&REG_LOC(R_R15));
+        }
+        else {
+            GEN_INST(I_AND), GEN_TEXT("rsp,0xfffffffffffffff0");
+            glob_asm_proc->stack_alloc += nnc_get_stack_pad(glob_asm_proc->stack_alloc);
+            GEN_TEXT("\r\n");
+        }
+    }
+    return pad;
+}
+
 
 nnc_static const char* nnc_get_ptr_size(const nnc_type* type) {
     if (nnc_arr_or_ptr_type(type)) {
@@ -135,8 +202,7 @@ nnc_static void nnc_pollute(nnc_reg reg, nnc_u8 amount) {
 nnc_static nnc_bool nnc_gen_reserve_reg(nnc_reg reg) {
     nnc_bool need_push = nnc_reserve_reg(reg);
     if (need_push) {
-        GEN_INST(I_PUSH);
-        GEN_TEXT("%s\n", glob_reg_str[reg]);
+        nnc_gen_push(&REG_LOC(reg));
     }
     return need_push;
 }
@@ -144,8 +210,11 @@ nnc_static nnc_bool nnc_gen_reserve_reg(nnc_reg reg) {
 nnc_static void nnc_gen_pop_reg(nnc_reg reg, nnc_bool pushed) {
     nnc_unreserve_reg(reg);
     if (pushed) {
-        GEN_INST(I_POP);
-        GEN_TEXT("%s\n", glob_reg_str[reg]);
+        nnc_loc loc = {
+            .exact.reg = reg,
+            .where = L_REG
+        };
+        nnc_gen_pop(&loc);
         nnc_pollute(reg, REG_HAS_JUNK_64);
     }
 }
@@ -169,7 +238,12 @@ nnc_static void nnc_gen_loc(const nnc_loc* at, const nnc_type* type) {
         }
         case L_STACK: {
             const char* ptr_size = nnc_get_ptr_size(type);
-            GEN_TEXT("%s ptr [rbp%d]", ptr_size, at->exact.mem);
+            if (at->exact.mem <= 0) {
+                GEN_TEXT("%s ptr [rbp%d]", ptr_size, at->exact.mem);
+            }
+            else {
+                GEN_TEXT("%s ptr [rbp+%d]", ptr_size, at->exact.mem);
+            }
             break;
         }
         case L_DATA: {
@@ -600,6 +674,7 @@ nnc_static void nnc_gen_label(const nnc_3a_addr* addr) {
 nnc_static void nnc_gen_label_decl(const nnc_quad* quad) {
     assert(quad->label != 0);
     GEN_TEXT(DR_LABEL"%u:\n", quad->label);
+    nnc_reset_junk_vec();
 }
 
 nnc_static void nnc_gen_op_ref(const nnc_3a_quad* quad) {
@@ -1030,13 +1105,16 @@ nnc_static void nnc_gen_op_arg(const nnc_3a_quad* quad) {
     // this is the location where it is must be placed, according to ABI
     nnc_loc abi_loc = nnc_store_param(&quad->arg1, state);
     if (abi_loc.where == L_REG) {
-        nnc_gen_mov_operand_to_reg(&abi_loc, &quad->arg1);            
+        assert(loc.where == L_REG);
+        nnc_gen_mov_reg_to_reg(&abi_loc, &loc);
+        // todo: (fix) call function `nnc_gen_mov_operand_to_reg`
+        // but note that `nnc_store_arg` updates current nnc_loc for quad->arg1,
+        // so `nnc_store` inside of `nnc_gen_mov_operand_to_reg` will return same nnc_loc.
+        buf_add(state->abi_used, abi_loc.exact.reg);
     }
     if (abi_loc.where == L_STACK) {
         assert(loc.where == L_REG);
-        GEN_INST(I_PUSH);
-        nnc_gen_loc(&loc, &u64_type); 
-        GEN_TEXT("\r\n");
+        nnc_gen_push(&loc);
     }
 }
 
@@ -1076,40 +1154,6 @@ nnc_static void nnc_gen_call(const nnc_3a_addr* addr) {
     GEN_TEXT("\r\n");
 }
 
-nnc_static void nnc_gen_alloc_stack(nnc_u32 bytes) {
-    assert(bytes % NNC_STACK_ALIGN == 0);
-    if (bytes != 0) {
-        GEN_INST(I_SUB);
-        GEN_TEXT("rsp,%u\n", bytes);
-    }
-}
-
-nnc_static void nnc_gen_dealloc_stack(nnc_u32 bytes) {
-    assert(bytes % NNC_STACK_ALIGN == 0);
-    if (bytes != 0) {
-        GEN_INST(I_ADD);
-        GEN_TEXT("rsp,%u\n", bytes);
-    }
-}
-
-nnc_static void nnc_gen_res_alloc(const nnc_3a_quad* quad, nnc_pclass_state* state) {
-    // if it is procedure (no result), skip.
-    if (quad->res.kind == ADDR_NONE) {
-        return;
-    }
-    // otherwise reserve RAX
-    state->res = &quad->res;
-    nnc_loc loc = nnc_store(state->res);
-    if (loc.where == L_REG) {
-        // if allocated storage is not RAX register, preserve it.
-        // it is needed for storing result of a function.
-        if (loc.exact.reg != R_RAX) {
-            state->was_res_pushed = nnc_gen_reserve_reg(R_RAX);
-            nnc_gen_xor_reg(&loc);
-        }
-    }
-}
-
 nnc_static void nnc_gen_res_dealloc(nnc_pclass_state* state) {
     if (state->res == NULL) {
         return;
@@ -1119,40 +1163,18 @@ nnc_static void nnc_gen_res_dealloc(nnc_pclass_state* state) {
     }
 }
 
-nnc_static nnc_u32 nnc_get_stack_pad(nnc_u32 bytes) {
-    // calculate amount of stack space to be added
-    // for performing 16byte stack alignment required by the ABI
-    nnc_u32 pad = bytes % NNC_STACK_ALIGN;
-    if (pad != 0) {
-        pad = (NNC_STACK_ALIGN - pad) % NNC_STACK_ALIGN;
-    }
-    return pad;
-}
-
-nnc_static nnc_u32 nnc_gen_align_stack(nnc_u32 bytes) {
-    nnc_u32 pad = nnc_get_stack_pad(bytes);
-    if (pad != 0) {
-        if (pad == PS_QWORD) {
-            GEN_INST(I_PUSH), GEN_TEXT("r15");
-        }
-        else {
-            GEN_INST(I_AND), GEN_TEXT("rsp,0xfffffffffffffff0");
-        }
-        GEN_TEXT("\r\n");
-    }
-    return pad;
-}
-
 nnc_static void nnc_gen_caller_prepare() {
     nnc_pclass_state* state = &buf_last(glob_call_states);
-    state->on_stack += nnc_gen_align_stack(state->on_stack);
+    nnc_u32 pad = nnc_get_stack_pad(glob_asm_proc->stack_alloc);
+    pad += nnc_get_stack_pad(state->on_stack);
+    state->on_stack += nnc_gen_align_stack(pad);
 }
 
 nnc_static void nnc_gen_caller_restore() {
     nnc_pclass_state* state = &buf_last(glob_call_states);
     nnc_gen_dealloc_stack(state->on_stack);
-    for (nnc_u64 i = 0; i < buf_len(state->pushed); i++) {
-        GEN_INST(I_POP), GEN_TEXT("%s\n", state->pushed[i]);
+    for (nnc_u64 i = buf_len(state->pushed); i > 0; i--) {
+        nnc_gen_pop(&REG_LOC(state->pushed[i-1]));
     }
     nnc_gen_res_dealloc(state);
     nnc_pclass_state_fini(state);
@@ -1168,7 +1190,11 @@ nnc_static void nnc_gen_op_pcall(const nnc_3a_quad* quad) {
 nnc_static void nnc_gen_op_fcall(const nnc_3a_quad* quad) {
     nnc_gen_caller_prepare();
     nnc_gen_call(&quad->arg1);
+    nnc_loc res_loc = nnc_store(&quad->res);
+    nnc_loc rax_loc = nnc_mkloc_reg(R_RAX, quad->res.type);
+    nnc_gen_mov_reg_to_operand(&rax_loc, &quad->res);
     nnc_gen_caller_restore();
+    //GEN_TEXT("# --------------------------------------------\n");
 }
 
 nnc_static void nnc_gen_cmp(const nnc_3a_quad* quad) {
@@ -1263,7 +1289,26 @@ nnc_static void nnc_gen_op_cjumpne(const nnc_3a_quad* quad) {
 nnc_static void nnc_gen_op_decl_call(const nnc_3a_quad* quad) {
     nnc_pclass_state state = { .was_init = false };
     nnc_pclass_state_init(&state);
-    nnc_gen_res_alloc(quad, &state);
+    //GEN_TEXT("# --------------------CALL--------------------\n");
+    nnc_reg res_reg = R_NONE;
+    if (quad->res.kind != ADDR_NONE) {
+        // allocate location for call result
+        nnc_loc res_loc = nnc_store(&quad->res);
+        if (res_loc.where == L_REG) {
+            res_reg = res_loc.exact.reg;
+        }
+    }
+    // save used registers before call, but do not
+    // save register that contains the result of the call,
+    // otherwise it can cause erase call's result.
+    for (nnc_reg r = R_RAX; r <= R_R15; r++) {
+        if (nnc_reg_busy(r) && res_reg != r) {
+            // add register to state `pushed` vector,
+            // so they will be restored later. 
+            nnc_push_reg(r), buf_add(state.pushed, r);
+            nnc_gen_push(&REG_LOC(r));
+        }
+    }
     buf_add(glob_call_states, state);
 }
 
@@ -1289,11 +1334,13 @@ nnc_static void nnc_gen_op_decl_string(const nnc_3a_quad* quad) {
 }
 
 nnc_static void nnc_gen_proc_prologue(nnc_3a_proc* proc) {
-    nnc_u32 pad = nnc_get_stack_pad(proc->local_stack_offset);
-    nnc_u32 num = proc->local_stack_offset + pad;
-    GEN_TEXT("# stack size: %u;\n", proc->local_stack_offset);
-    GEN_TEXT("# aligned   : +%u;\n", pad);
-    if (proc->local_stack_offset == 0) {
+    nnc_u32 pad = nnc_get_stack_pad(proc->l_stack);
+    nnc_u32 num = proc->l_stack + pad;
+    if (proc->l_stack != 0 && pad != 0) {
+        GEN_TEXT("# stack size: %u;\n", proc->l_stack);
+        GEN_TEXT("# aligned   : +%u;\n", pad);
+    }
+    if (proc->l_stack == 0) {
         // do not generate `enter` here because it will
         // contain `sub rsp, N` in it
         GEN_INST(I_PUSH), GEN_TEXT("rbp\n");
@@ -1330,20 +1377,29 @@ nnc_static nnc_asm_proc nnc_build_proc(const nnc_blob_buf* code_impl) {
     return *proc;
 }
 
-nnc_static void nnc_reset_junk_vec() {
-    memset(glob_junk_vec, REG_HAS_JUNK_64, sizeof(glob_junk_vec));
-}
-
-nnc_static nnc_u32 nnc_callee_stack_usage() {
-    //todo: check if function has nested calls, to avoid useless spill
-    assert(false);
+nnc_static nnc_u32 nnc_get_callee_stack() {
+    //todo: check if function has nested calls, to avoid useless spills
     // Due to the fact that all parameters are spilled 
     // to the stack at the beginning, allocated space
     return buf_len(glob_asm_proc->params) * PS_QWORD;
-} 
+}
 
 nnc_static void nnc_gen_store_params() {
-    glob_asm_proc->stack_usage = nnc_callee_stack_usage();
+    glob_asm_proc->p_stack = nnc_get_callee_stack();
+    glob_asm_proc->p_stack_pad = nnc_get_stack_pad(glob_asm_proc->p_stack);
+    nnc_pclass_state state = { .p_stack_pad = glob_asm_proc->p_stack_pad };
+    nnc_pclass_state_init(&state);
+    for (nnc_u64 i = 0; i < buf_len(glob_asm_proc->params); i++) {
+        const nnc_fn_param* param = glob_asm_proc->params[i];
+        const nnc_3a_addr addr = nnc_3a_mkname1(param->var);
+        nnc_loc p_loc = nnc_store_param(&addr, &state);
+        if (p_loc.where == L_REG) {
+            nnc_loc p_mem_loc = nnc_spill(&addr);
+            nnc_gen_mov_reg_to_mem(&p_mem_loc, &p_loc);
+        }
+    }
+    assert(state.pushed == NULL);
+    nnc_pclass_state_fini(&state);
 }
 
 /**
@@ -1469,5 +1525,6 @@ nnc_blob_buf nnc_build(nnc_asm_file* file) {
         nnc_blob_buf_append(&impl, &glob_asm_file.ds_impl);
         nnc_blob_buf_fini(&glob_asm_file.ds_impl);
     }
+    nnc_reset_str_map();
     return impl;
 }

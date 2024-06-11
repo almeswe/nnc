@@ -36,6 +36,9 @@ const static nnc_reg _int_p_local[] = {
  */
 nnc_static vector(nnc_3a_lr*) glob_lr_vec[21] = {0};
 
+nnc_static nnc_u32 glob_str_counter = 0;
+nnc_static _map_(char*, char*) glob_str_map = NULL;
+
 /**
  * @brief Global map for storing location associated with addresses.
  *  `nnc_store` uses it to avoid allocation of new location for same address.
@@ -97,11 +100,12 @@ nnc_static nnc_3a_lr* nnc_peek_reg(nnc_reg reg) {
     return buf_last(lr);
 }
 
-nnc_static nnc_bool nnc_reg_in_use(nnc_reg reg) {
-    nnc_3a_lr* lr = nnc_new(nnc_3a_lr);
-    lr->starts = glob_asm_proc->quad_pointer;
-    lr->ends = UINT32_MAX;
-    return nnc_lr_intersects(lr, nnc_peek_reg(reg));
+nnc_bool nnc_reg_busy(nnc_reg reg) {
+    nnc_3a_lr lr = {
+        .starts = glob_asm_proc->quad_pointer,
+        .ends = UINT32_MAX 
+    };
+    return nnc_lr_intersects(&lr, nnc_peek_reg(reg));
 }
 
 nnc_static void nnc_update_reg(nnc_reg reg, nnc_3a_lr* by) {
@@ -115,11 +119,15 @@ nnc_static void nnc_update_reg(nnc_reg reg, nnc_3a_lr* by) {
 }
 
 void nnc_pop_reg(nnc_reg reg) {
-    assert(!nnc_reg_lr_empty(reg));
-    buf_pop(glob_lr_vec[reg]);
+    //printf("pop: %s\n", glob_reg_str[reg]);
+    //assert(!nnc_reg_lr_empty(reg));
+    if (!nnc_reg_lr_empty(reg)) {
+        buf_pop(glob_lr_vec[reg]);
+    }
 }
 
 void nnc_push_reg(nnc_reg reg) {
+    //printf("push: %s\n", glob_reg_str[reg]);
     vector(nnc_3a_lr*) lr = glob_lr_vec[reg];
     assert(buf_last(lr) != NULL);
     buf_add(lr, NULL);
@@ -127,11 +135,12 @@ void nnc_push_reg(nnc_reg reg) {
 
 nnc_bool nnc_reserve_reg(nnc_reg reg) {
     //todo: free this lr?
+    //printf("reserve: %s\n", glob_reg_str[reg]);
     nnc_3a_lr* lr = nnc_new(nnc_3a_lr);
     lr->starts = glob_asm_proc->quad_pointer;
     lr->ends = UINT32_MAX;
     nnc_bool pushed = false;
-    if (nnc_reg_in_use(reg)) {
+    if (nnc_reg_busy(reg)) {
         nnc_push_reg(reg);
         pushed = true;
     }    
@@ -140,9 +149,12 @@ nnc_bool nnc_reserve_reg(nnc_reg reg) {
 }
 
 void nnc_unreserve_reg(nnc_reg reg) {
-    assert(!nnc_reg_lr_empty(reg));
+    //printf("unreserve: %s\n", glob_reg_str[reg]);
+    //assert(!nnc_reg_lr_empty(reg));
     //assert(nnc_reg_in_use(reg));
-    buf_pop(glob_lr_vec[reg]);
+    if (!nnc_reg_lr_empty(reg)) {
+        buf_pop(glob_lr_vec[reg]);
+    }
 }
 
 /**
@@ -200,21 +212,18 @@ nnc_static void nnc_make_var_loc_label(char* buf, const nnc_3a_addr* addr) {
  */
 nnc_static void nnc_make_str_loc_label(char* buf, const nnc_3a_addr* addr) {
     assert(addr->kind == ADDR_SCONST);
-    static nnc_u32 str_label_counter = 0;
-    //todo: free this somehow?
-    static _map_(char*, char*) str_id_value_map = NULL;
     nnc_str value = addr->exact.sconst.sconst;
-    if (str_id_value_map == NULL) {
-        str_id_value_map = map_init_with(8);
+    if (glob_str_map == NULL) {
+        glob_str_map = map_init_with(8);
     }
-    if (map_has_s(str_id_value_map, value)) {
-        const char* label = map_get_s(str_id_value_map, value);
+    if (map_has_s(glob_str_map, value)) {
+        const char* label = map_get_s(glob_str_map, value);
         strcpy(buf, label);
     }
     else {
-        sprintf(buf, "s_%u", str_label_counter++);
+        sprintf(buf, "s_%u", glob_str_counter++);
         char* label = nnc_strdup(buf);
-        map_put_s(str_id_value_map, value, label);
+        map_put_s(glob_str_map, value, label);
     }
 }
 
@@ -296,23 +305,29 @@ nnc_static nnc_loc* nnc_make_ds_loc(const nnc_3a_addr* addr) {
 
 nnc_static nnc_loc* nnc_make_ss_loc(const nnc_3a_addr* addr) {
     nnc_loc* loc = nnc_new(nnc_loc);
-    glob_asm_proc->local_stack_offset += nnc_sizeof(addr->type);
+    glob_asm_proc->l_stack += nnc_sizeof(addr->type);
     loc->where = L_STACK;
     loc->type = addr->type;
-    loc->exact.mem = -glob_asm_proc->local_stack_offset;
+    loc->exact.mem = -glob_asm_proc->l_stack;
+    nnc_put_loc(loc, addr);
+    return loc;
+}
+
+nnc_static nnc_loc* nnc_make_pss_loc(const nnc_3a_addr* addr, const nnc_pclass_state* state) {
+    nnc_loc* loc = nnc_new(nnc_loc);
+    loc->where = L_STACK;
+    loc->type = addr->type;
+    loc->exact.mem = 8 + state->p_stack_pad + state->on_stack;
     nnc_put_loc(loc, addr);
     return loc;
 }
 
 nnc_static void nnc_pclass_state_push_regs(nnc_pclass_state* state) {
     assert(state->pushed == NULL);
-    const vector(nnc_reg) p_vec = _int_p_param;
-    nnc_u64 p_len = nnc_arr_size(_int_p_param);
-    for (nnc_u64 i = 0; i < p_len; i++) {
-        const nnc_reg reg = p_vec[i];
-        if (nnc_reg_in_use(reg)) {
-            nnc_push_reg(reg);
-            buf_add(state->pushed, reg);
+    for (nnc_reg r = R_RAX; r < R_R15; r++) {
+        if (nnc_reg_busy(r) && r != state->exception_reg) {
+            nnc_push_reg(r);
+            buf_add(state->pushed, r);
         }
     }
 }
@@ -340,6 +355,11 @@ nnc_static void nnc_reloc_glob_sym(nnc_map_key key, nnc_map_val val) {
     else {
         map_put_s(glob_loc_map, label, loc);
     }
+}
+
+void nnc_reset_str_map() {
+    map_fini(glob_str_map);
+    glob_str_map = NULL;
 }
 
 /**
@@ -389,7 +409,8 @@ void nnc_pclass_state_init(nnc_pclass_state* state) {
     state->int_iter = 0;
     state->sse_iter = 0;
     state->pushed = NULL;
-    nnc_pclass_state_push_regs(state);
+    state->abi_used = NULL;
+    //nnc_pclass_state_push_regs(state);
 }
 
 /**
@@ -397,8 +418,14 @@ void nnc_pclass_state_init(nnc_pclass_state* state) {
  * @param state Pointer to initialized state.
  */
 void nnc_pclass_state_fini(nnc_pclass_state* state) {
-    const vector(nnc_reg) p_vec = state->pushed;
+    const vector(nnc_reg) p_vec = state->abi_used;
     nnc_u64 p_len = buf_len(p_vec);
+    for (nnc_u64 i = 0; i < p_len; i++) {
+        nnc_unreserve_reg(p_vec[i]);
+    }
+    buf_free(state->abi_used);
+    p_vec = state->pushed;
+    p_len = buf_len(p_vec);
     for (nnc_u64 i = 0; i < p_len; i++) {
         nnc_pop_reg(p_vec[i]);
     }
@@ -524,19 +551,32 @@ nnc_loc nnc_store(const nnc_3a_addr* addr) {
     return (nnc_loc){ .where = L_NONE };
 }
 
+nnc_loc nnc_spill(const nnc_3a_addr* addr) {
+    assert(addr->kind == ADDR_NAME);
+    assert(addr->exact.name.ictx == IDENT_FUNCTION_PARAM);
+    const nnc_loc* loc = nnc_get_loc(addr);
+    if (loc == NULL || loc->where != L_REG) {
+        nnc_abort_no_ctx("nnc_spill: cannot spill from empty or non-reg location.\n");
+    }
+    // todo: asserts above are needed to guarantee that
+    // there are no need for generating register restore.
+    nnc_unreserve_reg(loc->exact.reg);
+    return *nnc_make_ss_loc(addr);
+}
+
 nnc_static nnc_loc nnc_store_int_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
     const vector(nnc_reg) p_vec = _int_p_param;
     nnc_u64 p_len = nnc_arr_size(_int_p_param);
     const nnc_reg reg = p_vec[state->int_iter-1]; 
     nnc_reserve_reg(reg);
-    return (nnc_loc){ .type = addr->type, .where = L_REG, .exact.reg = reg };
+    return *nnc_make_reg_loc(reg, addr);
 }
 
 nnc_static nnc_loc nnc_store_mem_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
     // PS_QWORD specified because parameters will be pushed on stack
     assert(nnc_sizeof(addr->type) <= PS_QWORD);
     state->on_stack += PS_QWORD;
-    return (nnc_loc){ .type = addr->type, .where = L_STACK };
+    return *nnc_make_pss_loc(addr, state);
 }
 
 nnc_loc nnc_store_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {

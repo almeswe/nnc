@@ -38,7 +38,7 @@ nnc_static nnc_i32 nnc_shell(const char* desc, const char* what) {
 
 nnc_static void nnc_compile_pass1(const char* source) {
     nnc_check_for_errors();
-    glob_ir = NULL, glob_compiled = NULL;
+    glob_ir = NULL;
     glob_ast = nnc_parse(source);
     glob_asm_file = (nnc_asm_file){0};
     nnc_blob_buf_init(&glob_asm_file.ds_impl);
@@ -69,6 +69,7 @@ nnc_static void nnc_compilation_fini() {
 
 nnc_static void nnc_compile() {
     char dot_star[MAX_PATH] = {0};
+    glob_compiled = NULL;
     for (nnc_u64 i = 0; i < buf_len(glob_argv.sources); i++) {
         nnc_compile_pass1(glob_argv.sources[i]);
         nnc_compile_pass2();

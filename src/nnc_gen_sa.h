@@ -39,7 +39,8 @@ typedef enum _nnc_x86_64_reg {
     R_XMM0, R_XMM1, 
     R_XMM2, R_XMM3,
     R_XMM4, R_XMM5,
-    R_XMM6, R_XMM7
+    R_XMM6, R_XMM7,
+    R_NONE
 } nnc_reg;
 
 /**
@@ -104,9 +105,12 @@ typedef struct _nnc_pclass_state {
     nnc_u32 on_stack;
     nnc_bool was_init;
     nnc_bool was_res_pushed;
+    nnc_u16 p_stack_pad;
     // ...
     const nnc_3a_addr* res;
     vector(nnc_reg) pushed;
+    vector(nnc_reg) abi_used;
+    nnc_reg exception_reg;
 } nnc_pclass_state;
 
 /**
@@ -135,6 +139,10 @@ void nnc_unreserve_reg(
     const nnc_reg reg
 );
 
+nnc_bool nnc_reg_busy(
+    nnc_reg reg
+);
+
 /**
  * @brief Gets associated location with some address.
  * @param addr Address for which to search.
@@ -150,9 +158,14 @@ const nnc_loc* nnc_get_loc(
 void nnc_reset_lr_vec();
 
 /**
- * @brief Resets map of addr to loc association map.
+ * @brief Resets addr to loc association map.
  */
 void nnc_reset_loc_map();
+
+/**
+ * @brief Resets string literal map.
+ */
+void nnc_reset_str_map();
 
 /**
  * @brief Gets parameter class of the parameter's type.
@@ -194,7 +207,16 @@ nnc_loc nnc_store(
 );
 
 /**
- * @brief Stores function parameter (or argument in a call) 
+ * @brief Spills address stored in register to stack memory.
+ * @param addr Address to be spilled.
+ * @return New location in memory. Previous location in updated.
+ */
+nnc_loc nnc_spill(
+    const nnc_3a_addr* addr
+);
+
+/**
+ * @brief Stores function parameter. 
  * @param addr Address to be stored.
  * @return Location. If `.where` is L_NONE, nothing happened.
  *  (but see the implementation, may be this is a bug)
