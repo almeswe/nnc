@@ -1,0 +1,12 @@
+fn ext printf(
+    s: u8*,
+    x: i64
+);
+
+pub fn printld(x: i64) {
+    printf("%d", x);
+}
+
+pub fn print(s: u8*) {
+    printf("%s", (i64)s);
+}
