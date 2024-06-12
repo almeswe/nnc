@@ -1,0 +1,194 @@
+type enum {
+    TOK_ADD = 0,
+    TOK_SUB = 1,
+    TOK_MUL = 2,
+    TOK_DIV = 3,
+    TOK_NUM = 4,
+    TOK_OP  = 5,
+    TOK_CP  = 6,
+    TOK_EOF = 7
+} as tok;
+
+let expr_p: u8*;
+let expr_p_len: u64 = 0;
+let expr_ptr: u64 = 0;
+let expr_val: i64 = 0;
+
+let curr_num: u8[32];
+
+fn panic(s: u8*) {
+    print(s);
+    free(expr_p);
+    exit(1);
+}
+
+fn digit(c: u8): i32 {
+    return c >= '0' && c <= '9';
+}
+
+fn commit_tok(t: tok): tok {
+    expr_ptr = expr_ptr + 1;
+    return t;
+}
+
+fn next_num(): tok {
+    memset(curr_num, 0i8, lengthof(curr_num));
+    for (let idx: u64 = 0;; idx = idx + 1) {
+        curr_num[idx] = expr_p[expr_ptr];
+        expr_ptr = expr_ptr + 1;
+        if (!digit(expr_p[expr_ptr])) {
+            break;
+        }
+    }
+    return TOK_NUM;
+}
+
+fn curr_tok(): tok {
+    if (expr_ptr >= expr_p_len) {
+        return TOK_EOF;
+    }
+    let c: u8 = expr_p[expr_ptr];
+    if (c == ' ') {
+        expr_ptr = expr_ptr + 1;
+        return curr_tok();
+    }
+    if (digit(c)) {
+        return TOK_NUM;
+    }
+    if (c == '+') {
+        return TOK_ADD;
+    }
+    if (c == '-') {
+        return TOK_SUB;
+    }
+    if (c == '*') {
+        return TOK_MUL;
+    }
+    if (c == '/') {
+        return TOK_DIV;
+    }
+    if (c == '(') {
+        return TOK_OP;
+    }
+    if (c == ')') {
+        return TOK_CP;
+    }
+    panic("bad input expr\n");
+}
+
+fn next_tok(): tok {
+    let curr: tok = curr_tok(); 
+    return curr == TOK_NUM ? next_num() : commit_tok(curr);
+}
+
+fn parse_num(): i64 {
+    let t: tok = next_tok();
+    return atoi(curr_num);
+}
+
+fn parse_paren_expr(): i64 {
+    let val: i64 = parse_add_expr();
+    if (next_tok() != TOK_CP) {
+        panic("expected close paren\n");
+    }
+    return val;
+}
+
+fn parse_unary_expr(): i64 {
+    let t: tok = next_tok();
+    if (t == TOK_SUB) {
+        return -parse_unary_expr();
+    }
+    if (t == TOK_NUM) {
+        return atoi(curr_num);
+    }
+    if (t == TOK_OP) {
+        return parse_paren_expr();
+    }    
+    panic("bad primary expr\n\r");
+}
+
+fn parse_mul_expr(): i64 {
+    let rval: i64 = 0;
+    let lval: i64 = parse_unary_expr();
+    for (;;) {
+        let op: tok = curr_tok();
+        if (op == TOK_MUL || op == TOK_DIV) {
+            next_tok();
+            rval = parse_unary_expr();
+            if (op == TOK_MUL) {
+                lval = lval * rval;
+            }
+            else {
+                if (rval == 0) {
+                    panic("cannot divide by zero!\n");
+                }
+                lval = lval / rval;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    return lval;
+}
+
+fn parse_add_expr(): i64 {
+    let rval: i64 = 0;
+    let lval: i64 = parse_mul_expr();
+    for (;;) {
+        let op: tok = curr_tok();
+        if (op == TOK_ADD || op == TOK_SUB) {
+            next_tok();
+            rval = parse_mul_expr();
+            if (op == TOK_ADD) {
+                lval = lval + rval;
+            }
+            else {
+                lval = lval - rval;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    return lval;
+}
+
+pub fn eval(p: u8*): i64 {
+    expr_p = p;
+    expr_p_len = strlen(p);
+    let val: i64 = parse_add_expr();
+    free(expr_p);
+    return val;
+}
+
+fn ext free(
+    p: u8*
+);
+
+fn ext malloc(
+    size: u64
+): u8*;
+
+fn ext strlen(
+    p: u8*
+): i32;
+
+fn ext memcpy(
+    dst: u8*,
+    src: u8*,
+    size: u64
+): u8*;
+
+fn ext memset(
+    src: u8*,
+    c: u8,
+    size: u64
+);
+
+fn ext exit(code: i32);
+fn ext perror(s: u8*);
+fn ext print(s: u8*); 
+fn ext printld(x: i64);
+fn ext atoi(p: u8*): i64;

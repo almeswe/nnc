@@ -1,0 +1,60 @@
+// nnc --no-opt *.nnc /usr/lib/x86_64-linux-gnu/crt1.o /usr/lib/x86_64-linux-gnu/libc.so -o eval
+
+fn ext eval(p: u8*): i64;
+fn ext print(s: u8*); 
+fn ext printld(x: i64);
+
+pub fn expr(argc: i32, argv: u8**): u8* {
+    let expr_str: u8* = (u8*)0;
+    let expr_str_size: u64 = 0;  
+    for (let i: i32 = 1; i < argc; i = i + 1) {
+        expr_str_size = expr_str_size + strlen(argv[i]);
+    }
+    expr_str_size  = expr_str_size + argc;
+    expr_str = malloc(expr_str_size + 1);
+    expr_str[expr_str_size] = '\0';
+    if (!expr_str) {
+        perror("malloc"); exit(1);
+    }
+    let offset: u64 = 0;
+    for (let i: i32 = 1; i < argc; i = i + 1) {
+        let len: u64 = strlen(argv[i]);
+        memcpy(expr_str + offset, argv[i], len);
+        offset = offset + len;
+        expr_str[offset] = ' ';
+        offset = offset + 1;
+    }
+    return expr_str;
+}
+
+pub fn main(argc: i32, argv: u8**): i32 {
+    let val: i64 = 0;
+    if (argc <= 1) {
+        return 1;
+    }
+    val = eval(expr(argc, argv));
+    printld(val);
+    print("\r\n");
+    return 0;
+}
+
+fn ext free(
+    p: u8*
+);
+
+fn ext malloc(
+    size: u64
+): u8*;
+
+fn ext strlen(
+    p: u8*
+): i32;
+
+fn ext memcpy(
+    dst: u8*,
+    src: u8*,
+    size: u64
+): u8*;
+
+fn ext exit(code: i32);
+fn ext perror(s: u8*);
