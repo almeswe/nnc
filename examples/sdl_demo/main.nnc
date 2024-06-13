@@ -1,0 +1,63 @@
+type u64 as SDL_Window;
+type u64 as SDL_Renderer;
+
+type enum {
+    SCREEN_WIDTH = 800,
+    SCREEN_HEIGHT = 600
+} as scr_const;
+
+fn print(s: u8*) { printf("%s", (void*)s); }
+fn l_err(s: u8*) { print("[sdl] error: "); print(s); exit(1); }
+
+pub fn main(): i32 {
+    if (SDL_Init(0x00000020u32) < 0) {
+        l_err(SDL_GetError());
+        return 0;
+    }
+    let window: SDL_Window* = SDL_CreateWindow(
+        "SDL demo",
+        0,
+        0,
+        SCREEN_WIDTH as i32,
+        SCREEN_HEIGHT as i32,
+        4
+    );
+    if (!window) {
+        l_err(SDL_GetError());
+    }
+    else {
+        // Create renderer
+        let renderer: SDL_Renderer* = SDL_CreateRenderer(window, -1, 2);
+        if (!renderer) {
+            l_err(SDL_GetError());
+        }
+        else {
+            // Start the game
+            Game_start(
+                renderer,
+                SCREEN_WIDTH as i32,
+                SCREEN_HEIGHT as i32
+            );
+            // Destroy renderer
+            SDL_DestroyRenderer(renderer);
+        }
+        // Destroy windowl
+        SDL_DestroyWindow(window);
+    }
+    // Quit SDL
+    SDL_Quit();
+    return 0;
+}
+
+fn ext exit(code: i32);
+fn ext printf(s: u8*, x: void*);
+
+fn ext Game_start(renderer: SDL_Renderer*, w: i32, h: i32);
+
+fn ext SDL_Init(flags: u32): i32;
+fn ext SDL_GetError(): u8*;
+fn ext SDL_CreateWindow(title: u8*, x: i32, y: i32,  w: i32, h: i32, flags: u32): SDL_Window*;
+fn ext SDL_DestroyWindow(window: SDL_Window*);
+fn ext SDL_CreateRenderer(window: SDL_Window*, index: i32, flags: u32): SDL_Renderer*;
+fn ext SDL_DestroyRenderer(renderer: SDL_Renderer*);
+fn ext SDL_Quit();

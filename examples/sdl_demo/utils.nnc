@@ -1,0 +1,31 @@
+type struct {
+    r: u8;
+    g: u8;
+    b: u8;
+    a: u8;
+} as SDL_Color;
+
+type u64 as SDL_Renderer;
+
+type struct {
+    tv_sec: i64;
+    tv_nsec: i64;
+} as timespec;
+
+pub fn Utils_setBackgroundColor(renderer: SDL_Renderer*, color: SDL_Color*) {
+    // Initialize renderer color
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    // Clear screen
+    SDL_RenderClear(renderer);
+}
+
+pub fn Utils_time(): i64 {
+    let t: timespec;
+    clock_gettime(4, &t);
+    let val: i64 = t.tv_sec * 1000 + t.tv_nsec / 1000000;
+    return val;
+}
+
+fn ext clock_gettime(val: u64, t: timespec*);
+fn ext SDL_SetRenderDrawColor(renderer: SDL_Renderer*, r: u8, g: u8, b: u8, a: u8);
+fn ext SDL_RenderClear(renderer: SDL_Renderer*);
