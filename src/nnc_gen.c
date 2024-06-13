@@ -1,6 +1,8 @@
 #include "nnc_gen.h"
 #include "nnc_state.h"
 
+//todo: make enum 4 bytes please. (or manually set size for them)
+
 //todo: cfi or .loc directives??
 // https://sourceware.org/binutils/docs/as/
 // https://docs.oracle.com/cd/E53394_01/html/E54851/eoiyg.html
@@ -921,14 +923,16 @@ nnc_static void nnc_gen_rdx_extend(const nnc_3a_quad* quad) {
         case PS_DWORD: GEN_INST(I_CDQ); break;
         case PS_QWORD: GEN_INST(I_CQO); break;
         default: {
-            nnc_abort_no_ctx("nnc_GEN_INST_idiv: bad size of res.");
+            nnc_abort_no_ctx("nnc_gen_inst_idiv: bad size of res.");
         }
     }
     GEN_TEXT("\r\n");
 }
 
 nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, nnc_asm_inst div, nnc_bool mod) {
+    //todo: refactor this shit
     assert(!nnc_real_type(quad->res.type));
+    //GEN_TEXT("# div started\n");
     nnc_bool rax_pushed = false;
     nnc_bool rdx_pushed = nnc_gen_reserve_reg(R_RDX);
     nnc_loc rax_loc = nnc_mkloc_reg(R_RAX, quad->arg1.type);
@@ -937,6 +941,13 @@ nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, nnc_asm_inst div, nn
     if (!nnc_addr_inside_reg(&quad->arg1, R_RAX)) {
         rax_pushed = nnc_gen_reserve_reg(R_RAX);
         nnc_gen_mov_operand_to_reg(&rax_loc, &quad->arg1);
+        if (nnc_addr_inside_reg(&quad->arg2, R_RAX)) {
+            rax_pushed = false;
+            nnc_unreserve_reg(R_RAX);
+            nnc_swap_loc(&quad->arg1, &quad->arg2);
+            nnc_loc reg_loc = nnc_store(&quad->arg2);
+            nnc_gen_pop(&REG_LOC(reg_loc.exact.reg));
+        }
     }
     if (glob_junk_vec[R_RDX] != REG_HAS_JUNK_0) {
         nnc_gen_xor_reg(&rdx_loc);
@@ -958,6 +969,7 @@ nnc_static void nnc_gen_one_op_div(const nnc_3a_quad* quad, nnc_asm_inst div, nn
         nnc_gen_pop_reg(R_RAX, rax_pushed);
     }
     nnc_gen_pop_reg(R_RDX, rdx_pushed);
+    //GEN_TEXT("# div ended\n");
 }
 
 // https://www.felixcloutier.com/x86/div

@@ -216,6 +216,17 @@ nnc_loc nnc_spill(
 );
 
 /**
+ * @brief Swaps locations of two addresses.
+ *  This function assumes that location is allocated for both addresses.
+ * @param addr1 First address.
+ * @param addr2 Second address.
+ */
+void nnc_swap_loc(
+    const nnc_3a_addr* addr1,
+    const nnc_3a_addr* addr2
+);
+
+/**
  * @brief Stores function parameter. 
  * @param addr Address to be stored.
  * @return Location. If `.where` is L_NONE, nothing happened.

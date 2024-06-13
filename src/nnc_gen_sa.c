@@ -564,6 +564,18 @@ nnc_loc nnc_spill(const nnc_3a_addr* addr) {
     return *nnc_make_ss_loc(addr);
 }
 
+void nnc_swap_loc(const nnc_3a_addr* addr1, const nnc_3a_addr* addr2) {
+    const nnc_loc* loc1 = nnc_get_loc(addr1);
+    const nnc_loc* loc2 = nnc_get_loc(addr2);
+    assert(loc1->where == L_REG);
+    assert(loc2->where == L_REG);
+    if (loc1 == NULL || loc2 == NULL) {
+        nnc_abort_no_ctx("nnc_swap_loc: cannot swap NULL location.\n");
+    }
+    nnc_put_loc(loc1, addr2);
+    nnc_put_loc(loc2, addr1);
+}
+
 nnc_static nnc_loc nnc_store_int_param(const nnc_3a_addr* addr, nnc_pclass_state* state) {
     const vector(nnc_reg) p_vec = _int_p_param;
     nnc_u64 p_len = nnc_arr_size(_int_p_param);
