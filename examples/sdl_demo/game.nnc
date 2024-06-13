@@ -1,0 +1,377 @@
+type enum {
+    GRID_MAX_X_CELLS = 20,
+    GRID_MAX_Y_CELLS = 20
+} as constants;
+
+type struct {
+    _data: u8[20];
+} as FPSmanager;
+
+type struct {
+    r: u8;
+    g: u8;
+    b: u8;
+    a: u8;
+} as SDL_Color;
+
+type struct {
+    x: u32;
+    y: u32;
+    w: u32;
+    h: u32;
+} as SDL_Rect;
+
+type struct {
+    scancode: u32;
+    sym:      u32;
+    mod:      u16;
+    unused:   u16;
+    unused2:  u32;
+} as SDL_Keysym;
+
+type struct {
+    kind:      u32;        
+    timestamp: u32;    
+    windowID:  u32;     
+    state:     u8;        
+    repeat:    u8;        
+    padding2:  u8;
+    padding3:  u8;
+    keysym:    SDL_Keysym;  
+} as SDL_KeyboardEvent;
+
+type union {
+    kind:   u32;
+    key:    SDL_KeyboardEvent;
+    _data:  u8[56];
+} as SDL_Event;
+
+type u64 as SDL_Renderer;
+
+type struct {
+    rect:        SDL_Rect;
+    rectColor:   SDL_Color;
+    border:      SDL_Rect;
+    borderColor: SDL_Color;
+} as Cell;
+
+type struct {
+    rect:             SDL_Rect;
+    backgroundColor:  SDL_Color;
+    border:           u32;
+    borderColor:      SDL_Color;
+    xCells:           i32;
+    yCells:           i32;
+    cellsBorder:      u32;
+    cellsBorderColor: SDL_Color;
+    cells:            Cell[GRID_MAX_X_CELLS][GRID_MAX_Y_CELLS];
+} as Grid;
+
+type enum {
+    SDL_QUIT    = 0x100,
+    SDL_KEYDOWN = 0x300,
+} as SDL_EventType;
+
+type enum {
+    SDLK_ESCAPE = 0x1b,
+    SDLK_RIGHT  = 1073741903,
+    SDLK_LEFT   = 1073741904
+} as SDL_KeyCode;
+
+pub fn get_max_x_cells(): i32 {
+    return GRID_MAX_X_CELLS as i32;
+}
+
+pub fn get_max_y_cells(): i32 {
+    return GRID_MAX_Y_CELLS as i32;
+}
+
+pub fn set_color_gray(color: SDL_Color*) {
+    color.r = 100u8;
+    color.g = 100u8;
+    color.b = 100u8;
+    color.a = 255u8;
+}
+
+pub fn set_color_dark_gray(color: SDL_Color*) {
+    color.r = 30u8;
+    color.g = 30u8;
+    color.b = 30u8;
+    color.a = 255u8;
+}
+
+pub fn set_color_red(color: SDL_Color*) {
+    color.r = 255u8;
+    color.g = 0u8;
+    color.b = 0u8;
+    color.a = 255u8;
+}
+
+pub fn max(x: i32, y: i32): i32 {
+    return x >= y ? x : y;
+}
+
+pub fn min(x: i32, y: i32): i32 {
+    return x >= y ? y : x;
+}
+
+pub fn Game_start(renderer: SDL_Renderer*, w: i32, h: i32): i32 {
+    // Init grid
+    let grid: Grid;
+    // Set grid dimensions
+    let margin: i32 = 50;
+    grid.rect.w = min(w - margin * 2, h - margin * 2);
+    grid.rect.h = grid.rect.w;
+
+    // Set grid backgroud
+    set_color_dark_gray(&grid.backgroundColor);
+
+    // Set grid border thickness and color
+    grid.border = 3;
+    set_color_gray(&grid.borderColor);
+
+    // Set number of cells
+    grid.xCells = 10;
+    grid.yCells = 10;
+
+    // Set cells border thickness and color
+    grid.cellsBorder = grid.border;
+    set_color_gray(&grid.cellsBorderColor);
+
+    // Ajust size and center
+    Grid_ajustSize(&grid);
+    Grid_alignCenter(&grid, w, h);
+
+    if (!Grid_init(&grid)) {
+        return 0;
+    }
+
+    // Initialize framerate manager : 30 FPS
+    let fpsmanager: FPSmanager;
+    SDL_initFramerate(&fpsmanager);
+    SDL_setFramerate(&fpsmanager, 30);
+
+    // Initialize start time (in ms)
+    let last: i64 = Utils_time();
+
+    // Falling brick coordinates
+    let fallingBrickX: i32 = grid.xCells / 2;
+    let fallingBrickY: i32 = -1;
+    let fallingBrickSpeed: i32 = 4;
+
+    // Event loop exit flag
+    let quit: i32 = 0;
+
+    // Event loop
+    while (!quit) {
+        let e: SDL_Event;
+        // Get available event
+        while (SDL_PollEvent(&e)) {
+            // User requests quit
+            if (e.kind == SDL_QUIT) {
+                quit = 1;
+                break;
+            }
+            elif (e.kind == SDL_KEYDOWN) {
+                //printf("key: %d\n", (e.key.keysym.sym) as i32);
+                //printf("SDLK_R: %d\n", (SDLK_RIGHT) as i32);
+                if (e.key.keysym.sym == (SDLK_ESCAPE as i32)) {
+                    quit = 1;
+                }
+                elif (e.key.keysym.sym == (SDLK_RIGHT as i32)) {
+                    if (fallingBrickY != -1 && fallingBrickX < grid.xCells - 1) {
+                        // Un-color last position
+                        memcpy(
+                            (u8*)&grid.cells[fallingBrickX][fallingBrickY].rectColor,
+                            (u8*)&grid.backgroundColor,
+                            sizeof(SDL_Color)
+                        );
+                        // Color new position
+                        fallingBrickX = fallingBrickX + 1;
+                        set_color_red(&grid.cells[fallingBrickX][fallingBrickY].rectColor);
+                    }
+                }
+                elif (e.key.keysym.sym == (SDLK_LEFT as i32)) { 
+                    if (fallingBrickY != -1 && fallingBrickX > 0) {
+                        // Un-color last position
+                        memcpy(
+                            (u8*)&grid.cells[fallingBrickX][fallingBrickY].rectColor,
+                            (u8*)&grid.backgroundColor,
+                            sizeof(SDL_Color)
+                        );
+                        // Color new position
+                        fallingBrickX = fallingBrickX - 1;
+                        set_color_red(&grid.cells[fallingBrickX][fallingBrickY].rectColor);
+                    }
+                }
+            }
+        }
+        // Move the falling brick
+        let val__2: i64 = (i64)(Utils_time());
+        if ((val__2 - last) >= (1000 / fallingBrickSpeed)) {
+            if (fallingBrickY >= 0) {
+                // Un-color the falling brick last position
+                memcpy(
+                    (u8*)&grid.cells[fallingBrickX][fallingBrickY].rectColor,
+                    (u8*)&grid.backgroundColor,
+                    sizeof(SDL_Color)
+                );
+            }
+            if (fallingBrickY < grid.yCells - 1) {
+                // Go to next position
+                fallingBrickY = fallingBrickY + 1;
+
+                // Color the falling brick new position
+                set_color_red(&grid.cells[fallingBrickX][fallingBrickY].rectColor);
+            }
+            else {
+                // Reset position
+                fallingBrickY = -1;
+            }
+            last = Utils_time();
+        }
+
+        // Set background color
+        let __c: SDL_Color;
+        set_color_dark_gray(&__c);
+        Utils_setBackgroundColor(renderer, &__c);
+
+        // Render grid
+        Grid_render(&grid, renderer);
+
+        // Show message
+        stringRGBA(renderer, grid.rect.x + grid.xCells, grid.rect.y - 20,
+                   "This is a falling brick < Press RIGTH and LEFT to move >",
+                   200u8, 200u8, 200u8, 255u8);
+
+        // Update screen
+        SDL_RenderPresent(renderer);
+
+        // Delay
+        SDL_framerateDelay(&fpsmanager);
+    }
+    return 1;
+}
+
+fn Grid_ajustSize(grid: Grid*): i32 {
+    if (!grid.rect.w || !grid.rect.h || !grid.xCells || !grid.yCells) {
+        return 0;
+    }
+    // Init rect
+    let interspaceWidth: i32 = (i32)(grid.xCells * grid.cellsBorder * 2);
+    grid.rect.w = grid.rect.w - ((grid.rect.w - (grid.border * 2) - interspaceWidth) % grid.xCells);
+
+    let interspaceHeigth: i32 = (i32)(grid.yCells * grid.cellsBorder * 2);
+    grid.rect.h = grid.rect.h - ((grid.rect.h - (grid.border * 2) - interspaceHeigth) % grid.yCells);
+    return 1;
+}
+
+fn Grid_alignCenter(grid: Grid*, screenWidth: i32, screenHeight: i32) {
+    grid.rect.x = (screenWidth - grid.rect.w) / 2;
+    grid.rect.y = (screenHeight - grid.rect.h) / 2;
+}
+
+fn Grid_init(grid: Grid*): i32 {
+    if (!grid.rect.w || !grid.rect.h || !grid.xCells || !grid.yCells) {
+        return 0;
+    }
+
+    if (grid.xCells > get_max_x_cells() || grid.yCells > get_max_y_cells()) {
+        return 0;
+    }
+
+    // Init all cells
+    for (let i: i32 = 0; i < grid.xCells; i = i + 1) {
+        for (let j: i32 = 0; j < grid.yCells; j = j + 1) {
+            Grid_initCell(grid,
+                          &(grid.cells[i][j]),
+                          i, j,
+                          &grid.backgroundColor,
+                          &grid.cellsBorderColor);
+        }
+    }
+    return 1;
+}
+
+fn Grid_initCell(grid: Grid*, cell: Cell*, i: i32, j: i32, color: SDL_Color*, borderColor: SDL_Color*) {
+    // Init rect
+    let interspaceWidth: u32 = grid.xCells * grid.cellsBorder * 2;
+    cell.rect.w = (grid.rect.w - (grid.border * 2) - interspaceWidth) / grid.xCells;
+
+    let interspaceHeigth: u32 = grid.yCells * grid.cellsBorder * 2;
+    cell.rect.h = (grid.rect.h - (grid.border * 2) - interspaceHeigth) / grid.yCells;
+
+    cell.rect.x = grid.rect.x + grid.border + grid.cellsBorder + (grid.cellsBorder * 2 + cell.rect.w) * i;
+    cell.rect.y = grid.rect.y + grid.border + grid.cellsBorder + (grid.cellsBorder * 2 + cell.rect.h) * j;
+
+    // Init rectColor
+    memcpy((u8*)&cell.rectColor, (u8*)color, sizeof(SDL_Color));
+
+    // Init border
+    cell.border.w = cell.rect.w + grid.cellsBorder * 2;
+    cell.border.h = cell.rect.h + grid.cellsBorder * 2;
+    cell.border.x = cell.rect.x - grid.cellsBorder;
+    cell.border.y = cell.rect.y - grid.cellsBorder;
+
+    // Init borderColor
+    memcpy((u8*)&cell.borderColor, (u8*)borderColor, sizeof(SDL_Color));
+}
+
+fn Grid_render(grid: Grid*, renderer: SDL_Renderer*) {
+    // Grid border thickness different from 0
+    if (grid.border != 0) {
+        // Set renderer color to draw the grid border
+        SDL_SetRenderDrawColor(renderer,
+                               grid.borderColor.r,
+                               grid.borderColor.g,
+                               grid.borderColor.b,
+                               grid.borderColor.a);
+        // Render grid border
+        SDL_RenderFillRect(renderer, &(grid.rect));
+    }
+    // Render all cells
+    for (let i: i32 = 0; i < grid.xCells; i = i + 1) {
+        for (let j: i32 = 0; j < grid.yCells; j = j + 1) {
+            Grid_renderCell(&(grid.cells[i][j]), renderer);
+        }
+    }
+}
+
+fn Grid_renderCell(cell: Cell*, renderer: SDL_Renderer*) {
+    // Cells border thickness different from 0
+    if (cell.border.x != cell.rect.x) {
+        // Set renderer color to cell color
+        SDL_SetRenderDrawColor(renderer,
+                               cell.borderColor.r,
+                               cell.borderColor.g,
+                               cell.borderColor.b,
+                               cell.borderColor.a);
+        // Render filled cell
+        SDL_RenderFillRect(renderer, &(cell.border));
+    }
+    // Set renderer color to cell color
+    SDL_SetRenderDrawColor(renderer,
+                           cell.rectColor.r,
+                           cell.rectColor.g,
+                           cell.rectColor.b,
+                           cell.rectColor.a);
+    // Render filled cell
+    SDL_RenderFillRect(renderer, &(cell.rect));
+}
+
+fn ext exit(c: i32);
+fn ext printf(p: u8*, x: i64);
+fn ext memcpy(dst: u8*, src: u8*, size: u64);
+
+fn ext SDL_initFramerate(manager: FPSmanager*);
+fn ext SDL_setFramerate(manager: FPSmanager*, rate: u64);
+fn ext SDL_framerateDelay(manager: FPSmanager*);
+fn ext SDL_RenderFillRect(renderer: SDL_Renderer*, rect: SDL_Rect*);
+fn ext SDL_SetRenderDrawColor(renderer: SDL_Renderer*, r: u8, g: u8, b: u8, a: u8);
+fn ext SDL_PollEvent(event: SDL_Event*): i32;
+fn ext SDL_RenderPresent(renderer: SDL_Renderer*);
+
+fn ext stringRGBA(renderer: SDL_Renderer*, x: u32, y: u32, t: u8*, r: u8, g: u8, b: u8, a: u8);
+
+fn ext Utils_setBackgroundColor(renderer: SDL_Renderer*, color: SDL_Color*);
+fn ext Utils_time(): i64;
