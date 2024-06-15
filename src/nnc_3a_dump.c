@@ -338,6 +338,8 @@ void nnc_dump_3a_proc(const nnc_3a_proc* unit) {
     dump_3a("\n@_%s: (%lu=%d%%)\n", unit->name, unit->stat.reduced,
         (nnc_i32)(unit->stat.percent * 100));
     nnc_dump_3a_quads(unit->quads);
+    nnc_map_iter(unit->lr_cgt, nnc_dump_3a_lr_cgt);
+    nnc_map_iter(unit->lr_var, nnc_dump_3a_lr_var);
 }
 
 void nnc_dump_3a_code(const nnc_3a_code code) {

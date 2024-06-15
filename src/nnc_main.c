@@ -152,8 +152,8 @@ nnc_static void nnc_verbose_show() {
         return;
     }
     fprintf(stderr, "You see this because you set --verbose option.\n");
-    fprintf(stderr, "- as (Assembler) shell string: %s\n", glob_verbose.as_params);
-    fprintf(stderr, "- ld (Linker)    shell string: %s\n", glob_verbose.ld_params);
+    //fprintf(stderr, "- as (Assembler) shell string: %s\n", glob_verbose.as_params);
+    fprintf(stderr, "- ld (Linker) shell string: %s\n", glob_verbose.ld_params);
     fprintf(stderr, "---------------------\n");
     fprintf(stderr, "Source files (*.nnc | *.source):\n");
     for (nnc_u64 i = 0; i < buf_len(glob_argv.sources); i++) {
