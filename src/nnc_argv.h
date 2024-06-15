@@ -30,7 +30,6 @@
     "  --help                  Display this information\n"                                                      \
     "  --gen-debug             Generates debug symbols when assembling.\n"                                      \
     "  --compile               Compile only; do not assemble or link \n"                                        \
-    "  --no-opt                Disable peephole optimizations.\n"                                               \
     "  --output <file>         Set path for output file\n"                                                      \
     "  --dump-ast              Display abstract syntax tree of the program.\n"                                  \
     "  --dump-ir               Display intermediate representation of the program.\n"
