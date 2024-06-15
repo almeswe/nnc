@@ -6,7 +6,6 @@ nnc_verbose glob_verbose = {0};
 nnc_static nnc_option glob_nnc_opts[] = {
     { O_HELP,     "--help",      O_NO_ARG, &glob_argv.help,      true  },
     { O_VERBOSE,  "--verbose",   O_NO_ARG, &glob_argv.verbose,   true  },
-    { O_OPTIMIZE, "--no-opt",    O_NO_ARG, &glob_argv.optimize,  false },
     { O_COMPILE,  "-c",          O_NO_ARG, &glob_argv.compile,   true  },
     { O_COMPILE,  "--compile",   O_NO_ARG, &glob_argv.compile,   true  },
     { O_DEBUG,    "-g",          O_NO_ARG, &glob_argv.gen_debug, true  },
@@ -98,7 +97,7 @@ void nnc_glob_argv_init(nnc_i32 argc, char* const* argv) {
     glob_argv = (nnc_argv) {
         .help      = false,
         .verbose   = false,
-        .optimize  = true,
+        .optimize  = false,
         .compile   = false,
         .gen_debug = false,
         .dump_ir   = false,
