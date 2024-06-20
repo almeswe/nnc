@@ -13,6 +13,7 @@ You can easily build this with CMake, see how:</br>
 ```
 git clone https://github.com/almeswe/nnc.git
 mkdir nnc/src/build && cd nnc/src/build
+as --64 ../nnc_rt.s -o rt.o
 cmake .. && make -j
 ```
 You can also select build version (`Debug` or `Release`) in CMakeLists.txt file.<br>
@@ -26,7 +27,7 @@ Current version of this project uses automated black-box tests located at [`./py
 These tests ensure general correctness of the generation, and represent robust way to test compilers. (based on [`this`](https://github.com/c-testsuite/c-testsuite)).<br>
 You can run these tests using following command from `.../nnc/py_test` folder:<br>
 ```
-python nnc_gen_test.py ./tests
+python nnc_gen_test.py tests
 ```
 Don't waste your time on [`./tests`](./tests).<br> 
 
